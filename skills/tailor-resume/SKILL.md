@@ -82,9 +82,12 @@ sections:
     filter: [{company-slug}, general, all]  # tag-based filtering
     max: 4                                   # limit to most relevant
   - type: oss
+    filter: [{company-slug}, general, all]  # filter 필수 — 없으면 general_md 등 모든 태그 노출
   - type: sideProjects
     filter: [{company-slug}, general, all]
 ```
+
+**OSS 섹션 filter 주의**: filter 없이 `- type: oss`만 쓰면 `general_md` 태그 항목(bold 마크다운 포함)이 함께 노출된다. 마크다운 렌더링이 안 되는 레이아웃에서는 `**text**`가 raw로 보임. 반드시 filter를 지정할 것.
 
 If existing tags (general, toss) already cover what's needed, reuse them. Only add new tags to master.yaml bullets if absolutely necessary for filtering.
 
@@ -96,27 +99,64 @@ highlight_bullets: default
 
 ### Step 6: Verify Layout
 
-Build the PDF to check page layout:
-```bash
-npx zx <skill-dir>/scripts/groupby-api.mjs --slug=resume-{company-slug} --career-slug=career-{company-slug} --no-career
+**6-1. Build PDFs** (dev server must be running at localhost:5173):
+```javascript
+// Playwright headless로 PDF 생성
+const { chromium } = require('playwright');
+const browser = await chromium.launch();
+const page = await browser.newPage();
+
+await page.goto('http://localhost:5173/cv/resume-{company-slug}', { waitUntil: 'networkidle' });
+await page.pdf({ path: 'cv/output/resume-{company-slug}.pdf', format: 'A4', printBackground: true });
+
+await page.goto('http://localhost:5173/cv/career-{company-slug}', { waitUntil: 'networkidle' });
+await page.pdf({ path: 'cv/output/career-{company-slug}.pdf', format: 'A4', printBackground: true });
+await browser.close();
 ```
 
-Or to include career description:
-```bash
-npx zx <skill-dir>/scripts/groupby-api.mjs --slug=resume-{company-slug} --career-slug=career-{company-slug}
+Merge into combined.pdf:
+```python
+from pypdf import PdfWriter, PdfReader
+w = PdfWriter()
+for f in ['cv/output/resume-{slug}.pdf', 'cv/output/career-{slug}.pdf']:
+    for p in PdfReader(f).pages:
+        w.add_page(p)
+w.write('cv/output/combined.pdf')
 ```
+
+**6-2. 1페이지 검증** — 반드시 print media 에뮬레이션으로 확인:
+```javascript
+const page = await browser.newPage({ viewport: { width: 794, height: 1123 } }); // A4 96dpi
+await page.emulateMedia({ media: 'print' });
+await page.goto('http://localhost:5173/cv/resume-{company-slug}', { waitUntil: 'networkidle' });
+
+const height = await page.evaluate(() => document.documentElement.scrollHeight);
+// height > 1123이면 overflow — sections 조정 필요
+```
+
+**주의**: viewport scrollHeight (media: 'screen')는 print layout과 다르다. 반드시 `emulateMedia({ media: 'print' })`로 확인할 것.
+
+**6-3. 시각적 확인** — 스크린샷을 찍어서 직접 확인:
+```javascript
+await page.screenshot({ path: 'cv/output/resume-check.png', fullPage: true });
+```
+Read 도구로 스크린샷을 열어 레이아웃, bold 렌더링, 텍스트 깨짐 등을 확인한다.
 
 Check that:
 - Resume fits on 1 page (A4) without excessive whitespace
 - Career description sections break at logical points
 - No orphaned headers at page bottoms
+- `**bold**` 마크다운이 raw로 노출되지 않는지 확인
+- 콘텐츠가 잘리거나 겹치지 않는지 확인
 
 ### Step 7: Evaluate with Groupby
 
 Run both evaluations (팩폭 + 합격률 예측) in one command:
 ```bash
-npx zx <skill-dir>/scripts/groupby-api.mjs --mode=both --job-url="{posting-url}" --slug=resume-{company-slug} --career-slug=career-{company-slug}
+npx zx <skill-dir>/scripts/groupby-api.mjs both cv/output/combined.pdf "{posting-url}"
 ```
+
+Script uses **positional args**: `<mode> <pdf-path> <job-url>`. Modes: `improve` (팩폭), `job-match` (합격률), `both`.
 
 Review the results:
 - **합격률 예측**: Aim for 90+ score, check which requirements are "충족" vs "부족"
@@ -163,6 +203,15 @@ Titles must show **역량 영역**, not task lists.
 - **개선 사항**: Bold 전부 제거
 - **적용 결과**: 여기서만 성과/수치를 Bold
 - 동사("구현하여", "도입하고")에 Bold 금지
+
+### No Activity Counts (summary/highlight)
+
+summary_text, highlight_bullets_text에 활동 카운트를 넣지 않는다. 임팩트 수치만 허용.
+- Bad: "laravel-mix 12 PRs merged, 23개 오픈소스에 직접 기여"
+- Good: "laravel-mix·Astro·SWC 등 오픈소스 코어에 직접 기여"
+- Bad: "23개 오픈소스 프로젝트에 소스 분석 후 PR로 직접 기여"
+- Good: "Astro·SWC·Jotai 등 오픈소스 프로젝트에 소스 분석 후 PR로 직접 기여"
+- OK: 임팩트 수치 ("개발 시간 50% 단축", "UI 프리징 해소")
 
 ### Writing Style
 
