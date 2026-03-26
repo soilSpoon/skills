@@ -1,6 +1,6 @@
 {
   "name": "soilspoon-skills",
-  "description": "AI agent skills for resume tailoring and job application automation",
+  "description": "AI agent skills collection",
   "version": "1.0.0",
   "author": {
     "name": "Daehee Lee",
@@ -9,6 +9,7 @@
   "repository": "https://github.com/soilSpoon/skills",
   "license": "MIT",
   "skills": [
-    "./skills/tailor-resume/SKILL.md"
+    "./skills/tailor-resume/SKILL.md",
+    "./skills/fact-check/SKILL.md"
   ]
 }
