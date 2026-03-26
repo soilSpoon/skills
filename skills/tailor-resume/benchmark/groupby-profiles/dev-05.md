@@ -1,0 +1,333 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 5/13
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 기업에게 스카웃 제안 받고 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 조**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 신입
+                  - generic [ref=e95]: 백엔드 ‧ DevOps ‧ 인공지능 · 머신러닝 ‧ 데이터 엔지니어
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e99]:
+                - generic [ref=e100]: 🌱
+                - text: 성장 기록
+          - generic [ref=e102]:
+            - generic [ref=e103]: 자기소개
+            - generic [ref=e104]:
+              - generic [ref=e105]: 책임감이 강한
+              - generic [ref=e106]: 도전정신 강한
+              - generic [ref=e107]: 성장욕구 높은
+            - generic [ref=e109] [cursor=pointer]:
+              - generic [ref=e110]: 저는 현재 AI/ML 엔지니어 및 백엔드 엔지니어가 되고 싶은 지원자입니다. 이 업무를 하기 위해 네이버 부스트캠프에서 진행한 AI Tech 교육에 7기로 참여하였으며, Computer Vision 트랙에 참여해 컴퓨터 비전에 대한 다양한 개념들을 공부하고 Python과 PyTorch를 활용한 모델 개발 및 모델 강화를 진행했습니다. 또한 백엔드적 요소도 키우기 위해 FastAPI 및 Docker를 공부하여 적용해본 경험이 있으며, 최종 프로젝트 진행 시 백엔드를 맡아 프론트엔드와의 연결을 수행했고 그 외에도 실험 대기열 생성을 위한 Redis와 RabbitMQ를 공부하여 활용하였습니다. 이 처럼 처음 해보는 기술이라도 직접 공부하여 성장하려고 노력하는 모습을 보여줄 수 있으며, 제 자신이 성장하기 위해서는 힘든 것도 잊고 열심히 수행하고자 합니다. 팀원들과의 프로젝트 진행 시에는 수동적일 땐 수동적으로 필요한 업무를 빠른 시일 내에 완벽하게 마무리하고자 하고 의견을 적극적으로 내야 할 때는 의견을 적극적으로 내는 모습으로 수행하는 등 프로젝트 수행에 필요한 태도로 성실하게 임하고자 합니다. 팀원들과의 불화나 싸움이 일어나지 않도록 중재하며 프로젝트를 리드하고자 프로젝트 리더를 맡아서 진행해본 경험이 있으며, 의견을 수용하여 팀에게 도움이 되는 의견으로 만들고자 노력하였고 이에 프로젝트 성과가 점점 좋아지는 결과를 얻은 경험이 있습니다. 이러한 경험과 태도를 바탕으로 앞으로도 AI 업계나 프로그래밍 업계에서 백엔드를 개발하고, 파이프라인을 구성하여 최종 제품을 고객들에게 제공해줄 수 있는 엔지니어가 되고 싶습니다.
+              - text: ... 더보기
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: 스타트업에 기대하는 점
+              - generic [ref=e114]:
+                - generic [ref=e115]: 새로운 일에 도전
+                - generic [ref=e116]: 효율적인 업무 과정
+                - generic [ref=e117]: 수평적 관계
+              - generic [ref=e119] [cursor=pointer]:
+                - generic [ref=e120]: 저는 새로운 도전과 혁신을 추구하는 스타트업에서 일하고 싶습니다. 특히 AI/딥러닝 분야에서 끊임없이 발전하는 기술을 배우고 적용하면서, 실제 비즈니스 가치를 창출하는 과정에 참여하고 싶습니다. 제가 기대하는 스타트업은 수평적인 조직 문화 속에서 자유롭게 의견을 나누고, 서로의 전문성을 인정하며 협업하는 곳입니다. CV 프로젝트와 MLOps 경험을 통해 배운 것처럼, 효율적인 업무 프로세스와 자동화된 시스템을 구축하여 팀원 모두가 핵심 업무에 집중할 수 있는 환경을 만들어가고 싶습니다. 또한 실패를 두려워하지 않고 빠르게 시도하고 개선하는 문화, 그리고 이 과정에서 얻은 인사이트를 팀원들과 공유하며 함께 성장할 수 있는 환경을 기대합니다. 기술적 도전과 비즈니스적 가치 창출이 조화롭게 이루어지는 스타트업에서, 제 기술력과 열정을 마음껏 발휘하고 싶습니다.
+                - text: ... 더보기
+            - generic [ref=e122]:
+              - generic [ref=e123]: 경력
+              - generic [ref=e125]:
+                - generic [ref=e126]:
+                  - generic [ref=e127]:
+                    - generic [ref=e129]:
+                      - img [ref=e131]
+                      - img "/company-placeholder.svg" [ref=e132]
+                    - generic [ref=e133]:
+                      - generic [ref=e135]: 소프트웨어 중소기업
+                      - generic [ref=e136]: 제조솔루션사업부 MES 프로그램 구축 / 스마트팩토리
+                      - generic [ref=e137]: B2B ‧ 제조
+                  - generic [ref=e138]: 2022. 03 - 2024. 07 ‧ 2년 5개월
+                - generic [ref=e139]:
+                  - generic [ref=e141]:
+                    - generic [ref=e143]: C#
+                    - generic [ref=e145]: MSSQL
+                    - generic [ref=e147]: Android
+                  - generic [ref=e148] [cursor=pointer]:
+                    - generic [ref=e149]: 1. C#, .Net Framework를 활용한 제조 자동화 시스템 (MES) 구축 2. 물류, 출하, 기준정보 등 프로세스 화면 개발 및 MSSQL을 활용한 데이터베이스 정보 관리 3. Android를 활용한 PDA 개발 및 생산 현장 POP 화면 개발 4. 사용자 프로그램 교육 및 유지보수 업무 담당
+                    - text: ... 더보기
+              - generic [ref=e151]:
+                - generic [ref=e152]:
+                  - generic [ref=e153]:
+                    - generic [ref=e155]:
+                      - img [ref=e157]
+                      - img "/company-placeholder.svg" [ref=e158]
+                    - generic [ref=e159]:
+                      - generic [ref=e161]: OO대학교
+                      - generic [ref=e162]: 산업경영공학과 소속 조교
+                      - generic [ref=e163]: 교육
+                  - generic [ref=e164]: 2021. 03 - 2022. 02 ‧ 1년
+                - generic [ref=e165]:
+                  - generic [ref=e167]:
+                    - generic [ref=e169]: OracleDB
+                    - generic [ref=e171]: Adobe Premiere Pro
+                    - generic [ref=e173]: Microsoft Excel
+                    - generic [ref=e175]: PowerPoint
+                  - generic [ref=e177]: 1. Oracle을 활용한 학생 데이터베이스를 활용한 수업 출결 및 정보 관리 2. Microsoft Server를 활용한 학과 홈페이지 서버 관리 및 유지보수 3. 학교 물품 관리 및 컴퓨터 등 자재 물품 유지보수 관리 업무
+            - generic [ref=e179]:
+              - generic [ref=e180]: 직무 관련 활동
+              - generic [ref=e181]:
+                - generic [ref=e182]: 💡
+                - generic [ref=e183]:
+                  - generic [ref=e184]:
+                    - generic [ref=e185]:
+                      - generic [ref=e186]: SummarAI
+                      - generic [ref=e187]: 2025. 01
+                    - generic [ref=e189]:
+                      - generic [ref=e191]: Python
+                      - generic [ref=e193]: FastAPI
+                      - generic [ref=e195]: PostgreSQL
+                      - generic [ref=e197]: Pytorch
+                  - generic [ref=e199] [cursor=pointer]:
+                    - generic [ref=e200]: 1. RAG과 네이버 Clova Studio를 활용한 LLM Agent 개발 및 프롬프트 엔지니어링 수행 2. 질문의 질을 향상시켜 더 정확한 답을 추출하기 위해 Subquery와 Reranking 작업 수행 3. FastAPI 및 네이버 API를 활용하여 4개로 분할된 GPU를 연결하여 Frontend에서 요청이 오면 API로 분배하여 각각의 작업 수행하도록 분할 4. Backend 구축을 통한 Frontend 기능 수행 연결
+                    - text: ... 더보기
+              - generic [ref=e201]:
+                - generic [ref=e202]: 💡
+                - generic [ref=e203]:
+                  - generic [ref=e204]:
+                    - generic [ref=e205]:
+                      - generic [ref=e206]: Handbone X-Ray Dataset Segmentation Task
+                      - generic [ref=e207]: 2024. 11- 2024. 11 ‧ 1개월
+                    - generic [ref=e209]:
+                      - generic [ref=e211]: Python
+                      - generic [ref=e213]: Pytorch
+                      - generic [ref=e215]: Github
+                      - generic [ref=e217]: Notion
+                  - generic [ref=e219] [cursor=pointer]:
+                    - generic [ref=e220]: "1. SMP Library Encoder Backbone 변경 및 구조 변경을 통한 성능 향상 (dice score : 0.9299 -> 0.9639) 2. 기본 Model 선정(Unet++) 및 Mixed Precision을 활용한 GPU 한계를 극복하여 성능 향상 (모델 변경을 통한 성능 향상 [dice score : 0.9639 -> 0.9722], GPU 사용량 약 20% 이상 감소) 3. Notion API Key를 활용한 GPU 사용 실시간 추적 기능 추가 4. 전체 24개의 팀 중에서 1등 달성"
+                    - text: ... 더보기
+              - generic [ref=e221]:
+                - generic [ref=e222]: 💡
+                - generic [ref=e223]:
+                  - generic [ref=e224]:
+                    - generic [ref=e225]:
+                      - generic [ref=e226]: SumClip
+                      - generic [ref=e227]: 2024. 12- 2025. 01 ‧ 2개월
+                    - generic [ref=e229]:
+                      - generic [ref=e231]: FastAPI
+                      - generic [ref=e233]: PostgreSQL
+                      - generic [ref=e235]: Github
+                      - generic [ref=e237]: Notion
+                  - generic [ref=e239] [cursor=pointer]:
+                    - generic [ref=e240]: 1. FastAPI를 활용하여 모델 실행을 프론트엔드에서 백엔드 서버로 연결하여 비동기적으로 실행할 수 있도록 설계 및 적용 2. 프로그램 사용에 필요한 데이터를 저장하기 위해 PostgreSQL과 FastAPI 연동 작업 3. 기본 CRUD 작성 및 데이터 관리
+                    - text: ... 더보기
+              - generic [ref=e241]:
+                - generic [ref=e242]: 💡
+                - generic [ref=e243]:
+                  - generic [ref=e244]:
+                    - generic [ref=e245]:
+                      - generic [ref=e246]: 다국어 영수증 탐지 OCR
+                      - generic [ref=e247]: 2024. 10- 2024. 10 ‧ 1개월
+                    - generic [ref=e249]:
+                      - generic [ref=e251]: Python
+                      - generic [ref=e253]: Pytorch
+                      - generic [ref=e255]: Github
+                      - generic [ref=e257]: Notion
+                  - generic [ref=e259] [cursor=pointer]:
+                    - generic [ref=e260]: 1. 기본 베이스라인 코드 작성을 통한 조원 실험 진행의 편의성 제공 2. 학습 속도 향상을 위한 pickle 데이터셋 변환 (학습 속도 에폭 당 4분 -> 에폭 당 1분으로 감소) 3. 외부 데이터 조사 및 크롤링을 통해 train 데이터셋의 개수 증가 (기존 400개의 데이터 -> 800개의 데이터) 4. CVAT를 통한 불필요한 이상치 제거 후 BBox 재정의로 성능 향상 (f1 score 0.7834 -> 0.8479)
+                    - text: ... 더보기
+              - generic [ref=e261]:
+                - generic [ref=e262]: 💡
+                - generic [ref=e263]:
+                  - generic [ref=e264]:
+                    - generic [ref=e265]:
+                      - generic [ref=e266]: 쓰레기 종류별 Object Detection
+                      - generic [ref=e267]: 2024. 10- 2024. 10 ‧ 1개월
+                    - generic [ref=e269]:
+                      - generic [ref=e271]: Python
+                      - generic [ref=e273]: Pytorch
+                      - generic [ref=e275]: Github
+                      - generic [ref=e277]: Notion
+                  - generic [ref=e280] [cursor=pointer]:
+                    - generic [ref=e281]: "1. mmdetection 베이스라인 코드에 mmyolo를 이식하여 실험이 빠르고 성능이 준수한 yolov8 모델 이식을 통해 앙상블의 다양성 확보 2.클러스터링 기반의 앵커 박스추출을 통해 최적의 앵커 박스 추출 (모델 별 앵커 박스 추출을 통한 성능 향상, mAP50 : 0.4179 -> 0.4863) 3. yolov8에 swin-transformer backbone으로 변경하여 성능 향상 (mAP50 : 0.4557 -> 0.6178) 4. Data Versioning을 통한 빠른 학습 및 성능 확인 진행 (Data 분할을 통한 최적의 실험 흐름 도출)"
+                    - text: ... 더보기
+              - generic [ref=e282]:
+                - generic [ref=e283]: 💡
+                - generic [ref=e284]:
+                  - generic [ref=e285]:
+                    - generic [ref=e286]:
+                      - generic [ref=e287]: Sketch Image Classification
+                      - generic [ref=e288]: 2024. 09- 2024. 09 ‧ 1개월
+                    - generic [ref=e290]:
+                      - generic [ref=e292]: Python
+                      - generic [ref=e294]: RabbitMQ
+                      - generic [ref=e296]: Redis
+                      - generic [ref=e298]: Pytorch
+                      - generic [ref=e300]: Github
+                      - generic [ref=e302]: Notion
+                  - generic [ref=e305] [cursor=pointer]:
+                    - generic [ref=e306]: "1. Redis & RabbitMQ를 활용한 백엔드 작업 대기열 프로그램 개발, 실험 자동화 프로세스 구축 2. Hugging Face 모델과 가중치를 바로 load하여 적용할 수 있도록 모델 구조 설계 3. 클래스별 이미지 데이터가 적어 Flip, Rotate, Cutmix와 같은 Augmentation 기법으로 성능 향상 (Accuracy : 0.7670 -> 0.8030) 4. Wandb logging과 sweep 기능을 활용하여 실험 기록 추적 및 하이퍼파라미터 값 최적화"
+                    - text: ... 더보기
+              - generic [ref=e307]:
+                - generic [ref=e308]: 💡
+                - generic [ref=e309]:
+                  - generic [ref=e310]:
+                    - generic [ref=e311]:
+                      - generic [ref=e312]: 스마트팩토리 MES 프로그램 개발
+                      - generic [ref=e313]: 2022. 03- 2024. 07 ‧ 2년 5개월
+                    - generic [ref=e315]:
+                      - generic [ref=e317]: C#
+                      - generic [ref=e319]: MSSQL
+                      - generic [ref=e321]: Android
+                      - generic [ref=e323]: .Net
+                  - generic [ref=e325] [cursor=pointer]:
+                    - generic [ref=e326]: 1. 공장 요청사항 및 화면 요구사항에 대한 List-up 및 TODO List 작성 2. C#, .Net을 활용한 물류, 생산, 수입검사등록, 기준정보, 모니터링 등 다양한 모듈 개발 3. MSSQL을 활용한 Stored Procedure 작성 4. 출하 및 재고이동용 Android PDA 개발 및 유지보수 5. 현장 작업자들 사용을 위한 POP 개발을 통한 제품 설계도 직접 확인 가능, 실적 등록의 간편화 6. 현장 H/W 설치 및 소프트웨어 호환성 문제 해결 7. MES 프로그램 고도화 작업 진행
+                    - text: ... 더보기
+            - generic [ref=e328]:
+              - generic [ref=e329]: 학력
+              - generic [ref=e330]:
+                - generic [ref=e332]:
+                  - img [ref=e334]
+                  - img "/college-placeholder.svg" [ref=e335]
+                - generic [ref=e337]:
+                  - generic [ref=e338]:
+                    - generic [ref=e339]:
+                      - generic [ref=e340]: OO대학교
+                      - generic [ref=e341]: 학사
+                    - generic [ref=e343]: 산업공학과
+                  - generic [ref=e344]:
+                    - generic [ref=e345]: 2015 - 2020 ‧
+                    - generic [ref=e346]: 졸업
+            - generic [ref=e348]:
+              - generic [ref=e349]: 외국어 능력
+              - generic [ref=e352]:
+                - generic [ref=e353]:
+                  - generic [ref=e354]: 영어
+                  - generic [ref=e356]: 비즈니스 회화
+                - generic [ref=e357]: OPIC Intermediate High, TOEIC 890 취득 경험
+            - generic [ref=e359]:
+              - generic [ref=e360]: 관심 스킬
+              - generic [ref=e361]:
+                - generic [ref=e363]: C#
+                - generic [ref=e365]: Python
+                - generic [ref=e367]: FastAPI
+                - generic [ref=e369]: MSSQL
+                - generic [ref=e371]: PostgreSQL
+                - generic [ref=e373]: Pytorch
+                - generic [ref=e375]: Docker
+                - generic [ref=e377]: Github
+                - generic [ref=e379]: SQL
+                - generic [ref=e381]: .Net
+            - generic [ref=e382]:
+              - generic [ref=e383]: 인재 배지
+              - generic [ref=e385]:
+                - generic [ref=e386]:
+                  - img "성장 기록" [ref=e389]
+                  - generic [ref=e390]:
+                    - generic [ref=e391]:
+                      - generic [ref=e392]: 성장 기록
+                      - generic [ref=e393]:
+                        - generic [ref=e394]: 자기주도성
+                        - generic [ref=e395]: 실무 능력
+                    - generic [ref=e396]:
+                      - img [ref=e397]
+                      - generic [ref=e399]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                - generic [ref=e401]:
+                  - generic [ref=e402]: 기록을 꾸준히 작성하는 이유는 무엇인가요?
+                  - generic [ref=e404]: 제가 공부하는 것들을 나중에 다시 확인하고, 실무에서 사용할 때 이런 부분들을 참고해서 코드를 작성하거나 유지보수, Refactor할 수 있을 것 같아서 기록합니다. 공부를 한 것을 기록하면 오랫동안 보고 기록하고 사용할 수 있기 때문입니다!
+            - generic [ref=e407]:
+              - generic [ref=e408]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e409] [cursor=pointer]:
+                - generic [ref=e410]:
+                  - generic [ref=e411]:
+                    - img [ref=e413]
+                    - img "kakao-login-button" [ref=e414]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e416]:
+        - generic [ref=e417]: 이력서 하이라이트
+        - generic [ref=e418]: 학습 경험을 통해 자신의 강점을 효과적으로 말하는 자소서
+        - generic [ref=e421]:
+          - generic [ref=e422]:
+            - generic [ref=e423]: 학습 경험을 통해 성장하는 태도와 의지 표현
+            - generic [ref=e424]:
+              - generic [ref=e425]: 📍 돋보이는 표현
+              - generic [ref=e426]: “이 처럼 처음 해보는 기술이라도 직접 공부하여 성장하려고 노력하는 모습을 보여줄 수 있으며, 제 자신이 성장하기 위해서는 힘든 것도 잊고 열심히 수행하고자 합니다. ”
+            - generic [ref=e427]:
+              - generic [ref=e428]: 📝 이렇게 쓰세요
+              - generic [ref=e429]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내
+          - generic [ref=e431]:
+            - generic [ref=e432]: 관심있는 도메인과 자신의 꿈 제시
+            - generic [ref=e433]:
+              - generic [ref=e434]: 📍 돋보이는 표현
+              - generic [ref=e435]: “로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 ”
+            - generic [ref=e437]:
+              - generic [ref=e438]: 📝 이렇게 쓰세요
+              - generic [ref=e439]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자
+          - generic [ref=e442]:
+            - generic [ref=e443]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e444] [cursor=pointer]:
+              - generic [ref=e445]:
+                - generic [ref=e446]:
+                  - img [ref=e448]
+                  - img "kakao-login-button" [ref=e449]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e450]
+  - button "그룹바이 상담 버튼" [ref=e452]:
+    - generic [ref=e453] [cursor=pointer]:
+      - generic [ref=e454]: 그룹바이 상담 버튼
+      - img [ref=e456]

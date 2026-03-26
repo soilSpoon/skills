@@ -1,0 +1,315 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "프로필" [ref=e14] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - heading "프로필" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - link [ref=e32] [cursor=pointer]:
+            - /url: /chat-rooms
+            - img [ref=e35]
+          - link "이대희 님" [ref=e37] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - generic [ref=e38]:
+              - img [ref=e39]
+              - generic [ref=e42]: 이대희 님
+              - img [ref=e43]
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]: 합격하는 이력서
+        - generic [ref=e49]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e50]:
+        - generic [ref=e52] [cursor=pointer]: 전체
+        - generic [ref=e54] [cursor=pointer]: 개발
+        - generic [ref=e56] [cursor=pointer]: 마케팅
+        - generic [ref=e58] [cursor=pointer]: 디자인
+        - generic [ref=e60] [cursor=pointer]: 기획
+        - generic [ref=e62] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e64] [cursor=pointer]: 사업개발
+        - generic [ref=e66] [cursor=pointer]: 경영지원
+        - generic [ref=e68] [cursor=pointer]: CX/CS
+    - generic [ref=e72]:
+      - generic [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic [ref=e76]: 이전
+      - generic [ref=e77]: 2/13
+      - generic [ref=e78] [cursor=pointer]:
+        - generic [ref=e79]: 다음
+        - img [ref=e80]
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e86]: 🏆 기업에게 스카웃 제안 받고 최종합격 했어요.
+        - generic [ref=e88]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e94]:
+                - img [ref=e96]
+                - img "유저아이콘" [ref=e97]
+              - generic [ref=e98]:
+                - generic [ref=e100]: 이**
+                - generic [ref=e101]:
+                  - generic [ref=e102]: 신입
+                  - generic [ref=e104]: 프론트엔드
+            - generic [ref=e105]:
+              - generic [ref=e592]:
+                - generic [ref=e593]: 🔥
+                - text: 적극 구직 중
+              - generic [ref=e106]:
+                - generic [ref=e107]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e112]:
+                - generic [ref=e113]: 🌱
+                - text: 성장 기록
+          - generic [ref=e117]:
+            - generic [ref=e118]: 자기소개
+            - generic [ref=e119]:
+              - generic [ref=e120]: 커뮤니케이션 잘하는
+              - generic [ref=e594]: 책임감이 강한
+              - generic [ref=e595]: 꼼꼼한
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: 알아서! 잘! 딱! 깔끔하고! 센스있게! 작은 오류까지 놓치지 않는 세심함으로 협업에 기여하는 주니어 프론트엔드 개발자 이OO입니다. - 문제의 본질을 빠르게 파악하고, 정확한 해결책을 제시하는 센스 - 프로젝트 개발 중 발생하는 이슈를 빠르게 분석하고 최적의 해결책 도출 - 주어진 기술 스택뿐만 아니라, 새로운 기술도 필요하면 빠르게 습득하여 적용 - 작은 오류도 놓치지 않는 세심함과 꼼꼼함 - 타입 에러까지 신경 쓰며 안정적인 코드 작성 - 코드의 유지보수성과 가독성을 고려한 리팩토링 진행 - 빠르고 정확한 업무 수행으로 팀 퍼포먼스 극대화 - 손이 빠르고 효율적인 업무 처리로 프로젝트 일정 준수 및 생산성 향상 - 맡은 일을 신속하게 마무리한 후, 팀원들의 업무를 적극 지원하여 원활한 협업 유도 - 책임감 있는 일정 관리와 원활한 협업 - Jira, Notion을 활용한 일정 관리로 맡은 업무를 기한 내 완수 - 백엔드, 디자이너와의 협업 경험을 통한 효과적인 커뮤니케이션
+              - text: ... 더보기
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - generic [ref=e128]: 스타트업에 기대하는 점
+              - generic [ref=e129]:
+                - generic [ref=e596]: 의견 제시에 수용적
+                - generic [ref=e597]: 주도성
+                - generic [ref=e598]: 직무 몰입도
+            - generic [ref=e599]:
+              - generic [ref=e600]: 경력
+              - generic [ref=e602]:
+                - generic [ref=e603]:
+                  - generic [ref=e604]:
+                    - generic [ref=e606]:
+                      - img [ref=e608]
+                      - img "/company-placeholder.svg" [ref=e609]
+                    - generic [ref=e610]:
+                      - generic [ref=e611]:
+                        - generic [ref=e612]: 여행 커뮤니티 스타트업
+                        - generic [ref=e613]: 스타트업
+                      - generic [ref=e614]: 프론트엔드
+                      - generic [ref=e615]: 여행 ‧ 소셜
+                  - generic [ref=e616]: 2024. 08 - 재직중 ‧ 1년 8개월
+                - generic [ref=e617]:
+                  - generic [ref=e618] [cursor=pointer]:
+                    - generic [ref=e619]:
+                      - generic [ref=e621]: JavaScript
+                      - generic [ref=e623]: TypeScript
+                      - generic [ref=e625]: GraphQL
+                      - generic [ref=e627]: NextJS
+                      - generic [ref=e629]: ReactJS
+                      - generic [ref=e631]: Storybook
+                      - generic [ref=e633]: Apollo
+                      - generic [ref=e635]: React-Native
+                      - generic [ref=e637]: Github
+                      - generic [ref=e639]: Github-Action
+                    - generic [ref=e640]: "+3"
+                  - generic [ref=e641] [cursor=pointer]:
+                    - generic [ref=e642]: "- 목표 - 숙박 서비스 플랫폼 백오피스 개발 - 게스트하우스 사장님을 위한 숙소/객실/파티 및 기타 프로그램 관리 기능 구축 - 담당 업무 - 공통 컴포넌트 개발 및 유지보수 - React Hook Form을 활용한 입력 폼 구현 및 검증 로직 개발 - GraphQL을 활용한 API 연동 및 데이터 관리 - 성과 - 공통 컴포넌트 개발로 코드 재사용성 및 유지보수성 증가 - Git Flow에서 `rebase` 전략을 도입해 병합 커밋 최소화 및 코드 리뷰 효율성 향상 - `rebase` 전략을 적용하여 불필요한 병합 커밋을 제거하고 커밋 히스토리의 일관성을 유지 - 이를 통해 코드 충돌 해결 및 병합 시간 단축, 팀의 코드 리뷰 속도 향상 - 팀원들에게 `rebase` 전략 교육을 통해 기술적 이해도 향상 및 협업 능력 강화 - 여러 개의 폼 데이터를 효과적으로 관리하기 위한 상태 관리 개선 - 기존 문제: 폼 데이터를 recoil로 관리했지만, 폼의 수가 증가할수록 상태 관리의 복잡도가 증가하는 문제가 발생 - 해결 방안: URL의 `searchParams`를 활용하여 폼 데이터를 유지하도록 개선 - 결과 - 새로고침 및 페이지 이동 시에도 작성된 값이 유지 - 불필요한 상태 관리를 줄여 애플리케이션 성능 최적화 - 전역 상태 관리 부담을 줄여 유지보수성 향상"
+                    - text: ... 더보기
+            - generic [ref=e136]:
+              - generic [ref=e137]: 직무 관련 활동
+              - generic [ref=e138]:
+                - generic [ref=e139]: 💡
+                - generic [ref=e140]:
+                  - generic [ref=e141]:
+                    - generic [ref=e142]:
+                      - generic [ref=e143]: CO-KKIRI
+                      - generic [ref=e144]: 2024. 03- 2024. 04 ‧ 2개월
+                    - generic [ref=e145] [cursor=pointer]:
+                      - generic [ref=e146]:
+                        - generic [ref=e150]: JavaScript
+                        - generic [ref=e644]: TypeScript
+                        - generic [ref=e646]: ReactJS
+                        - generic [ref=e648]: Github
+                        - generic [ref=e650]: Github-Action
+                        - generic [ref=e156]: HTML/CSS
+                        - generic [ref=e652]: RESTful API
+                        - generic [ref=e654]: Styled-Component
+                      - generic [ref=e655]: "+1"
+                  - generic [ref=e158] [cursor=pointer]:
+                    - generic [ref=e159]: "Overview - 개발자 간의 팀(프로젝트/스터디) 모집에 효율적인 매칭을 도모하는 구인 플랫폼 서비스 입니다. - 스카우트(팀원 초대)기능과 리뷰 기능을 통해 성공적인 팀을 완주하는데 있어 더욱 편리하고 효과적인 서비스를 이용할 수 있습니다. Skills `Vite` `React` `TypeScript` `TanStack Query` `Zustand` `React Hook Form` `Styled-components` `AWS EC2` Task - Notion, Figma를 활용한 서비스 기획, 개발 참여 - 마이페이지, 프로젝트/스터디 목록, 스카우트, 스터디 관리 페이지, 공통 컴포넌트(Gnb, SideBar) 담당 - GitHub을 활용한 프로젝트 관리 - 이슈 및 Pull Request 관리: 약 138개의 이슈 및 204개의 PR을 컨벤션을 지켜서 생성함 - git branch 관리: GitHub Action을 이용하여 rebase 실수 방지 - TanStack Query를 활용한 페이지네이션, 무한스크롤 기능 구현 - Zustand를 활용한 로그인 된 유저 정보, 사이드바, 검색 필터, toast 기능 상태 관리 - 프로젝트를 AWS EC2에서 배포하여 실서비스 환경에서 운영 가능하도록 구성 Problem - 프로젝트/스터디 목록 페이지 - 문제: 데이터 로딩 지연으로 인해 사용자 경험이 저하 - 해결 1. 데이터를 prefetch 하는 기능을 사용하여 다음 페이지의 내용을 미리 캐시에 저장하고 꺼내 사용하는 방식을 사용 2. prefetch 사용 시, 불필요한 네트워크 비용, 다음페이지 뿐만 아니라 특정 번호의 페이지로 이동할 가능성의 단점으로 placeholderData로 변경 - 크로스브라우징 이슈(date-fns Github issue 참고) - 문제: date-fns 라이브러리를 사용한 달력 컴포넌트에서 Safari 브라우저에서만 오류 발생. 사용하던 날짜 형식이 dot(.)으로 되어 있었고, Safari는 이를 인식하지 못함. - 해결: hyphen(-)으로 수정하여 date 형식을 바꿔주면서 문제 해결."
+                    - text: ... 더보기
+              - generic [ref=e160]:
+                - generic [ref=e161]: 💡
+                - generic [ref=e162]:
+                  - generic [ref=e163]:
+                    - generic [ref=e164]:
+                      - generic [ref=e165]: Rolling
+                      - generic [ref=e166]: 2023. 12
+                    - generic [ref=e168]:
+                      - generic [ref=e657]: ReactJS
+                      - generic [ref=e659]: Styled-Component
+                  - generic [ref=e178] [cursor=pointer]:
+                    - generic [ref=e179]: "Overview 각자에게 그동안 하고 싶었지만 못 했던 말을 익명으로 전할 수 있는 롤링페이퍼 서비스 입니다. Skills `React` `Styled-Components` `Supabase` Task - React 프로젝트 초기 구성 및 설계 참여 - REST API 연결하여 CRUD 기능 개발 - ThemeProvider를 이용한 다크모드 테마 구현 - Styled-Components를 이용한 페이지 전반적인 디자인 스타일 구현 및 반응형 처리 - props 상태를 통한 동적 이벤트 구현 용이 Problem - Supabase를 이용한 각 사용자 로컬이미지 선택 구현 - 문제: 기존의 API에서는 사용자가 선택할 수 있는 이미지를 제한하여 사용자 경험이 제한 - 해결: Supabase를 통해 자신이 원하는 이미지를 업로드하고 선택할 수 있도록 구현"
+                    - text: ... 더보기
+              - generic [ref=e180]:
+                - generic [ref=e181]: 💡
+                - generic [ref=e182]:
+                  - generic [ref=e183]:
+                    - generic [ref=e184]:
+                      - generic [ref=e185]: 코드잇 스프린트 | 프론트엔드 부트캠프 2기
+                      - generic [ref=e186]: 2023. 10- 2024. 04 ‧ 7개월
+                    - generic [ref=e187] [cursor=pointer]:
+                      - generic [ref=e188]:
+                        - generic [ref=e192]: JavaScript
+                        - generic [ref=e661]: TypeScript
+                        - generic [ref=e663]: NextJS
+                        - generic [ref=e665]: ReactJS
+                        - generic [ref=e667]: Storybook
+                        - generic [ref=e669]: Tailwind
+                        - generic [ref=e671]: Github
+                        - generic [ref=e673]: RESTful API
+                        - generic [ref=e675]: SCSS
+                        - generic [ref=e677]: SASS
+                        - generic [ref=e679]: Firebase
+                        - generic [ref=e681]: AWS-EC2
+                        - generic [ref=e683]: AWS-S3
+                        - generic [ref=e685]: Notion
+                        - generic [ref=e687]: Figma
+                        - generic [ref=e689]: Styled-Component
+                      - generic [ref=e690]: "+8"
+                  - generic [ref=e202] [cursor=pointer]:
+                    - generic [ref=e203]: "- HTML/CSS, Javascript, React, Typescript, Next, Git, GitHub에 대한 이해 - 모던 자바스크립트 스터디 - React, Next 팀 프로젝트 경험 - 디자이너, 백엔드와의 협업 경험"
+                    - text: ... 더보기
+              - generic [ref=e204]:
+                - generic [ref=e205]: 💡
+                - generic [ref=e206]:
+                  - generic [ref=e207]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]: Taskify
+                      - generic [ref=e210]: 2024. 01- 2024. 02 ‧ 2개월
+                    - generic [ref=e212]:
+                      - generic [ref=e692]: JavaScript
+                      - generic [ref=e694]: TypeScript
+                      - generic [ref=e696]: NextJS
+                      - generic [ref=e698]: ReactJS
+                      - generic [ref=e700]: RESTful API
+                      - generic [ref=e702]: SCSS
+                      - generic [ref=e704]: Zustand
+                  - generic [ref=e216] [cursor=pointer]:
+                    - generic [ref=e217]: "Overview - 일의 생산성을 높이고, 구성원을 초대하여 스마트하게 관리할 수 있는 일정 관리 서비스 입니다. Skills `React/Next` `TypeScript` `React Hook Form` `SCSS` Task - Next 프로젝트 초기 구성 및 설계 참여 - REST API 연결하여 CRUD 기능 개발 - 페이지네이션 기능 구현 - React Hook Form을 사용하여 유효성 검사 - SCSS를 이용한 페이지 전반적인 디자인 수정 및 반응형 처리 - ****.***의 빌드 과정에서 SCSS가 처리되는 장점으로 초기 로드 시간 개선 - 변수 사용, 중첩 구조, mixin/include 등의 기능으로 보다 효율적으로 작성, 관리 Problem - 네트워크 요청의 안정성 개선 - 문제: 네트워크 요청이 성공적으로 완료되기 전에 데이터가 렌더링 되는 문제 발생 - 해결: useEffect 내에서 ****.***를 사용하는 안전장치를 도입하여 안정성 개선"
+                    - text: ... 더보기
+              - generic [ref=e218]:
+                - generic [ref=e219]: 💡
+                - generic [ref=e220]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]:
+                      - generic [ref=e223]: Sturing
+                      - generic [ref=e224]: 2024. 06- 2024. 08 ‧ 3개월
+                    - generic [ref=e226]:
+                      - generic [ref=e706]: JavaScript
+                      - generic [ref=e708]: TypeScript
+                      - generic [ref=e710]: NextJS
+                      - generic [ref=e228]: ReactJS
+                      - generic [ref=e712]: Tailwind
+                      - generic [ref=e714]: MongoDB
+                      - generic [ref=e716]: Zustand
+                  - generic [ref=e249] [cursor=pointer]:
+                    - generic [ref=e250]: "Overview - 사람과 스터디, 강의가 한 고리로 연결되는 Sturing은 동기부여 및 성취감을 주어 지속적인 스터디 참여와 팀원들의 적극적인 참여를 지원하는 스터디 서비스입니다. Skills `React/Next` `Typescript` `Zustand` `TailwindCSS` `MongoDB` Task - Notion, Figma를 활용한 서비스 기획, 개발 참여 - `NextAuth`를 통한 OAuth 로그인 기능 구현 - 백엔드 API 설계 및 구현, `MongoDB`를 활용한 CRUD 작업을 수행 - TailwindCSS를 이용한 페이지 전반적인 디자인 스타일 구현 및 반응형 처리"
+                    - text: ... 더보기
+            - generic [ref=e358]:
+              - generic [ref=e359]: 학력
+              - generic [ref=e717]:
+                - generic [ref=e719]:
+                  - img [ref=e721]
+                  - img "/college-placeholder.svg" [ref=e722]
+                - generic [ref=e724]:
+                  - generic [ref=e725]:
+                    - generic [ref=e726]:
+                      - generic [ref=e727]: OO대학교
+                      - generic [ref=e728]: 학사
+                    - generic [ref=e730]: 화학과
+                  - generic [ref=e731]:
+                    - generic [ref=e732]: 2012 - 2018 ‧
+                    - generic [ref=e733]: 졸업
+            - generic [ref=e378]:
+              - generic [ref=e379]: 외국어 능력
+              - generic [ref=e735]:
+                - generic [ref=e736]:
+                  - generic [ref=e737]: 영어
+                  - generic [ref=e739]: 일상 회화
+                - generic [ref=e740]: "TOEIC: 820/990 TOEIC Speaking Test: Advanced Level/170"
+            - generic [ref=e387]:
+              - generic [ref=e388]: 관심 스킬
+              - generic [ref=e389]:
+                - generic [ref=e393]: JavaScript
+                - generic [ref=e395]: TypeScript
+                - generic [ref=e742]: GraphQL
+                - generic [ref=e399]: NextJS
+                - generic [ref=e744]: ReactJS
+                - generic [ref=e746]: Storybook
+                - generic [ref=e748]: Apollo
+                - generic [ref=e750]: MongoDB
+                - generic [ref=e417]: Github
+                - generic [ref=e419]: HTML/CSS
+                - generic [ref=e421]: RESTful API
+                - generic [ref=e752]: SCSS
+                - generic [ref=e754]: Firebase
+                - generic [ref=e427]: Git
+                - generic [ref=e437]: Figma
+                - generic [ref=e756]: Styled-Component
+                - generic [ref=e758]: Vite
+                - generic [ref=e760]: Zustand
+            - generic [ref=e460]:
+              - generic [ref=e461]: 인재 배지
+              - generic [ref=e512]:
+                - img "성장 기록" [ref=e515]
+                - generic [ref=e516]:
+                  - generic [ref=e517]:
+                    - generic [ref=e518]: 성장 기록
+                    - generic [ref=e519]:
+                      - generic [ref=e520]: 자기주도성
+                      - generic [ref=e521]: 실무 능력
+                  - generic [ref=e522]:
+                    - img [ref=e523]
+                    - generic [ref=e525]: 성장 과정을 블로그 등에 꾸준히 기록해요
+      - generic [ref=e555]:
+        - generic [ref=e556]: 이력서 하이라이트
+        - generic [ref=e557]: 목표, 업무, 성과! 과정부터 결과까지 깔끔한 경력 기술
+        - generic [ref=e560]:
+          - generic [ref=e761]:
+            - generic [ref=e762]: 자신의 강점이 협업에 기여할 수 있음을 어필
+            - generic [ref=e763]:
+              - generic [ref=e764]: 📍 돋보이는 표현
+              - generic [ref=e765]: “작은 오류까지 놓치지 않는 세심함으로 협업에 기여하는”
+            - generic [ref=e766]:
+              - generic [ref=e767]: 📝 이렇게 쓰세요
+              - generic [ref=e768]: 내 강점이 조직에 긍정적인 영향을 미칠 수 있음을 어필해보세요. 구체적으로 어떤 업무를 잘하고 자신 있는지 나열해보세요.
+          - generic [ref=e769]:
+            - generic [ref=e770]: 문제 해결 과정이 보이는 경력 기술
+            - generic [ref=e771]:
+              - generic [ref=e772]: 📍 돋보이는 표현
+              - generic [ref=e773]: "“기존 문제: 폼 데이터를 recoil로 관리했지만, 폼의 수가 증가할수록 상태 관리의 복잡도가 증가하는 문제가 발생”"
+            - generic [ref=e774]:
+              - generic [ref=e775]: 📝 이렇게 쓰세요
+              - generic [ref=e776]: 기존에 어떤 문제가 있었고, 어떻게 해결하여, 어떤 성과를 냈는지 작성해보세요.
+    - generic [ref=e579]:
+      - generic [ref=e580]:
+        - generic [ref=e581]: 그룹바이에서 합격하는 이력서를 완성해 보세요
+        - generic [ref=e582]: 나에게 딱 맞는 채용 공고를 추천 받을 수 있어요
+      - button "지금 바로 프로필 작성하기" [ref=e583] [cursor=pointer]
+  - alert [ref=e584]: 그룹바이 | 스타트업 채용 플랫폼
+  - button "그룹바이 상담 버튼" [ref=e586]:
+    - generic [ref=e587] [cursor=pointer]:
+      - generic [ref=e588]: 그룹바이 상담 버튼
+      - img [ref=e590]

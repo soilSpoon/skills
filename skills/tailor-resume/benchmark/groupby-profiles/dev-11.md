@@ -1,0 +1,220 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 11/73
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 그룹바이에서 기업과 매칭되어 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 김**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 1년
+                  - generic [ref=e95]: iOS ‧ 네이티브 앱 개발자 ‧ PM/PO ‧ 소프트웨어 엔지니어
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e99]:
+                - generic [ref=e100]: 👑
+                - text: 리더 경험
+          - generic [ref=e102]:
+            - generic [ref=e103]: 자기소개
+            - generic [ref=e104]:
+              - generic [ref=e105]: 커뮤니케이션 잘하는
+              - generic [ref=e106]: 주도적인
+              - generic [ref=e107]: 성장욕구 높은
+            - generic [ref=e110]: 변화무쌍한 IT 환경 속에서도 한 걸음 앞서 나가며 쉽고 효과적인 솔루션을 제시하는 것이 저의 강점입니다. 글로벌 개발자들과의 협업을 통해 소통과 조율의 힘을 배웠고, 복잡한 문제를 해결하는 과정에서 논리적 사고와 추진력을 길러왔습니다. 철저한 일정 관리 및 문제 해결을 위한 유연한 사고로 프로젝트를 성공적으로 완수하는 것에 대한 강한 책임감을 가지고 있습니다. 팀의 시너지를 극대화하는 사람으로서 모든 구성원이 최상의 결과를 낼 수 있도록 돕는 것이 저의 목표입니다. 변화를 두려워하지 않고, 새로운 도전을 통해 더욱 성장해 나가겠습니다
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - generic [ref=e113]: 스타트업에 기대하는 점
+              - generic [ref=e114]:
+                - generic [ref=e115]: 새로운 일에 도전
+                - generic [ref=e116]: 목표 지향
+                - generic [ref=e117]: 신뢰 높은 팀
+              - generic [ref=e120]: 진취적이고 새로운 기술에 두려워하지 않고 성장하고 싶습니다.
+            - generic [ref=e122]:
+              - generic [ref=e123]: 이직하는 이유
+              - generic [ref=e126]: 회사 폐업으로 인한 퇴사를 하게 되었습니다.
+            - generic [ref=e128]:
+              - generic [ref=e129]: 경력
+              - generic [ref=e131]:
+                - generic [ref=e132]:
+                  - generic [ref=e133]:
+                    - generic [ref=e135]:
+                      - img [ref=e137]
+                      - img "/company-placeholder.svg" [ref=e138]
+                    - generic [ref=e139]:
+                      - generic [ref=e140]:
+                        - generic [ref=e141]: HR스타트업
+                        - generic [ref=e142]: 스타트업
+                      - generic [ref=e143]: 개발PM
+                      - generic [ref=e144]: B2B ‧ 블록체인 ‧ AI ‧ IT 컨설팅 ‧ SI
+                  - generic [ref=e145]: 2024. 11 - 2025. 03 ‧ 5개월
+                - generic [ref=e146]:
+                  - generic [ref=e148]:
+                    - generic [ref=e150]: Swift
+                    - generic [ref=e152]: Jira
+                    - generic [ref=e154]: RxSwift
+                    - generic [ref=e156]: iOS
+                    - generic [ref=e158]: Notion
+                    - generic [ref=e160]: Microsoft Word
+                    - generic [ref=e162]: PowerPoint
+                    - generic [ref=e164]: Slack
+                  - generic [ref=e165] [cursor=pointer]:
+                    - generic [ref=e166]: "• 총 3개 프로젝트의 성공적인 PM 경험 • 프로젝트 A - 블록체인 기반 거래 시그널 텔레그램 미니앱 • 프로젝트 B - 세컨핸드 의류 수거 어플리케이션 • 프로젝트 C - AI 연동 웹사이트 리뉴얼 • 5개월간 총 7명의 글로벌 개발자 관리 • 인도, 인도네시아, 파키스탄 개발자들과 협업 • 매일 데일리 미팅, WBS 작성 및 관리로 진행상황 체계적 관리 • 글로벌 개발자 대상 효과적인 커뮤니케이션 및 문서화 • 피그마 기반 기능 디스크립션 패널 작성 및 번역 • PRD 문서 작성으로 개발자 이해도 향상 • 프로젝트 일정 및 품질 관리 성과 • 프로젝트 B, 10일 앞당긴 런칭 성공 • 프로젝트 C, 일정에 맞춰 안정적 배포 • 프로젝트 A, 기능 구현 마무리 단계까지 진행 • QA 및 오류 대응 성과 • QA 직접 수행: UI 오류 137건(프로젝트 B), 42건(프로젝트 C) 발견 및 리포트 • 반복되는 오류 원인 분석 및 개발 방향 제시 • 비용 효율성과 리소스 최적화 • 프로젝트 A 내 DEX 모듈 병목 최소화를 위해 Wallet 개발자 역할 전환 → 전체 일정 단축 • 개발 모듈 간 의존성 최소화 → 독립 모듈 구조 설계 • 고객사 커뮤니케이션 및 기획 대응 • 프로젝트 A 고객사 요청 11건 중 9건 수용되는 설득력 있는 제안 수행 • 한국 로컬 서비스 이해도가 부족한 글로벌 개발자에게 API 문서 번역 및 설명 제공"
+                    - text: ... 더보기
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - generic [ref=e170]:
+                    - generic [ref=e172]:
+                      - img [ref=e174]
+                      - img "/company-placeholder.svg" [ref=e175]
+                    - generic [ref=e176]:
+                      - generic [ref=e177]:
+                        - generic [ref=e178]: F&B중견기업
+                        - generic [ref=e179]: 스타트업
+                      - generic [ref=e180]: iOS개발(파견)
+                      - generic [ref=e181]: B2C ‧ 이커머스
+                  - generic [ref=e182]: 2023. 04 - 2024. 08 ‧ 1년 5개월
+                - generic [ref=e183]:
+                  - generic [ref=e185]:
+                    - generic [ref=e187]: Swift
+                    - generic [ref=e189]: RxSwift
+                    - generic [ref=e191]: iOS
+                  - generic [ref=e193]: OO그룹 자사몰 iOS 어플리케이션 신규 앱 개발, 신규기능 개발, 유지보수 업무 담당
+            - generic [ref=e195]:
+              - generic [ref=e196]: 학력
+              - generic [ref=e197]:
+                - generic [ref=e199]:
+                  - img [ref=e201]
+                  - img "/college-placeholder.svg" [ref=e202]
+                - generic [ref=e204]:
+                  - generic [ref=e205]:
+                    - generic [ref=e206]:
+                      - generic [ref=e207]: 한국체육대학교
+                      - generic [ref=e208]: 학사
+                    - generic [ref=e210]: 운동건강관리학
+                  - generic [ref=e211]:
+                    - generic [ref=e212]: 2016 - 2021 ‧
+                    - generic [ref=e213]: 졸업
+            - generic [ref=e215]:
+              - generic [ref=e216]: 외국어 능력
+              - generic [ref=e219]:
+                - generic [ref=e220]:
+                  - generic [ref=e221]: 영어
+                  - generic [ref=e223]: 비즈니스 회화
+                - generic [ref=e224]: 글로벌 개발팀(인도, 인도네시아, 파키스탄 등)을 이끌어본 경험이 있습니다. 필요성을 느끼고 회화를 공부하고 있습니다.
+            - generic [ref=e226]:
+              - generic [ref=e227]: 관심 스킬
+              - generic [ref=e228]:
+                - generic [ref=e230]: Swift
+                - generic [ref=e232]: Objective-C
+                - generic [ref=e234]: Alamofire
+                - generic [ref=e236]: RxSwift
+                - generic [ref=e238]: iOS
+                - generic [ref=e240]: Airbridge
+                - generic [ref=e242]: Braze
+                - generic [ref=e244]: GA4
+            - generic [ref=e245]:
+              - generic [ref=e246]: 인재 배지
+              - generic [ref=e249]:
+                - img "리더 경험" [ref=e252]
+                - generic [ref=e253]:
+                  - generic [ref=e254]:
+                    - generic [ref=e255]: 리더 경험
+                    - generic [ref=e256]:
+                      - generic [ref=e257]: 자기주도성
+                      - generic [ref=e258]: 오너십
+                      - generic [ref=e259]: 책임감
+                      - generic [ref=e260]: 문제해결력
+                      - generic [ref=e261]: 커뮤니케이션
+                  - generic [ref=e262]:
+                    - img [ref=e263]
+                    - generic [ref=e265]: 한 그룹(팀)의 리더가 되어 이끌어 본 경험이 있어요
+            - generic [ref=e268]:
+              - generic [ref=e269]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e270] [cursor=pointer]:
+                - generic [ref=e271]:
+                  - generic [ref=e272]:
+                    - img [ref=e274]
+                    - img "kakao-login-button" [ref=e275]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e277]:
+        - generic [ref=e278]: 이력서 하이라이트
+        - generic [ref=e279]: 책임감 있고 좋은 리더에 대해 고민한 흔적
+        - generic [ref=e282]:
+          - generic [ref=e283]:
+            - generic [ref=e284]: 이타적인 목표로 조직에 긍정적인 영향
+            - generic [ref=e285]:
+              - generic [ref=e286]: 📍 돋보이는 표현
+              - generic [ref=e287]: “팀의 시너지를 극대화하는 사람으로서 모든 구성원이 최상의 결과를 낼 수 있도록 돕는 것이 저의 목표입니다.”
+            - generic [ref=e288]:
+              - generic [ref=e289]: 📝 이렇게 쓰세요
+              - generic [ref=e290]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인
+          - generic [ref=e293]:
+            - generic [ref=e294]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e295] [cursor=pointer]:
+              - generic [ref=e296]:
+                - generic [ref=e297]:
+                  - img [ref=e299]
+                  - img "kakao-login-button" [ref=e300]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e301]
+  - button "그룹바이 상담 버튼" [ref=e303]:
+    - generic [ref=e304] [cursor=pointer]:
+      - generic [ref=e305]: 그룹바이 상담 버튼
+      - img [ref=e307]

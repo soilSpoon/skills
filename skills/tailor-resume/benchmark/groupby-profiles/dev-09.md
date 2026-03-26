@@ -1,0 +1,262 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 9/73
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 스카웃 제안 2회, 서류합격 2회 후 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 백**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 2년
+                  - generic [ref=e95]: 프론트엔드
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 🔥
+                - text: 적극 구직 중
+              - generic [ref=e99]:
+                - generic [ref=e100]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e101]:
+                - generic [ref=e102]: 🎓
+                - text: IT 특성화고 출신
+              - generic [ref=e103]:
+                - generic [ref=e104]: 🏆
+                - text: 해커톤 수상
+              - generic [ref=e105]:
+                - generic [ref=e106]: 🌱
+                - text: 성장 기록
+          - generic [ref=e108]:
+            - generic [ref=e109]: 자기소개
+            - generic [ref=e110]:
+              - generic [ref=e111]: 성장욕구 높은
+              - generic [ref=e112]: 끊임없이 배우는
+            - generic [ref=e114] [cursor=pointer]:
+              - generic [ref=e115]: "안녕하세요. 매 순간 배우려는 자세를 가지고 임하며, 대화를 통해 해결하기를 힘쓰는 개발자 백OO 입니다. 이력서 하단의 포트폴리오 링크를 살펴봐주시면 감사하겠습니다. [끊임없는 성장을 갈구합니다.] 현실에 안주하는 것이 아니라 다양한 분야에 관심을 가지고 배우며 더욱 큰 개발자로 성장하길 원합니다. 저는 풀스택, 다시 말해 웹과 앱을 어우르는 모든 분야에서 전문가가 되고 싶습니다. 프론트엔드 개발을 주력으로 삼지만, 해당 업무만 진행하는 것이 아니라 백엔드 개발, 모바일 앱 개발에도 관심을 가지고 배우고 있습니다. 많은 분야의 경험을 통해 끊임없이 성장하는 개발자가 되고싶습니다. [사용자의 관점에서 행동합니다.] 개발자가 만족하는 서비스가 아닌 사용자가 만족하는 서비스를 만들고 싶습니다. 저는 개인 프로젝트 개발 시 서비스를 주변 지인들에게 사용하게 한 뒤 피드백을 요구했습니다. 이를 통해 개발자가 아닌 사용자 입장에서의 문제점과 불편한점 들을 찾아내어 해결할 수 있었습니다. 앞으로도 사용자가 편하게, 그리고 자주 사용할 수 있는 서비스를 개발하고 싶습니다. [주요 특징] 빠른 업무 적응: 담당 개발자 중도퇴사 후 급한 투입 3건 모두 기한 내 성공적으로 배포 다양한 직무 경험: 주 업무 프론트 개발 외에 React-Native 사용 앱 개발, Node.js, Nest.js 사용 백엔드 개발 업무 참여 타 직군과의 소통: 개발자, 기획자, 디자이너 등 모두가 프로젝트를 함께하는데 필요한 공통 문서 개발 주도"
+              - text: ... 더보기
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e118]: 스타트업에 기대하는 점
+              - generic [ref=e119]:
+                - generic [ref=e120]: 새로운 일에 도전
+                - generic [ref=e121]: 재밌는 서비스
+                - generic [ref=e122]: 자율성
+              - generic [ref=e125]: "- 많은 성장을 원합니다 - 프로젝트의 처음부터 끝까지 참여하고 싶습니다 - 자율성을 기반으로 가장 효율적인 환경에서 일하고 싶습니다"
+            - generic [ref=e127]:
+              - generic [ref=e128]: 이직하는 이유
+              - generic [ref=e131]: 현재 안정적인 직장에 재직중이지만 그 안정적임이 무섭게 느껴졌습니다. 회사가 더욱 폭발적으로 성장함에 따라 저도 함께 성장할 수 있는 환경에 있고 싶었습니다. 회사의 성장이 곧 저의 성장이라 생각되어 빠르게 성장하는 회사에 합류하여 높은 성장을 이루고 싶습니다.
+            - generic [ref=e133]:
+              - generic [ref=e134]: 경력
+              - generic [ref=e136]:
+                - generic [ref=e137]:
+                  - generic [ref=e138]:
+                    - generic [ref=e140]:
+                      - img [ref=e142]
+                      - img "/company-placeholder.svg" [ref=e143]
+                    - generic [ref=e144]:
+                      - generic [ref=e146]: SI 중소기업
+                      - generic [ref=e147]: 프론트엔드 개발
+                  - generic [ref=e148]: 2023. 11 - 2025. 07 ‧ 1년 9개월
+                - generic [ref=e149]:
+                  - generic [ref=e150] [cursor=pointer]:
+                    - generic [ref=e151]:
+                      - generic [ref=e153]: JavaScript
+                      - generic [ref=e155]: TypeScript
+                      - generic [ref=e157]: Emotion
+                      - generic [ref=e159]: NextJS
+                      - generic [ref=e161]: ReactJS
+                      - generic [ref=e163]: Tailwind
+                      - generic [ref=e165]: NestJS
+                      - generic [ref=e167]: NodeJS
+                      - generic [ref=e169]: React-Native
+                      - generic [ref=e171]: Github
+                      - generic [ref=e173]: Github-Action
+                      - generic [ref=e175]: SCSS
+                    - generic [ref=e176]: "+4"
+                  - generic [ref=e177] [cursor=pointer]:
+                    - generic [ref=e178]: "- 스터디카페 예약 서비스 OOO의 전체 프론트엔드 개발 주도 - 신규 서비스 2개 배포 - 기존 서비스 2개 리뉴얼 - Docusaurus 사용 OOO 가이드 문서 개발 - 마이그레이션 작업 - JQuery -> Next.js 이관 - Class형 컴포넌트 -> 함수형 컴포넌트 - 백오피스 개발 및 유지보수 - 스터디카페 점주 대상 백오피스 - 슈퍼관리자(운영진) 대상 백오피스 - 외부 광고 기능 개발 - 앱 외부 광고 기능 추가 (팝업, 피드, 배너) 및 트래킹 - 광고주 대상 외부 광고 리포트 웹 서비스 개발 - 기존 프론트엔드 Github Action CI/CD 파이프라인 수정 - 백엔드 API 신규 개발 및 수정 - Node.js(Koa.js) 사용 이용권 관련 API 수정 - Nest.js 사용 CRUD API 추가 - Firebase App Distribution, Test Flight 사용 내부 앱 테스트 - CodePush 사용 앱 배포"
+                    - text: ... 더보기
+            - generic [ref=e180]:
+              - generic [ref=e181]: 학력
+              - generic [ref=e182]:
+                - generic [ref=e184]:
+                  - img [ref=e186]
+                  - img "/college-placeholder.svg" [ref=e187]
+                - generic [ref=e189]:
+                  - generic [ref=e190]:
+                    - generic [ref=e191]:
+                      - generic [ref=e192]: 한국방송통신대학교
+                      - generic [ref=e193]: 학사
+                    - generic [ref=e194]:
+                      - generic [ref=e195]: 컴퓨터과학과
+                      - generic [ref=e196]: 컴퓨터 관련 전공
+                  - generic [ref=e197]:
+                    - generic [ref=e198]: 2025 ‧
+                    - generic [ref=e199]: 재학
+              - generic [ref=e200]:
+                - generic [ref=e202]:
+                  - img [ref=e204]
+                  - img "/college-placeholder.svg" [ref=e205]
+                - generic [ref=e207]:
+                  - generic [ref=e208]:
+                    - generic [ref=e210]: 광주소프트웨어마이스터고
+                    - generic [ref=e211]:
+                      - generic [ref=e212]: 소프트웨어개발과
+                      - generic [ref=e213]: 컴퓨터 관련 전공
+                  - generic [ref=e214]:
+                    - generic [ref=e215]: 2021 - 2024 ‧
+                    - generic [ref=e216]: 졸업
+            - generic [ref=e218]:
+              - generic [ref=e219]: 관심 스킬
+              - generic [ref=e220]:
+                - generic [ref=e222]: JavaScript
+                - generic [ref=e224]: TypeScript
+                - generic [ref=e226]: Emotion
+                - generic [ref=e228]: NextJS
+                - generic [ref=e230]: ReactJS
+                - generic [ref=e232]: Recoil
+                - generic [ref=e234]: Tailwind
+                - generic [ref=e236]: NodeJS
+                - generic [ref=e238]: React-Native
+                - generic [ref=e240]: Github
+                - generic [ref=e242]: Github-Action
+                - generic [ref=e244]: HTML/CSS
+                - generic [ref=e246]: RESTful API
+                - generic [ref=e248]: SCSS
+                - generic [ref=e250]: Git
+                - generic [ref=e252]: Notion
+                - generic [ref=e254]: Webpack
+                - generic [ref=e256]: Babel
+                - generic [ref=e258]: React-Query
+                - generic [ref=e260]: Vercel
+                - generic [ref=e262]: Vite
+            - generic [ref=e263]:
+              - generic [ref=e264]: 인재 배지
+              - generic [ref=e265]:
+                - generic [ref=e267]:
+                  - img "IT 특성화고 출신" [ref=e270]
+                  - generic [ref=e271]:
+                    - generic [ref=e272]:
+                      - generic [ref=e273]: IT 특성화고 출신
+                      - generic [ref=e275]: 실무 능력
+                    - generic [ref=e276]:
+                      - img [ref=e277]
+                      - generic [ref=e279]: IT 특성화 고등학교 출신이에요
+                - generic [ref=e280]:
+                  - generic [ref=e281]:
+                    - img "해커톤 수상" [ref=e284]
+                    - generic [ref=e285]:
+                      - generic [ref=e286]:
+                        - generic [ref=e287]: 해커톤 수상
+                        - generic [ref=e288]:
+                          - generic [ref=e289]: 자기주도성
+                          - generic [ref=e290]: 문제해결력
+                          - generic [ref=e291]: 실무 능력
+                      - generic [ref=e292]:
+                        - img [ref=e293]
+                        - generic [ref=e295]: 해커톤에 참가하여 수상을 해보았어요
+                  - generic [ref=e297]:
+                    - generic [ref=e298]: 어떤 목적으로 무엇을 만들었나요?
+                    - generic [ref=e300]: 프로젝트화 되지 못하고 버려지는 아이디어를 거래하는 서비스를 제작하여 인기상을 수상하였습니다
+                - generic [ref=e301]:
+                  - generic [ref=e302]:
+                    - img "성장 기록" [ref=e305]
+                    - generic [ref=e306]:
+                      - generic [ref=e307]:
+                        - generic [ref=e308]: 성장 기록
+                        - generic [ref=e309]:
+                          - generic [ref=e310]: 자기주도성
+                          - generic [ref=e311]: 실무 능력
+                      - generic [ref=e312]:
+                        - img [ref=e313]
+                        - generic [ref=e315]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                  - generic [ref=e317]:
+                    - generic [ref=e318]: 주로 어떤 기록을 작성하시나요?
+                    - generic [ref=e320]: 개발자로서 알게되는 지식들을 작성합니다
+            - generic [ref=e323]:
+              - generic [ref=e324]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e325] [cursor=pointer]:
+                - generic [ref=e326]:
+                  - generic [ref=e327]:
+                    - img [ref=e329]
+                    - img "kakao-login-button" [ref=e330]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e332]:
+        - generic [ref=e333]: 이력서 하이라이트
+        - generic [ref=e334]: 솔직하지만 바람직한 이직 사유
+        - generic [ref=e337]:
+          - generic [ref=e338]:
+            - generic [ref=e339]: 성장을 위한 도전적인 이직
+            - generic [ref=e340]:
+              - generic [ref=e341]: 📍 돋보이는 표현
+              - generic [ref=e342]: “현재 안정적인 직장에 재직중이지만 그 안정적임이 무섭게 느껴졌습니다.”
+            - generic [ref=e343]:
+              - generic [ref=e344]: 📝 이렇게 쓰세요
+              - generic [ref=e345]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로
+          - generic [ref=e348]:
+            - generic [ref=e349]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e350] [cursor=pointer]:
+              - generic [ref=e351]:
+                - generic [ref=e352]:
+                  - img [ref=e354]
+                  - img "kakao-login-button" [ref=e355]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e356]
+  - button "그룹바이 상담 버튼" [ref=e358]:
+    - generic [ref=e359] [cursor=pointer]:
+      - generic [ref=e360]: 그룹바이 상담 버튼
+      - img [ref=e362]

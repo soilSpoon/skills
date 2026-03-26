@@ -1,0 +1,311 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 13/73
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 기업에게 스카웃 제안 2회 받고 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 신**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 8년
+                  - generic [ref=e95]: 백엔드
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e99]:
+                - generic [ref=e100]: 👥
+                - text: 사용자 있는 프로젝트
+              - generic [ref=e101]:
+                - generic [ref=e102]: 🌱
+                - text: 성장 기록
+              - generic [ref=e103]:
+                - generic [ref=e104]: 👑
+                - text: 리더 경험
+          - generic [ref=e106]:
+            - generic [ref=e107]: 자기소개
+            - generic [ref=e108]:
+              - generic [ref=e109]: 성실한
+              - generic [ref=e110]: 커뮤니케이션 잘하는
+              - generic [ref=e111]: 열정이 강한
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]: 안녕하세요. Back-End Developer 신OO입니다. 제 경력을 간단히 말씀드리자면 웹 에이전시에서 2년간의 경험이 있으며, 헬스케어 데이터를 분석하고 제공하는 SI 업체에서 약 3년간 근무한 경험이 있습니다. 마지막으로 재직한 회사는 스탁키퍼(Stockeeper)로, 여기서 Back-End 파트 리더로서 국내 최초의 가축 투자증권 한우 조각 투자 플랫폼인 '뱅카우' 서비스를 개편하고 운영한 경험이 있습니다. 회사의 성장이 곧 저의 성장으로, 저의 성장이 회사의 성장으로 직결되는 선순환이 이루어져야 합니다. 제가 맡은 서비스를 나의 서비스라고 생각하고 업무를 진행하며, 회사 성장에 도움이 될 수 있는 사람이 된다면 저 또한 성장한 것이라고 생각합니다. 더욱더 성장하기 위해 높은 트래픽과 대용량의 데이터 처리에 대해 관심이 많고 다양한 트러블 슈팅 경험을 하고 해결해 나가고 싶습니다. 개발자를 시작하면서 아주 작은 부분이라도 세상을 변화시킬 수 있을 때 가장 뿌듯하고 그것이 삶의 큰 동기 부여가 됩니다. 저의 장점은 서비스 비즈니스를 빠르게 이해하고 설계하는 것입니다. 비즈니스에 따라 아키텍처가 달라지기 때문에 "어떻게 해야 요구사항을 만족하며 가장 간결하게 관리할 수 있고 확장할 수 있을까?"를 중요시합니다. 단순히 기능 개발이 아닌 서비스가 목표하는 가치를 생각하며 문제를 해결하고 더욱 효율적인 방법을 생각합니다. 또한 설계한 부분이나 운영하면서 발생하는 문제가 있다면 어떠한 기술과 방법으로 이를 해결할 것인지 논의하고 도전하는 것을 지향합니다. 저의 지식이 동료에게 도움이 될 수 있고, 동료의 지식이 저에게 도움이 될 수 있기 때문에 협업과 커뮤니케이션이 굉장히 중요하다고 생각합니다. 끝없는 성장과 자기 개발을 통해 사람과 서비스에 도움을 줄 수 있는 사람이 되려고 항상 노력합니다. [핵심역량] - 기본기를 중요시하며 문제 해결을 위한 자기주도적 탐구 및 학습 능력 - 기획, 디자인, 마케팅 등 다른 직군과의 커뮤니케이션 및 협업 능숙 - 비즈니스와 도메인에 대한 빠른 이해를 바탕으로 개발 아키텍처 설계 - 웹/앱 서비스의 기획, Back-End 설계 및 개발, 운영까지의 경험 보유
+              - text: ... 더보기
+          - generic [ref=e115]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: 스타트업에 기대하는 점
+              - generic [ref=e118]:
+                - generic [ref=e119]: 성장 지원 복지
+                - generic [ref=e120]: 대규모 서비스
+                - generic [ref=e121]: 직무 몰입도
+              - generic [ref=e124]: 고객에게 실질적으로 도움이 되고 좋은 경험을 줄 수 있는 서비스를 동기부여로 가지고 있습니다.
+            - generic [ref=e126]:
+              - generic [ref=e127]: 경력
+              - generic [ref=e129]:
+                - generic [ref=e130]:
+                  - generic [ref=e131]:
+                    - generic [ref=e133]:
+                      - img [ref=e135]
+                      - img "/company-placeholder.svg" [ref=e136]
+                    - generic [ref=e137]:
+                      - generic [ref=e138]:
+                        - generic [ref=e139]: 스탁키퍼(Stockeeper)
+                        - generic [ref=e140]: 스타트업
+                      - generic [ref=e141]: Back-End Part Leader
+                      - generic [ref=e142]: B2C ‧ 금융 ‧ 핀테크
+                  - generic [ref=e143]: 2023. 03 - 2024. 09 ‧ 1년 7개월
+                - generic [ref=e144]:
+                  - generic [ref=e145] [cursor=pointer]:
+                    - generic [ref=e146]:
+                      - generic [ref=e148]: Java
+                      - generic [ref=e150]: AWS-SQS
+                      - generic [ref=e152]: SpringBoot
+                      - generic [ref=e154]: Docker
+                      - generic [ref=e156]: Github-Action
+                      - generic [ref=e158]: AWS-RDS
+                      - generic [ref=e160]: AWS-Route53
+                      - generic [ref=e162]: AWS-ECS
+                      - generic [ref=e164]: AWS-ECR
+                    - generic [ref=e165]: "+2"
+                  - generic [ref=e166] [cursor=pointer]:
+                    - generic [ref=e167]: "# 한우 조각투자 플랫폼 뱅카우 리뉴얼 및 운영 (Core Server) - Back-end Part Leader를 맡아 업무 일정 관리, 외부 미팅 및 협업 진행 - 서비스 비즈니스 도메인 구조(DDD Architecture) 설계 및 리뉴얼(Java, Spring Boot, JPA/Hibernate, RESTful API) - Infra & DevOps 설계/구축(GitHub Actions, Docker, AWS ECR, ECS Fargate, Blue/Green CI/CD, Datadog, Spring Cloud Config) - AWS ElastiCache Redis를 활용해 Distributed Lock 적용 및 API Response 캐시화 - Spring Batch를 활용해 Legacy Data Migration - Toss \"투자로 돈불리기\" 서비스 연동 # 뱅카우 핀테크 서버 분리 구축 및 증권사 연동 (Banking Server) - 뱅카우 서비스 예치금 및 투자 이체를 담당하는 Banking Server 분리 구축 - VPC 구성 및 외부 증권사와 Network & API 연동 - 자산 이체 시스템 AWS SQS 도입으로 안정적인 이체 시스템 개발 - BDD, TDD 전략으로 테스트 코드 작성(Mockito, H2) # 성과 - 2023년 06월 금융위원회로부터 실사 점검 후 투자계약증권 인정 - 뱅카우 서비스 리뉴얼 2024-06-10 V3.3 리뉴얼 오픈 - 국내 최초 가축투자계약증권 1-1호, 1-2호 출시 및 완판 - 최종 청약률 215% 초과 달성 (₩866,800,000 / ₩1,870,640,000) - Toss “투자로 돈불리기” 노출 효과 - 가축투자계약증권 1-1호 - 배너 광고 : 노출 419,835건 / 클릭 102,237건 / CTR 24.35% - 토스 홈 상단 광고 : 노출 5,735,104건 / 클릭 306,266건 / CTR 5.34% - 앱 푸시 : 노출 69,643건 / 클릭 5,366건 / CTR 7.71% - 가축투자계약증권 1-2호 - 배너 광고 : 노출 291,246건 / 클릭 66,200건 / CTR 22.73% - 토스 홈 상단 광고 : 노출 2,084,555건 / 클릭 104,755건 / CTR 5.03% - 앱 푸시 : 노출 759,682건 / 클릭 65,121건 / CTR 8.57% - 총 노출 9,360,065건 / 클릭 수 649,945건 / CTR 6.94% - 월간 투자 신청률 약 109.23% 증가 - 월간 6만건 이상 안정적인 이체 요청 통신"
+                    - text: ... 더보기
+              - generic [ref=e169]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]:
+                    - generic [ref=e173]:
+                      - img [ref=e175]
+                      - img "/company-placeholder.svg" [ref=e176]
+                    - generic [ref=e177]:
+                      - generic [ref=e178]:
+                        - generic [ref=e179]: 카이아이(Kai-i)
+                        - generic [ref=e180]: 스타트업
+                      - generic [ref=e181]: Project Leader
+                      - generic [ref=e182]: B2C ‧ 바이오/의료 ‧ 헬스케어
+                  - generic [ref=e183]: 2019. 06 - 2023. 03 ‧ 3년 10개월
+                - generic [ref=e184]:
+                  - generic [ref=e186]:
+                    - generic [ref=e188]: Java
+                    - generic [ref=e190]: PHP
+                    - generic [ref=e192]: VueJS
+                    - generic [ref=e194]: Spring
+                    - generic [ref=e196]: Docker
+                    - generic [ref=e198]: Jenkins
+                    - generic [ref=e200]: Git
+                    - generic [ref=e202]: NCP
+                  - generic [ref=e203] [cursor=pointer]:
+                    - generic [ref=e204]: "# 서울시 영유아 스크리닝 신체적성검사 서비스 개발 및 운영 - Project Team 업무 및 일정 관리, 외부 협업 진행 - Infra & DevOps 설계/구축(Jenkins, Docker, NCP(Naver Cloud Platform) Container Registry, Blue/Green CI/CD, ELK Stack) - JPA Pessimistic Lock(비관적 락), JPA L2 cache(2차 캐시) 적용, Flyway 도입 - BDD, TDD 전략으로 테스트 코드 작성 (Mockito, H2) # 치과주치의 사업 덴티아이 개발 및 유지보수, 리뉴얼 - 2019년 서비스 유지보수 (PHP, CodeIgniter Framework, Vue.js) - 2020년 서비스 업데이트 및 유지보수 (PHP, CodeIgniter Framework) - 2021년 서비스 리뉴얼 및 유지보수 (Java, Spring Boot, JPA/Hibernate) # 성과 - 2019년 스마트 어워드 코리아 건강관리 분야 대상 수상 - 2020년 사내 인사 평가 1위 - 2021년 제8회 대한민국 SW제품 품질 최우수상 수상"
+                    - text: ... 더보기
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]:
+                    - generic [ref=e210]:
+                      - img [ref=e212]
+                      - img "/company-placeholder.svg" [ref=e213]
+                    - generic [ref=e214]:
+                      - generic [ref=e216]: 이노아이티(Inno It)
+                      - generic [ref=e217]: 대리
+                      - generic [ref=e218]: B2B ‧ B2C
+                  - generic [ref=e219]: 2017. 05 - 2019. 05 ‧ 2년 1개월
+                - generic [ref=e220]:
+                  - generic [ref=e224]: PHP
+                  - generic [ref=e225] [cursor=pointer]:
+                    - generic [ref=e226]: "# 학교 안전 공제 중앙회 인력풀 개발 및 유지보수 - 학교 안전 공제 중앙회와 다이렉트로 커뮤니케이션, 기획 진행 - 디자인, 퍼블리싱을 제외한 모든 부분 담당, 전체적인 서비스 이해 후 DB 구조 설계 - PHP, CodeIgniter Framework를 이용해 MVC Pattern 구현 # 웹 사이트 신규 구축 및 유지보수 - 카페24 호스팅과 DB를 이용하여 서버 구축 - PHP, CodeIgniter Framework를 이용해서 템플릿을 제작해 개발 속도 개선 - 다수의 기업 웹 사이트 구축 및 유지보수 - 창운인터내셔널(Changwoon International) 반응형 웹 사이트 구축 및 번역 시스템 개발 - Stuart Price & Partners 원가 관리 시스템 Backoffice 개발 - 위너스멘토(WinnersMentor) 웹 사이트 유지보수 및 인강 미디어 플레이어 연동(현재 폐쇠) - 학교 안전공제 중앙회 웹 사이트 구축 및 유지보수 - 덕우건설 웹 사이트 구축 및 유지보수 - 코오롱 스포렉스 웹 사이트 구축 및 유지보수 - 마스터 자동차 웹 사이트 구축 및 유지보수"
+                    - text: ... 더보기
+            - generic [ref=e228]:
+              - generic [ref=e229]: 학력
+              - generic [ref=e230]:
+                - generic [ref=e232]:
+                  - img [ref=e234]
+                  - img "/college-placeholder.svg" [ref=e235]
+                - generic [ref=e237]:
+                  - generic [ref=e238]:
+                    - generic [ref=e239]:
+                      - generic [ref=e240]: 수원과학대학교
+                      - generic [ref=e241]: 학사
+                    - generic [ref=e243]: 신소재응용학과
+                  - generic [ref=e244]:
+                    - generic [ref=e245]: 2012 ‧
+                    - generic [ref=e246]: 중퇴
+            - generic [ref=e248]:
+              - generic [ref=e249]: 관심 스킬
+              - generic [ref=e250]:
+                - generic [ref=e252]: Java
+                - generic [ref=e254]: PHP
+                - generic [ref=e256]: AWS-SNS
+                - generic [ref=e258]: AWS-SQS
+                - generic [ref=e260]: Hibernate
+                - generic [ref=e262]: Spring
+                - generic [ref=e264]: SpringBoot
+                - generic [ref=e266]: Swagger
+                - generic [ref=e268]: ElasticSearch
+                - generic [ref=e270]: MySQL
+                - generic [ref=e272]: Redis
+                - generic [ref=e274]: Kafka
+                - generic [ref=e276]: Kibana
+                - generic [ref=e278]: Prometheus
+                - generic [ref=e280]: Docker
+                - generic [ref=e282]: Github
+                - generic [ref=e284]: Github-Action
+                - generic [ref=e286]: Jenkins
+                - generic [ref=e288]: Kubernetes
+                - generic [ref=e290]: RESTful API
+                - generic [ref=e292]: Jira
+                - generic [ref=e294]: AWS
+                - generic [ref=e296]: AWS-RDS
+                - generic [ref=e298]: Git
+                - generic [ref=e300]: AWS-EC2
+                - generic [ref=e302]: AWS-S3
+                - generic [ref=e304]: AWS-Route53
+                - generic [ref=e306]: NCP
+                - generic [ref=e308]: AWS-ECS
+                - generic [ref=e310]: Fargate
+                - generic [ref=e312]: CloudWatch
+            - generic [ref=e313]:
+              - generic [ref=e314]: 인재 배지
+              - generic [ref=e315]:
+                - generic [ref=e316]:
+                  - generic [ref=e317]:
+                    - img "사용자 있는 프로젝트" [ref=e320]
+                    - generic [ref=e321]:
+                      - generic [ref=e322]:
+                        - generic [ref=e323]: 사용자 있는 프로젝트
+                        - generic [ref=e324]:
+                          - generic [ref=e325]: 자기주도성
+                          - generic [ref=e326]: 오너십
+                          - generic [ref=e327]: 문제해결력
+                      - generic [ref=e328]:
+                        - img [ref=e329]
+                        - generic [ref=e331]: 프로젝트를 주도하여 실제 사용자를 만들어보았어요
+                  - generic [ref=e333]:
+                    - generic [ref=e334]: 진행하며 만난 가장 큰 문제는 무엇이었으며 어떻게 해결했나요?
+                    - generic [ref=e336]: 운영 시 문제가 발생했을때 가장 효율적인 방법으로 빠르게 복구하는 방법에 대한 경험이 부족했기 때문에 신속한 대응이 어려웠지만 차분하게 원인을 분석하여 하나씩 고쳐나가 문제를 해결했던 경험이 있었습니다.
+                - generic [ref=e337]:
+                  - generic [ref=e338]:
+                    - img "성장 기록" [ref=e341]
+                    - generic [ref=e342]:
+                      - generic [ref=e343]:
+                        - generic [ref=e344]: 성장 기록
+                        - generic [ref=e345]:
+                          - generic [ref=e346]: 자기주도성
+                          - generic [ref=e347]: 실무 능력
+                      - generic [ref=e348]:
+                        - img [ref=e349]
+                        - generic [ref=e351]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                  - generic [ref=e353]:
+                    - generic [ref=e354]: 기록을 꾸준히 작성하는 이유는 무엇인가요?
+                    - generic [ref=e356]: 미래의 나 자신을 위해 기록하고 있습니다. 독자가 읽었을때 최대한 이해하기 쉽도록 작성하고 있습니다. 누군가 보지 않아도 글을 쓰는 행위와 꾸준함은 의미가 있다고 생각합니다.
+                - generic [ref=e357]:
+                  - generic [ref=e358]:
+                    - img "리더 경험" [ref=e361]
+                    - generic [ref=e362]:
+                      - generic [ref=e363]:
+                        - generic [ref=e364]: 리더 경험
+                        - generic [ref=e365]:
+                          - generic [ref=e366]: 자기주도성
+                          - generic [ref=e367]: 오너십
+                          - generic [ref=e368]: 책임감
+                          - generic [ref=e369]: 문제해결력
+                          - generic [ref=e370]: 커뮤니케이션
+                      - generic [ref=e371]:
+                        - img [ref=e372]
+                        - generic [ref=e374]: 한 그룹(팀)의 리더가 되어 이끌어 본 경험이 있어요
+                  - generic [ref=e376]:
+                    - generic [ref=e377]: 팀을 이끌면서 느낀 것이 있다면?
+                    - generic [ref=e379]: 몰입하며 최고의 효율을 나타낼 수 있는 방법은 좋은 기술도 중요하지만 원팀이 되어 팀에게 도움이 되려는 마음가짐이 가장 중요하다는 것을 느꼈습니다.
+            - generic [ref=e382]:
+              - generic [ref=e383]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e384] [cursor=pointer]:
+                - generic [ref=e385]:
+                  - generic [ref=e386]:
+                    - img [ref=e388]
+                    - img "kakao-login-button" [ref=e389]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e391]:
+        - generic [ref=e392]: 이력서 하이라이트
+        - generic [ref=e393]: 사용자에게 서비스를 제공하는 의미로 셀프 모티베이션
+        - generic [ref=e396]:
+          - generic [ref=e397]:
+            - generic [ref=e398]: 높은 책임감과 주인의식
+            - generic [ref=e399]:
+              - generic [ref=e400]: 📍 돋보이는 표현
+              - generic [ref=e401]: “제가 맡은 서비스를 나의 서비스라고 생각하고 업무를 진행하며, 회사 성장에 도움이 될 수 있는 사람이 된다면 저 또한 성장한 것이라고 생각합니다.”
+            - generic [ref=e402]:
+              - generic [ref=e403]: 📝 이렇게 쓰세요
+              - generic [ref=e404]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시
+          - generic [ref=e406]:
+            - generic [ref=e407]: 개발자로서 의미와 보람을 느끼는 상황
+            - generic [ref=e408]:
+              - generic [ref=e409]: 📍 돋보이는 표현
+              - generic [ref=e410]: “로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 ”
+            - generic [ref=e412]:
+              - generic [ref=e413]: 📝 이렇게 쓰세요
+              - generic [ref=e414]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바
+          - generic [ref=e417]:
+            - generic [ref=e418]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e419] [cursor=pointer]:
+              - generic [ref=e420]:
+                - generic [ref=e421]:
+                  - img [ref=e423]
+                  - img "kakao-login-button" [ref=e424]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e425]
+  - button "그룹바이 상담 버튼" [ref=e427]:
+    - generic [ref=e428] [cursor=pointer]:
+      - generic [ref=e429]: 그룹바이 상담 버튼
+      - img [ref=e431]

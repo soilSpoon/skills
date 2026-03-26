@@ -1,0 +1,420 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "프로필" [ref=e14] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - heading "프로필" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - link [ref=e32] [cursor=pointer]:
+            - /url: /chat-rooms
+            - img [ref=e35]
+          - link "이대희 님" [ref=e37] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - generic [ref=e38]:
+              - img [ref=e39]
+              - generic [ref=e42]: 이대희 님
+              - img [ref=e43]
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]: 합격하는 이력서
+        - generic [ref=e49]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e50]:
+        - generic [ref=e52] [cursor=pointer]: 전체
+        - generic [ref=e54] [cursor=pointer]: 개발
+        - generic [ref=e56] [cursor=pointer]: 마케팅
+        - generic [ref=e58] [cursor=pointer]: 디자인
+        - generic [ref=e60] [cursor=pointer]: 기획
+        - generic [ref=e62] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e64] [cursor=pointer]: 사업개발
+        - generic [ref=e66] [cursor=pointer]: 경영지원
+        - generic [ref=e68] [cursor=pointer]: CX/CS
+    - generic [ref=e72]:
+      - generic [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic [ref=e76]: 이전
+      - generic [ref=e77]: 1/13
+      - generic [ref=e78] [cursor=pointer]:
+        - generic [ref=e79]: 다음
+        - img [ref=e80]
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e86]: 🏆 기업에게 스카웃 제안 2회 받고 최종합격 했어요.
+        - generic [ref=e88]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e94]:
+                - img [ref=e96]
+                - img "유저아이콘" [ref=e97]
+              - generic [ref=e98]:
+                - generic [ref=e100]: 오**
+                - generic [ref=e101]:
+                  - generic [ref=e102]: 신입
+                  - generic [ref=e104]: 백엔드 ‧ 풀스택 ‧ PM/PO
+            - generic [ref=e105]:
+              - generic [ref=e106]:
+                - generic [ref=e107]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e108]:
+                - generic [ref=e109]: 🚀
+                - text: 창업 경험
+              - generic [ref=e110]:
+                - generic [ref=e111]: 👥
+                - text: 사용자 있는 프로젝트
+              - generic [ref=e112]:
+                - generic [ref=e113]: 🌱
+                - text: 성장 기록
+              - generic [ref=e114]:
+                - generic [ref=e115]: 👑
+                - text: 리더 경험
+          - generic [ref=e117]:
+            - generic [ref=e118]: 자기소개
+            - generic [ref=e119]:
+              - generic [ref=e120]: 커뮤니케이션 잘하는
+              - generic [ref=e121]: 도전정신 강한
+              - generic [ref=e122]: 성장욕구 높은
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: 저는 도전정신이 강하고 목표를 향해 끊임없이 나아가는 사람입니다. 어떤 일이든 주저하지 않고 완벽하게 수행하기 위해 노력하며, 꼼꼼한 계획과 실행력을 바탕으로 성과를 만들어왔습니다. 부모님의 사업에서 문제점을 찾고 이를 확장하며 사업을 A부터 Z까지 만들어 왔습니다. 기획, 프로젝트 관리, 구현, 사업, 광고 운영 등 다양한 경험을 통해 여러 이해관계자와 소통하며 조율해왔습니다. 현재 광고 집행에서는 클릭률 3%, 전환율 10% 후반, 수익률 600%를 기록하며, 효율적인 전략으로 성과를 내고 있습니다. 또한, 새로운 아이템 기획과 출시, 외부 업체와의 협상 및 조정을 통해 12월 말 현재 구매 전환율 41%를 기록하고 있습니다. 저는 트렌드를 빠르게 파악하고 이를 적용하는 데 강점이 있습니다. 사업 또한 데이터 지표, SNS를 탐색하며 트렌드 아이템을 찾아 빠르게 성장하여 광고 없이 한 달에 800만 원의 수익을 달성하였으며, 유튜브에 올린 첫 영상으로 13만 조회수와 800개의 댓글을 얻었습니다. 3개의 영상만으로 3만 시청 시간, 30만 조회수를 기록했습니다. 현재도 계속해서 올라가고 있습니다. 저는 또한 컴퓨터공학을 전공하며 백엔드 개발에 흥미를 가져 기술을 집중적으로 학습하였습니다. 여러 프로젝트들을 진행하며 프론트엔드 개발 기술에도 흥미를 가져 스스로 공부하여 항상 프로젝트에서 풀스택 개발을 맡아 이어나갔고, 실 사용자가 있는 자사 반응형 사이트 개발까지 완성했습니다. 제조업, 서비스업, 건설, 인테리어 등 주변 스타트업 및 사업이 진행되는 환경 속에서 살아왔습니다. 누구보다 스타트업 환경을 잘 이해하고 적응할 자신 있습니다. 이런 경험과 역량을 바탕으로 더 큰 도전을 통해 성장하고, 회사의 비전을 실현하는 데 기여하고 싶습니다.
+              - text: ... 더보기
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - generic [ref=e128]: 스타트업에 기대하는 점
+              - generic [ref=e129]:
+                - generic [ref=e130]: 새로운 일에 도전
+                - generic [ref=e131]: 목표 지향
+                - generic [ref=e132]: 피드백 문화
+              - generic [ref=e135]: 더욱 성장하고 싶습니다. 누구나 처음은 있지만 빨리 배우고 최대한 귀사에 도움이 되고 싶습니다.
+            - generic [ref=e136]:
+              - generic [ref=e137]: 직무 관련 활동
+              - generic [ref=e138]:
+                - generic [ref=e139]: 💡
+                - generic [ref=e140]:
+                  - generic [ref=e141]:
+                    - generic [ref=e142]:
+                      - generic [ref=e143]: 아모여(아파트 공동구매 커뮤니티)
+                      - generic [ref=e144]: 2024. 06
+                    - generic [ref=e146]:
+                      - generic [ref=e148]: Java
+                      - generic [ref=e150]: JavaScript
+                      - generic [ref=e152]: Spring
+                      - generic [ref=e154]: SpringBoot
+                      - generic [ref=e156]: HTML/CSS
+                  - generic [ref=e158] [cursor=pointer]:
+                    - generic [ref=e159]: "치솟는 물가에 스트레스 받는 주민들을 위하여 아파트 공동구매 커뮤니티 웹을 제작했습니다. 농민은 중간 상인이 줄어 합리적인 가격에 판매 가능하고, 주민은 아파트 이웃 문화 활성화 및 합리적인 가격의 구매, 아파트는 수수료로 아파트 발전 기금에 사용할 수 있도록 구현했습니다 (백엔드: 로그인, 회원가입, 공동구매 페이지 구현) (프론트엔드: 전체 구현 (반응형))"
+                    - text: ... 더보기
+              - generic [ref=e160]:
+                - generic [ref=e161]: 💡
+                - generic [ref=e162]:
+                  - generic [ref=e163]:
+                    - generic [ref=e164]:
+                      - generic [ref=e165]: 코슬로
+                      - generic [ref=e166]: 2024. 08
+                    - generic [ref=e168]:
+                      - generic [ref=e170]: Java
+                      - generic [ref=e172]: Spring
+                      - generic [ref=e174]: SpringBoot
+                      - generic [ref=e176]: MySQL
+                  - generic [ref=e178] [cursor=pointer]:
+                    - generic [ref=e179]: "가속노화 방지 챌린지 서비스 가속노화를 방지하고자 MZ세대들의 트랜드인 챌린지를 참여하도록 유도하는 서비스입니다. 가속노화 방지 챌린지에 참여하면 포인트를 지급하고 이를 제휴서비스 구매로 이어지도록 하였습니다. (백엔드: 카카오로그인 50%, 챌린지 업로드)"
+                    - text: ... 더보기
+              - generic [ref=e180]:
+                - generic [ref=e181]: 💡
+                - generic [ref=e182]:
+                  - generic [ref=e183]:
+                    - generic [ref=e184]:
+                      - generic [ref=e185]: 수야호 (친환경 중고거래 시스템)
+                      - generic [ref=e186]: 2024. 05
+                    - generic [ref=e188]:
+                      - generic [ref=e190]: Java
+                      - generic [ref=e192]: JavaScript
+                      - generic [ref=e194]: Spring
+                      - generic [ref=e196]: SpringBoot
+                      - generic [ref=e198]: MySQL
+                      - generic [ref=e200]: HTML/CSS
+                  - generic [ref=e202] [cursor=pointer]:
+                    - generic [ref=e203]: "환경 오염으로 인한 지구온난화의 가속으로 경각심 유발을 위해 제작했습니다 대부분 이용자들이 중고직거래를 하며 이득을 보는 것은 단순 판매로 나오는 돈 입니다. 중고 직거래를 하면 택배 배송을 하지 않기에 탄소배출량이 감소되고 불필요한 새 상품을 사지 않게 됩니다. 이용자들이 하는 중고거래 생활이 친환경적인 활동이며 중고거래 횟수에 따른 탄소배출 감소량 및 사용자LV 친환경적인 활동 등을 포함한 사이트를 구현했습니다. (백엔드: 관리자페이지, 마이페이지 구현) (프론트: 관리자페이지, 마이페이지, 중고거래 글 게시 페이지 구현)"
+                    - text: ... 더보기
+              - generic [ref=e204]:
+                - generic [ref=e205]: 💡
+                - generic [ref=e206]:
+                  - generic [ref=e207]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]: 은평대전 멘토/기획단
+                      - generic [ref=e210]: 2022. 09- 현재 ‧ 3년 7개월
+                    - generic [ref=e214]: PowerPoint
+                  - generic [ref=e217]: 은평대전(멘토링 프로그램) 멘토 활동을 하며 유치원~고등학생을 대상으로 박람회, 강연, 상담을 진행했습니다. 멘토기획단을 진행하며 큰 행사(오리엔테이션 등) 기획 및 준비, 멘토 영상 가이드 제작, 멘토별 강연 자료 피드백, 강연 모니터링 등 해오고 있습니다
+              - generic [ref=e218]:
+                - generic [ref=e219]: 💡
+                - generic [ref=e220]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]:
+                      - generic [ref=e223]: weroom(밴드 연습실 예약 서비스)
+                      - generic [ref=e224]: 2024. 09- 2024. 12 ‧ 4개월
+                    - generic [ref=e225] [cursor=pointer]:
+                      - generic [ref=e226]:
+                        - generic [ref=e228]: ReactJS
+                        - generic [ref=e230]: Spring
+                        - generic [ref=e232]: SpringBoot
+                        - generic [ref=e234]: MySQL
+                        - generic [ref=e236]: Docker
+                        - generic [ref=e238]: Github
+                        - generic [ref=e240]: Jenkins
+                        - generic [ref=e242]: RESTful API
+                        - generic [ref=e244]: Jira
+                        - generic [ref=e246]: Figma
+                      - generic [ref=e247]: "+2"
+                  - generic [ref=e250]: DDD, 와이어프레임 제작, 화면 설계 등 기획 단계부터 시작하여 풀스택 기반으로 참여했습니다. 프론트엔드는 백오피스를 제외한 부분 전체를 구현했고, 백엔드는 예약 시스템, 결제(토스API), 커뮤니티, 연습실 장소 등록 CRUD 및 검색 필터링을 맡았습니다.
+              - generic [ref=e251]:
+                - generic [ref=e252]: 💡
+                - generic [ref=e253]:
+                  - generic [ref=e254]:
+                    - generic [ref=e255]:
+                      - generic [ref=e256]: 멋쟁이사자처럼
+                      - generic [ref=e257]: 2024. 03- 2024. 12 ‧ 10개월
+                    - generic [ref=e258] [cursor=pointer]:
+                      - generic [ref=e259]:
+                        - generic [ref=e261]: Java
+                        - generic [ref=e263]: Spring
+                        - generic [ref=e265]: SpringBoot
+                        - generic [ref=e267]: MySQL
+                        - generic [ref=e269]: Github
+                        - generic [ref=e271]: AWS
+                        - generic [ref=e273]: AWS-RDS
+                        - generic [ref=e275]: Git
+                        - generic [ref=e277]: AWS-EC2
+                        - generic [ref=e279]: AWS-S3
+                        - generic [ref=e281]: SpringDataJPA
+                      - generic [ref=e282]: "+2"
+                  - generic [ref=e285]: 백엔드 파트 아기사자로 활동하였습니다. CO-SLOW(저속 노화 챌린지) 프로젝트로 해커톤에 참여했습니다.
+              - generic [ref=e286]:
+                - generic [ref=e287]: 💡
+                - generic [ref=e288]:
+                  - generic [ref=e290]:
+                    - generic [ref=e291]: 사회적 이슈 글쓰기 대회
+                    - generic [ref=e292]: 2023. 07
+                  - generic [ref=e295]: 우수상 / 장애인 차별 관련 내용 작성
+              - generic [ref=e296]:
+                - generic [ref=e297]: 💡
+                - generic [ref=e298]:
+                  - generic [ref=e299]:
+                    - generic [ref=e300]:
+                      - generic [ref=e301]: 레코딩
+                      - generic [ref=e302]: 2022. 09- 현재 ‧ 3년 7개월
+                    - generic [ref=e304]:
+                      - generic [ref=e306]: JavaScript
+                      - generic [ref=e308]: Python
+                      - generic [ref=e310]: PHP
+                      - generic [ref=e312]: HTML/CSS
+                  - generic [ref=e314] [cursor=pointer]:
+                    - generic [ref=e315]: "1. SW중심대학사업단 홈페이지 리뉴얼&신규 서비스 생성 : 워드프레스 기반 SW중심대학사업단 홈페이지를 전반적으로 리뉴얼하고 SW포트폴리오 기능을 생성했습니다. 이는 대회로까지 개최되었습니다. 사업단 요청사항에 맞게 조율, 구현을 했습니다. 2. 워드프레스 기반 My Daily NewsReport 홈페이지를 제작했습니다. Google trends에서 이슈가 되는 키워드를 가져와 ChatGPT API로 자동 뉴스 생성, 구독자 관리 및 뉴스 메일 전송 기능을 구현했습니다. 3. ChatGPT가 만들어주는 자서전 서비스 Python 음성인식 라이브러리와 ChatGPT API를 활용하여 자서전 제작 웹서비스를 만들었습니다"
+                    - text: ... 더보기
+              - generic [ref=e316]:
+                - generic [ref=e317]: 💡
+                - generic [ref=e318]:
+                  - generic [ref=e319]:
+                    - generic [ref=e320]:
+                      - generic [ref=e321]: GDSC
+                      - generic [ref=e322]: 2022. 09- 2025. 02 ‧ 2년 6개월
+                    - generic [ref=e324]:
+                      - generic [ref=e326]: Java
+                      - generic [ref=e328]: JavaScript
+                      - generic [ref=e330]: TypeScript
+                      - generic [ref=e332]: Python
+                      - generic [ref=e334]: HTML/CSS
+                  - generic [ref=e337]: 코어 멤버(운영진) 및 멤버로 활동하며 세션참여, 운영, 동아리 운영, 행사 기획을 했습니다.
+              - generic [ref=e338]:
+                - generic [ref=e339]: 💡
+                - generic [ref=e340]:
+                  - generic [ref=e341]:
+                    - generic [ref=e342]:
+                      - generic [ref=e343]: 네이버스마트스토어 운영/자사몰 개발
+                      - generic [ref=e344]: 2024. 05- 현재 ‧ 1년 11개월
+                    - generic [ref=e346]:
+                      - generic [ref=e348]: JavaScript
+                      - generic [ref=e350]: HTML/CSS
+                      - generic [ref=e352]: Adobe Photoshop
+                      - generic [ref=e354]: Naver (SA,DA,shopping)
+                  - generic [ref=e356] [cursor=pointer]:
+                    - generic [ref=e357]: A-Z까지 전반적인 운영을 담당했습니다. 기존 사업을 온라인으로 사업 확장하며 상품 기획, 촬영, 포토샵, 상세페이지 제작, 고객 관리 + 응대, 챗봇, 광고 집행 등 데이터 기반으로 신규 상품 기획, 개선 등을 했으며 소비자 심리를 파악하고 고려하며 제작 및 운영했습니다. 사진 촬영, 포토샵, 엑셀 등 해보지 않았던 것들을 혼자 운영하고 매출을 내기 위해 직접 부딪히며 성장했으며 시작 3달 만에 광고 없이 파워등급(2400%매출 상승) 을 달성했습니다. 현재 25년 3월 기준 월 매출 1300만원 이상까지 성장했습니다. 9월부터는 광고 흐름을 파악하기 위해 광고 집행을 시작했으며, 10월부터 현재까지 진행중인 광고는 클릭율과 전환율이 평균보다 높게 나오며 수익을 내고 있습니다. 현재(25.3월 기준) 는 클릭율 3%, 전환율 10% 후반, 수익률 1000%를 달성했습니다. 관련 업체들과 함께 신상품을 발굴했고, 새 카테고리에도 도전하여 직접 발로 뛰며 단가가 제일 합리적인 업체를 찾아 직접 디자인하여 새로운 상품 또한 출시했습니다. 자사몰 또한 구현했으며 PG사 & 네이버페이 승인이되었고 SEO 최적화 작업중인 상태입니다. 부모님 사업 확장에 대해 업무를 진행한 것이며 회사 일에 지장은 없도록 부모님이 이어받게 잘 구성해 놓았습니다. (매뉴얼 생성 등)
+                    - text: ... 더보기
+            - generic [ref=e358]:
+              - generic [ref=e359]: 학력
+              - generic [ref=e360]:
+                - generic [ref=e362]:
+                  - img [ref=e364]
+                  - img "/college-placeholder.svg" [ref=e365]
+                - generic [ref=e367]:
+                  - generic [ref=e368]:
+                    - generic [ref=e369]:
+                      - generic [ref=e370]: OO대학교
+                      - generic [ref=e371]: 학사
+                    - generic [ref=e372]:
+                      - generic [ref=e373]: 컴퓨터공학부
+                      - generic [ref=e374]: 컴퓨터 관련 전공
+                  - generic [ref=e375]:
+                    - generic [ref=e376]: 2021 - 2025 ‧
+                    - generic [ref=e377]: 졸업예정
+            - generic [ref=e378]:
+              - generic [ref=e379]: 외국어 능력
+              - generic [ref=e383]:
+                - generic [ref=e384]: 영어
+                - generic [ref=e386]: 일상 회화
+            - generic [ref=e387]:
+              - generic [ref=e388]: 관심 스킬
+              - generic [ref=e389]:
+                - generic [ref=e391]: Java
+                - generic [ref=e393]: JavaScript
+                - generic [ref=e395]: TypeScript
+                - generic [ref=e397]: Python
+                - generic [ref=e399]: NextJS
+                - generic [ref=e401]: Unity
+                - generic [ref=e403]: Apache
+                - generic [ref=e405]: MyBatis
+                - generic [ref=e407]: Spring
+                - generic [ref=e409]: SpringBoot
+                - generic [ref=e411]: MySQL
+                - generic [ref=e413]: React-Native
+                - generic [ref=e415]: Docker
+                - generic [ref=e417]: Github
+                - generic [ref=e419]: HTML/CSS
+                - generic [ref=e421]: RESTful API
+                - generic [ref=e423]: AWS
+                - generic [ref=e425]: AWS-RDS
+                - generic [ref=e427]: Git
+                - generic [ref=e429]: AWS-EC2
+                - generic [ref=e431]: AWS-S3
+                - generic [ref=e433]: AWS-Route53
+                - generic [ref=e435]: Notion
+                - generic [ref=e437]: Figma
+                - generic [ref=e439]: JSP
+                - generic [ref=e441]: Vercel
+                - generic [ref=e443]: Linux
+                - generic [ref=e445]: Ubuntu
+                - generic [ref=e447]: Adobe Illustrator
+                - generic [ref=e449]: Adobe Photoshop
+                - generic [ref=e451]: Kakao
+                - generic [ref=e453]: Naver (SA,DA,shopping)
+                - generic [ref=e455]: Microsoft Word
+                - generic [ref=e457]: Microsoft Excel
+                - generic [ref=e459]: PowerPoint
+            - generic [ref=e460]:
+              - generic [ref=e461]: 인재 배지
+              - generic [ref=e462]:
+                - generic [ref=e463]:
+                  - generic [ref=e464]:
+                    - img "창업 경험" [ref=e467]
+                    - generic [ref=e468]:
+                      - generic [ref=e469]:
+                        - generic [ref=e470]: 창업 경험
+                        - generic [ref=e471]:
+                          - generic [ref=e472]: 자기주도성
+                          - generic [ref=e473]: 오너십
+                          - generic [ref=e474]: 책임감
+                          - generic [ref=e475]: 스타트업 이해도
+                          - generic [ref=e476]: 문제해결력
+                      - generic [ref=e477]:
+                        - img [ref=e478]
+                        - generic [ref=e480]: 주도적으로 창업을 하여 사업자등록증을 내보았어요
+                  - generic [ref=e481]:
+                    - generic [ref=e482]:
+                      - generic [ref=e483]: 창업을 시작한 계기가 있나요?
+                      - generic [ref=e485]: 기존 부모님이 하시던 하청업이 물가 상승과 맞지 않는 단가를 받고 있었고, 디지털화, 셀프 유행으로 인한 하청량의 감소로 인해 더 합리적인 가격으로 제공하며, 더 많은 고객층을 상대로 사업하기 위해 시작했습니다.
+                    - generic [ref=e486]:
+                      - generic [ref=e487]: 가장 큰 성과는 무엇이었나요?
+                      - generic [ref=e489]: 예산 내에서 진행해야 했기 때문에 광고를 하지 못했습니다. 그럼에도 불구하고 시작한 지 3개월 만에 스마트스토어 파워 등급을 달성했으며 스마트스토어 에서만 월 천 만원에 육박하는 수익을 내고 있습니다. 현재는 광고도 집행 중이며 수익률 700%를 유지하고 있습니다. 모든 기반을 다 쌓아놓았고 매뉴얼을 다 제작해 놓았기에 업무에 지장이 가지 않도록 구축해 놓았습니다.
+                - generic [ref=e490]:
+                  - generic [ref=e491]:
+                    - img "사용자 있는 프로젝트" [ref=e494]
+                    - generic [ref=e495]:
+                      - generic [ref=e496]:
+                        - generic [ref=e497]: 사용자 있는 프로젝트
+                        - generic [ref=e498]:
+                          - generic [ref=e499]: 자기주도성
+                          - generic [ref=e500]: 오너십
+                          - generic [ref=e501]: 문제해결력
+                      - generic [ref=e502]:
+                        - img [ref=e503]
+                        - generic [ref=e505]: 프로젝트를 주도하여 실제 사용자를 만들어보았어요
+                  - generic [ref=e507]:
+                    - generic [ref=e508]: 진행하며 만난 가장 큰 문제는 무엇이었으며 어떻게 해결했나요?
+                    - generic [ref=e510]: 오배송, 전산 오류 등의 컴플레인의 위기 사항이 있었습니다. 오배송 같은 경우 생산-포장 프로세스 단계에 보완점이 있음을 발견했고, 판매 개수를 카테고리화 하고 옵션 명과 제목을 포장 단계에서 오류가 없도록 변경했습니다. 아직까지 똑같은 문제가 발생하지 않았습니다. 고객 응대 같은 경우 고객 만족도를 최우선하여 스토어 규모를 고려하여 최대한 빠른 응대와 해결을 하도록 했고, 급한 고객의 경우 퀵 서비스를 이용하여 해결했습니다. 전산 오류의 경우 배송 과정에서 일어나는 일으로 업무 시간 외에 보통 일어나 고객께 먼저 안내 말씀을 드린 뒤 택배사에 알아보는 형식으로 해결했습니다. 추후 동일한 문제 발생 시 빠르게 해결할 수 있도록 매뉴얼을 생성하고 계속 갱신하고 있습니다.
+                - generic [ref=e511]:
+                  - generic [ref=e512]:
+                    - img "성장 기록" [ref=e515]
+                    - generic [ref=e516]:
+                      - generic [ref=e517]:
+                        - generic [ref=e518]: 성장 기록
+                        - generic [ref=e519]:
+                          - generic [ref=e520]: 자기주도성
+                          - generic [ref=e521]: 실무 능력
+                      - generic [ref=e522]:
+                        - img [ref=e523]
+                        - generic [ref=e525]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                  - generic [ref=e527]:
+                    - generic [ref=e528]: 주로 어떤 기록을 작성하시나요?
+                    - generic [ref=e530]: 백엔드 공부 기록을 작성합니다
+                - generic [ref=e531]:
+                  - generic [ref=e532]:
+                    - img "리더 경험" [ref=e535]
+                    - generic [ref=e536]:
+                      - generic [ref=e537]:
+                        - generic [ref=e538]: 리더 경험
+                        - generic [ref=e539]:
+                          - generic [ref=e540]: 자기주도성
+                          - generic [ref=e541]: 오너십
+                          - generic [ref=e542]: 책임감
+                          - generic [ref=e543]: 문제해결력
+                          - generic [ref=e544]: 커뮤니케이션
+                      - generic [ref=e545]:
+                        - img [ref=e546]
+                        - generic [ref=e548]: 한 그룹(팀)의 리더가 되어 이끌어 본 경험이 있어요
+                  - generic [ref=e550]:
+                    - generic [ref=e551]: 프로젝트를 어떻게 시작하게 되었나요?
+                    - generic [ref=e553]: 문제점을 발견하고 사업을 확장하기 위해 이커머스 사업을 시작했습니다
+      - generic [ref=e555]:
+        - generic [ref=e556]: 이력서 하이라이트
+        - generic [ref=e557]: 성과가 명확한 강점 어필, 일에 대한 열정까지
+        - generic [ref=e560]:
+          - generic [ref=e561]:
+            - generic [ref=e562]: 주도적으로 한 업무의 우수한 성과 지표를 명확하게 제시
+            - generic [ref=e563]:
+              - generic [ref=e564]: 📍 돋보이는 표현
+              - generic [ref=e565]: “광고 없이 한 달에 4000만 원의 수익을 달성하였으며, 유튜브에 올린 첫 영상으로 13만 조회수와 800개의 댓글을 얻었습니다.”
+            - generic [ref=e566]:
+              - generic [ref=e567]: 📝 이렇게 쓰세요
+              - generic [ref=e568]: 직접 주도한 업무가 있다면 주도적으로 수행한 업무임을 명확히 작성해요. 개발뿐만 아니라 비즈니스 관련 경험이 있으면 상세히 작성해보세요.
+          - generic [ref=e569]:
+            - generic [ref=e570]: 기여하고자 하는 의지와 열정
+            - generic [ref=e571]:
+              - generic [ref=e572]: 📍 돋보이는 표현
+              - generic [ref=e573]: “빨리 배우고 최대한 귀사에 도움이 되고 싶습니다.”
+            - generic [ref=e574]:
+              - generic [ref=e575]: 📝 이렇게 쓰세요
+              - generic [ref=e576]: 조직에 어떻게 기여할 수 있는지 구체적으로 작성해보세요. 입사 후 이 사람이 이렇게 기여할 수 있겠다는 상상을 할 수 있게 작성해보세요.
+    - generic [ref=e579]:
+      - generic [ref=e580]:
+        - generic [ref=e581]: 그룹바이에서 합격하는 이력서를 완성해 보세요
+        - generic [ref=e582]: 나에게 딱 맞는 채용 공고를 추천 받을 수 있어요
+      - button "지금 바로 프로필 작성하기" [ref=e583] [cursor=pointer]
+  - alert [ref=e584]: 그룹바이 | 스타트업 채용 플랫폼
+  - button "그룹바이 상담 버튼" [ref=e586]:
+    - generic [ref=e587] [cursor=pointer]:
+      - generic [ref=e588]: 그룹바이 상담 버튼
+      - img [ref=e590]

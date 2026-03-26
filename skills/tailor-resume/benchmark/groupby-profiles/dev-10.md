@@ -1,0 +1,363 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 10/73
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 기업에게 스카웃 제안 받고 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 서**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 2년
+                  - generic [ref=e95]: 백엔드
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e99]:
+                - generic [ref=e100]: 👥
+                - text: 사용자 있는 프로젝트
+              - generic [ref=e101]:
+                - generic [ref=e102]: 🌱
+                - text: 성장 기록
+          - generic [ref=e104]:
+            - generic [ref=e105]: 자기소개
+            - generic [ref=e106]:
+              - generic [ref=e107]: 커뮤니케이션 잘하는
+              - generic [ref=e108]: 책임감이 강한
+              - generic [ref=e109]: 끊임없이 배우는
+            - generic [ref=e111] [cursor=pointer]:
+              - generic [ref=e112]: 1년 6개월 경력의 서버 개발자로서, AWS 클라우드 환경과 Node.js, Python 기반 백엔드 개발에 강점을 보유했습니다. 데이터베이스 성능 최적화와 장애 대응 경험을 바탕으로, 안정적이고 확장성 높은 서비스 구축에 기여할 수 있습니다. 단순히 기능 구현에 그치지 않고, 프로젝트의 기획부터 개발, 배포까지 전 과정을 경험하며 실무 역량을 쌓았습니다. 특히 EC2에서 ECS(Fargate)로의 마이그레이션, MongoDB 기반 로그 관리, Redis를 활용한 인증 체계 강화 등의 작업을 주도하며, 기술적 관점에서 서비스의 확장성과 안정성을 높이는 데 기여한 경험이 있습니다. 최근에는 기존과 다른 기술 스택인 Python과 Django REST Framework를 활용해 입사와 동시에 메인 기능 구현을 맡았으며, 빠르게 새로운 언어와 환경에 적응해 웹과 앱 서비스를 아우르는 개발을 진행 중입니다. 저는 특정 기술에 집착하지 않고, 변화하는 환경에 유연하게 대응하며 필요한 기술을 빠르게 습득하고 실무에 적용하는 역량을 갖추고 있습니다. 무엇보다 이 과정에서 가장 크게 배운 것은 ‘혼자 잘하는 개발자’보다는 ‘같이 성장하는 팀원’의 중요성이었습니다. 문제 발생 시 원인 분석을 주도하고, 팀원들과 협력하여 신속히 해결 방안을 도출했습니다. 늘 부족함을 성장의 원동력으로 삼아왔고, 그 자세로 앞으로도 새로운 기술과 도전을 두려워하지 않으며 성장해나가고 싶습니다. 빠르게 변화하는 환경에서 팀과 함께 문제를 해결하고, 사용자 중심의 안정적인 서비스를 만들어나가는 개발자로 기여하고자 합니다.
+              - text: ... 더보기
+          - generic [ref=e113]:
+            - generic [ref=e114]:
+              - generic [ref=e115]: 스타트업에 기대하는 점
+              - generic [ref=e116]:
+                - generic [ref=e117]: 새로운 일에 도전
+                - generic [ref=e118]: 스택 일치
+                - generic [ref=e119]: 업무 다양성
+              - generic [ref=e121] [cursor=pointer]:
+                - generic [ref=e122]: 제가 일하고 싶은 스타트업은 새로운 일에 도전할 수 있는 환경을 제공하는 곳입니다. 정해진 틀에 갇히지 않고, 끊임없이 변화하는 기술과 사용자 요구에 유연하게 대응하는 것이 중요하다고 생각합니다. 익숙한 스택을 활용하되 그 기술을 더 깊이 이해하고 확장해나갈 수 있는 기회를 통해 개발자로서 지속적으로 성장하고 싶습니다. 또한, 다양한 업무를 경험하며 문제를 해결하는 과정에서 의미 있는 성장을 이루고자 합니다. 단순한 백엔드 서버 개발을 넘어 데이터베이스 최적화, 클라우드 인프라 관리 등 여러 영역에서 능동적으로 기여할 수 있는 환경을 기대합니다. 특히 실제 사용자와 직접 맞닿은 라이브 서비스에 참여하여, 실시간으로 발생하는 문제를 해결하고 서비스의 안정성과 품질을 높이는 경험을 쌓고 싶습니다.
+                - text: ... 더보기
+            - generic [ref=e124]:
+              - generic [ref=e125]: 경력
+              - generic [ref=e128]:
+                - generic [ref=e129]:
+                  - generic [ref=e131]:
+                    - img [ref=e133]
+                    - img "/company-placeholder.svg" [ref=e134]
+                  - generic [ref=e135]:
+                    - generic [ref=e136]:
+                      - generic [ref=e137]: 모난돌컴퍼니
+                      - generic [ref=e138]: 스타트업
+                    - generic [ref=e139]: 백엔드 개발자
+                - generic [ref=e140]: 2025. 08 - 재직중 ‧ 8개월
+              - generic [ref=e142]:
+                - generic [ref=e143]:
+                  - generic [ref=e144]:
+                    - generic [ref=e146]:
+                      - img [ref=e148]
+                      - img "/company-placeholder.svg" [ref=e149]
+                    - generic [ref=e150]:
+                      - generic [ref=e151]:
+                        - generic [ref=e152]: 와이콤마
+                        - generic [ref=e153]: 스타트업
+                      - generic [ref=e154]: 개발팀 사원
+                      - generic [ref=e155]: B2C ‧ 의류 ‧ 명품 ‧ 액세서리 ‧ 신발 ‧ 가방
+                  - generic [ref=e156]: 2025. 02 - 2025. 05 ‧ 4개월
+                - generic [ref=e157]:
+                  - generic [ref=e158] [cursor=pointer]:
+                    - generic [ref=e159]:
+                      - generic [ref=e161]: Python
+                      - generic [ref=e163]: NextJS
+                      - generic [ref=e165]: Django
+                      - generic [ref=e167]: AWS-AuroraDB
+                      - generic [ref=e169]: PostgreSQL
+                      - generic [ref=e171]: React-Native
+                      - generic [ref=e173]: Github
+                      - generic [ref=e175]: Github-Action
+                      - generic [ref=e177]: Jira
+                      - generic [ref=e179]: AWS
+                      - generic [ref=e181]: Git
+                      - generic [ref=e183]: AWS-EC2
+                      - generic [ref=e185]: AWS-S3
+                      - generic [ref=e187]: AWS-Route53
+                      - generic [ref=e189]: Notion
+                      - generic [ref=e191]: Figma
+                      - generic [ref=e193]: OpenSearch
+                    - generic [ref=e194]: "+10"
+                  - generic [ref=e195] [cursor=pointer]:
+                    - generic [ref=e196]: 풀스택 업무, 앱 서비스 및 웹 유지보수 등의 업무도 병행하여 수행 • 서버 및 클라이언트 영역을 구분하지 않고 신규 기능 API 개발 메인 담당 • 본사 및 입점사 어드민 기능 유지보수 및 기능 개선 업무 담당 • AWS OpenSearch 기반 검색 기능 최적화를 통해 검색 응답 정확도 개선 • 라이브 서비스 운영 환경에서 기존 로직에 대한 유지보수 및 배포 중 발생하는 이슈에 실시간 대응 • 인프라 전반에서 발생하는 에러 및 장애에 대한 원인 분석 및 조치 수행
+                    - text: ... 더보기
+              - generic [ref=e198]:
+                - generic [ref=e199]:
+                  - generic [ref=e200]:
+                    - generic [ref=e202]:
+                      - img [ref=e204]
+                      - img "/company-placeholder.svg" [ref=e205]
+                    - generic [ref=e206]:
+                      - generic [ref=e207]:
+                        - generic [ref=e208]: 이씨에프
+                        - generic [ref=e209]: 스타트업
+                      - generic [ref=e210]: IT개발부/사원
+                      - generic [ref=e211]: B2C ‧ 패션 ‧ 커머스
+                  - generic [ref=e212]: 2024. 11 - 2025. 02 ‧ 4개월
+                - generic [ref=e213]:
+                  - generic [ref=e214] [cursor=pointer]:
+                    - generic [ref=e215]:
+                      - generic [ref=e217]: TypeScript
+                      - generic [ref=e219]: NestJS
+                      - generic [ref=e221]: NodeJS
+                      - generic [ref=e223]: ElasticSearch
+                      - generic [ref=e225]: MongoDB
+                      - generic [ref=e227]: PostgreSQL
+                      - generic [ref=e229]: Redis
+                      - generic [ref=e231]: Docker
+                      - generic [ref=e233]: Github
+                      - generic [ref=e235]: Github-Action
+                      - generic [ref=e237]: Jira
+                      - generic [ref=e239]: AWS-RDS
+                      - generic [ref=e241]: AWS-EC2
+                      - generic [ref=e243]: Notion
+                      - generic [ref=e245]: Figma
+                      - generic [ref=e247]: AWS-ECS
+                      - generic [ref=e249]: Fargate
+                    - generic [ref=e250]: "+10"
+                  - generic [ref=e251] [cursor=pointer]:
+                    - generic [ref=e252]: • ECS(Fargate)로의 인프라 구성 변경을 통해 관리 효율성 향상. • MongoDB 기반 로그 관리 시스템 설계 및 개발로 입점사 관리 효율성 25% 증가 • Jwt Token과 Redis를 활용해 로그인 처리 속도 1.5초 → 0.5초로 40% 개선 • 지속적인 테스트 코드를 작성으로 코드 품질 및 안정성 유지에 기여. • 기획 및 프론트 직군과 협업하여 새로운 기능 구현 및 버그 대응 평균 소요시간 2일 → 1.5일로 25% 단축 • Swagger를 활용하여 복잡한 반환 데이터의 경우 공통 데코레이터 작성으로 팀원들이 편리하게 작업할 수 있도록 지원하고, 컨트롤러 코드 20% 간소화.
+                    - text: ... 더보기
+              - generic [ref=e254]:
+                - generic [ref=e255]:
+                  - generic [ref=e256]:
+                    - generic [ref=e258]:
+                      - img [ref=e260]
+                      - img "/company-placeholder.svg" [ref=e261]
+                    - generic [ref=e262]:
+                      - generic [ref=e264]: 소울
+                      - generic [ref=e265]: 백엔드 서버 개발
+                  - generic [ref=e266]: 2024. 01 - 2024. 06 ‧ 6개월
+                - generic [ref=e267]:
+                  - generic [ref=e268] [cursor=pointer]:
+                    - generic [ref=e269]:
+                      - generic [ref=e271]: TypeScript
+                      - generic [ref=e273]: NGINX
+                      - generic [ref=e275]: NestJS
+                      - generic [ref=e277]: MySQL
+                      - generic [ref=e279]: Redis
+                      - generic [ref=e281]: Docker
+                      - generic [ref=e283]: Github
+                      - generic [ref=e285]: AWS-RDS
+                      - generic [ref=e287]: Git
+                      - generic [ref=e289]: AWS-EC2
+                      - generic [ref=e291]: AWS-S3
+                      - generic [ref=e293]: Notion
+                      - generic [ref=e295]: Figma
+                    - generic [ref=e296]: "+5"
+                  - generic [ref=e297] [cursor=pointer]:
+                    - generic [ref=e298]: "[COSS 통합 플랫폼] 3개의 PC 홈페이지로 분리되어있던 기존 COSS 융합 대학 사업을 단일 플랫폼으로 통합 구축 [백엔드 서버 개발 담당 업무] • 데이터 정규화 작업으로 쿼리 성능 35% 향상, 데이터 중복률 50% 감소. • 클라이언트 맞춤형 API 개발로 플랫폼 주요 기능의 처리 속도 25% 개선. • 서버 인프라 관리 및 모니터링, 서버 다운타임 최소화 등 장애 대응 시간 50% 단축."
+                    - text: ... 더보기
+              - generic [ref=e300]:
+                - generic [ref=e301]:
+                  - generic [ref=e302]:
+                    - generic [ref=e304]:
+                      - img [ref=e306]
+                      - img "/company-placeholder.svg" [ref=e307]
+                    - generic [ref=e308]:
+                      - generic [ref=e310]: 소울
+                      - generic [ref=e311]: 백엔드 서버 개발
+                      - generic [ref=e312]: B2B
+                  - generic [ref=e313]: 2023. 08 - 2023. 12 ‧ 5개월
+                - generic [ref=e314]:
+                  - generic [ref=e315] [cursor=pointer]:
+                    - generic [ref=e316]:
+                      - generic [ref=e318]: TypeScript
+                      - generic [ref=e320]: NGINX
+                      - generic [ref=e322]: NestJS
+                      - generic [ref=e324]: NodeJS
+                      - generic [ref=e326]: MSSQL
+                      - generic [ref=e328]: Github
+                      - generic [ref=e330]: Git
+                      - generic [ref=e332]: AWS-EC2
+                      - generic [ref=e334]: Notion
+                    - generic [ref=e335]: "+1"
+                  - generic [ref=e336] [cursor=pointer]:
+                    - generic [ref=e337]: "[ICTWOW] ICT 기업과 해외 바이어를 연결하여 글로벌 비즈니스를 지원하는 기존 플랫폼을 성능 개선을 목표로 플랫폼 전반에 걸쳐 대대적인 개편 사업 [백엔드 서버 개발 담당 업무] • 기존 온프레미스 서버를 클라우드로 전환하여 운영 비용 절감, 서버 관리 효율성 향상. • 클라이언트 요구사항에 맞춰 기존 데이터 마이그레이션 작업 • TypeScript로 코드 리팩토링하여 코드 가독성 및 유지보수성 40% 개선. • 클라이언트 요구사항 반영해 신규 기능 15개 이상 API 개발, 요청 처리 속도 30% 단축."
+                    - text: ... 더보기
+            - generic [ref=e339]:
+              - generic [ref=e340]: 학력
+              - generic [ref=e341]:
+                - generic [ref=e343]:
+                  - img [ref=e345]
+                  - img "/college-placeholder.svg" [ref=e346]
+                - generic [ref=e348]:
+                  - generic [ref=e349]:
+                    - generic [ref=e350]:
+                      - generic [ref=e351]: OO대학교
+                      - generic [ref=e352]: 학사
+                    - generic [ref=e354]: 문예창작과
+                  - generic [ref=e355]:
+                    - generic [ref=e356]: 2017 - 2019 ‧
+                    - generic [ref=e357]: 졸업
+            - generic [ref=e359]:
+              - generic [ref=e360]: 외국어 능력
+              - generic [ref=e363]:
+                - generic [ref=e364]:
+                  - generic [ref=e365]: 일본어
+                  - generic [ref=e367]: 일상 회화
+                - generic [ref=e368]: JLPT N3 취득
+            - generic [ref=e370]:
+              - generic [ref=e371]: 관심 스킬
+              - generic [ref=e372]:
+                - generic [ref=e374]: Java
+                - generic [ref=e376]: JavaScript
+                - generic [ref=e378]: TypeScript
+                - generic [ref=e380]: Python
+                - generic [ref=e382]: Django
+                - generic [ref=e384]: ExpressJS
+                - generic [ref=e386]: NestJS
+                - generic [ref=e388]: NodeJS
+                - generic [ref=e390]: SpringBoot
+                - generic [ref=e392]: Swagger
+                - generic [ref=e394]: MSSQL
+                - generic [ref=e396]: MySQL
+                - generic [ref=e398]: React-Native
+                - generic [ref=e400]: Docker
+                - generic [ref=e402]: Github
+                - generic [ref=e404]: HTML/CSS
+                - generic [ref=e406]: RESTful API
+                - generic [ref=e408]: MariaDB
+                - generic [ref=e410]: AWS
+                - generic [ref=e412]: AWS-RDS
+                - generic [ref=e414]: Git
+                - generic [ref=e416]: AWS-EC2
+                - generic [ref=e418]: AWS-S3
+                - generic [ref=e420]: Notion
+                - generic [ref=e422]: Figma
+                - generic [ref=e424]: AWS-ECS
+                - generic [ref=e426]: Linux
+                - generic [ref=e428]: OpenSearch
+            - generic [ref=e429]:
+              - generic [ref=e430]: 인재 배지
+              - generic [ref=e431]:
+                - generic [ref=e433]:
+                  - img "사용자 있는 프로젝트" [ref=e436]
+                  - generic [ref=e437]:
+                    - generic [ref=e438]:
+                      - generic [ref=e439]: 사용자 있는 프로젝트
+                      - generic [ref=e440]:
+                        - generic [ref=e441]: 자기주도성
+                        - generic [ref=e442]: 오너십
+                        - generic [ref=e443]: 문제해결력
+                    - generic [ref=e444]:
+                      - img [ref=e445]
+                      - generic [ref=e447]: 프로젝트를 주도하여 실제 사용자를 만들어보았어요
+                - generic [ref=e448]:
+                  - generic [ref=e449]:
+                    - img "성장 기록" [ref=e452]
+                    - generic [ref=e453]:
+                      - generic [ref=e454]:
+                        - generic [ref=e455]: 성장 기록
+                        - generic [ref=e456]:
+                          - generic [ref=e457]: 자기주도성
+                          - generic [ref=e458]: 실무 능력
+                      - generic [ref=e459]:
+                        - img [ref=e460]
+                        - generic [ref=e462]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                  - generic [ref=e464]:
+                    - generic [ref=e465]: 주로 어떤 기록을 작성하시나요?
+                    - generic [ref=e467]: 기술적 학습 외에도 실무 경험을 진행하며 겪었던 트러블 슈팅과 회고를 작성하는 편입니다!
+            - generic [ref=e470]:
+              - generic [ref=e471]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e472] [cursor=pointer]:
+                - generic [ref=e473]:
+                  - generic [ref=e474]:
+                    - img [ref=e476]
+                    - img "kakao-login-button" [ref=e477]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e479]:
+        - generic [ref=e480]: 이력서 하이라이트
+        - generic [ref=e481]: 업무 범위가 넓고 전문성까지 보이는 자소서
+        - generic [ref=e484]:
+          - generic [ref=e485]:
+            - generic [ref=e486]: 전체 개발 과정을 아우를 수 있는 만능 개발자
+            - generic [ref=e487]:
+              - generic [ref=e488]: 📍 돋보이는 표현
+              - generic [ref=e489]: “단순히 기능 구현에 그치지 않고, 프로젝트의 기획부터 개발, 배포까지 전 과정을 경험하며 실무 역량을 쌓았습니다.”
+            - generic [ref=e490]:
+              - generic [ref=e491]: 📝 이렇게 쓰세요
+              - generic [ref=e492]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면
+          - generic [ref=e494]:
+            - generic [ref=e495]: 협업하면서 배운 점을 확실히 제시
+            - generic [ref=e496]:
+              - generic [ref=e497]: 📍 돋보이는 표현
+              - generic [ref=e498]: “로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세”
+            - generic [ref=e500]:
+              - generic [ref=e501]: 📝 이렇게 쓰세요
+              - generic [ref=e502]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인
+          - generic [ref=e505]:
+            - generic [ref=e506]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e507] [cursor=pointer]:
+              - generic [ref=e508]:
+                - generic [ref=e509]:
+                  - img [ref=e511]
+                  - img "kakao-login-button" [ref=e512]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e513]
+  - button "그룹바이 상담 버튼" [ref=e515]:
+    - generic [ref=e516] [cursor=pointer]:
+      - generic [ref=e517]: 그룹바이 상담 버튼
+      - img [ref=e519]

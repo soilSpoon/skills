@@ -1,0 +1,304 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "프로필" [ref=e14] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - heading "프로필" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - link [ref=e32] [cursor=pointer]:
+            - /url: /chat-rooms
+            - img [ref=e35]
+          - link "이대희 님" [ref=e37] [cursor=pointer]:
+            - /url: /scouts/my-profile
+            - generic [ref=e38]:
+              - img [ref=e39]
+              - generic [ref=e42]: 이대희 님
+              - img [ref=e43]
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]: 합격하는 이력서
+        - generic [ref=e49]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e50]:
+        - generic [ref=e52] [cursor=pointer]: 전체
+        - generic [ref=e54] [cursor=pointer]: 개발
+        - generic [ref=e56] [cursor=pointer]: 마케팅
+        - generic [ref=e58] [cursor=pointer]: 디자인
+        - generic [ref=e60] [cursor=pointer]: 기획
+        - generic [ref=e62] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e64] [cursor=pointer]: 사업개발
+        - generic [ref=e66] [cursor=pointer]: 경영지원
+        - generic [ref=e68] [cursor=pointer]: CX/CS
+    - generic [ref=e72]:
+      - generic [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic [ref=e76]: 이전
+      - generic [ref=e77]: 3/13
+      - generic [ref=e78] [cursor=pointer]:
+        - generic [ref=e79]: 다음
+        - img [ref=e80]
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e86]: 🏆 서류합격 4회 후 최종합격 했어요.
+        - generic [ref=e88]:
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - generic [ref=e94]:
+                - img [ref=e96]
+                - img "유저아이콘" [ref=e97]
+              - generic [ref=e98]:
+                - generic [ref=e100]: 박**
+                - generic [ref=e101]:
+                  - generic [ref=e102]: 신입
+                  - generic [ref=e104]: 풀스택
+            - generic [ref=e106]:
+              - generic [ref=e107]: 💎
+              - text: 첫 제안 수락률 높음
+          - generic [ref=e117]:
+            - generic [ref=e118]: 자기소개
+            - generic [ref=e119]:
+              - generic [ref=e594]: 책임감이 강한
+              - generic [ref=e777]: 열정이 강한
+              - generic [ref=e778]: 도전정신 강한
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: 쇼핑몰을 운영하며 경쟁력 있는 상품 및 키워드 분석 업무의 비효율성을 절실히 느꼈고, 이를 해결하기 위해 프로그래밍을 시작했습니다. 반복적인 작업을 자동화하면서 문제 해결과 생산성 향상의 가치를 체감했으며, 이후 확장성과 유지보수성을 고려한 백엔드 아키텍처 설계에 관심을 가지며 다양한 프로젝트를 수행해왔습니다. 특히, 오픈소스 기여를 통해 협업과 코드 품질 개선 경험을 쌓으며 기술을 활용해 사회에 기여하는 개발자가 되고자 노력해왔습니다. Nestia 프로젝트에서는 Swagger 문서 자동 생성 기능을 개선하여 API 사용성을 향상시켰으며, Toss/es-toolkit 프로젝트에서는 uniqBy, cloneDeep 등의 유틸리티 함수를 추가하여 코드 재사용성을 높였습니다. 앞으로도 확장성 있는 시스템을 설계하고, 기술을 활용해 실질적인 가치를 창출하는 개발자가 되기 위해 끊임없이 학습하고 도전하겠습니다.
+              - text: ... 더보기
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - generic [ref=e128]: 스타트업에 기대하는 점
+              - generic [ref=e129]:
+                - generic [ref=e779]: 새로운 일에 도전
+                - generic [ref=e780]: 스택 일치
+                - generic [ref=e781]: 책임감 있는 팀원
+              - generic [ref=e784]: 뛰어난 동료들과 함께 근무하면서, 팀원들의 장점을 흡수하며 빠르게 성장하기
+            - generic [ref=e599]:
+              - generic [ref=e600]: 경력
+              - generic [ref=e602]:
+                - generic [ref=e603]:
+                  - generic [ref=e604]:
+                    - generic [ref=e606]:
+                      - img [ref=e608]
+                      - img "/company-placeholder.svg" [ref=e609]
+                    - generic [ref=e610]:
+                      - generic [ref=e611]:
+                        - generic [ref=e612]: 물류 스타트업
+                        - generic [ref=e613]: 스타트업
+                      - generic [ref=e614]: 풀스택개발자
+                      - generic [ref=e615]: B2B
+                  - generic [ref=e616]: 2025. 03 - 재직중 ‧ 1년 1개월
+                - generic [ref=e619]:
+                  - generic [ref=e623]: TypeScript
+                  - generic [ref=e627]: NextJS
+                  - generic [ref=e786]: NestJS
+                  - generic [ref=e788]: Redash
+                  - generic [ref=e790]: Android
+              - generic [ref=e792]:
+                - generic [ref=e793]:
+                  - generic [ref=e794]:
+                    - generic [ref=e796]:
+                      - img [ref=e798]
+                      - img "/company-placeholder.svg" [ref=e799]
+                    - generic [ref=e800]:
+                      - generic [ref=e801]:
+                        - generic [ref=e802]: 환경 스타트업
+                        - generic [ref=e803]: 스타트업
+                      - generic [ref=e804]: 백엔드 개발자(인턴)
+                      - generic [ref=e805]: B2B ‧ 환경 ‧ SaaS
+                  - generic [ref=e806]: 2024. 05 - 2024. 07 ‧ 3개월
+                - generic [ref=e807]:
+                  - generic [ref=e808] [cursor=pointer]:
+                    - generic [ref=e809]:
+                      - generic [ref=e811]: TypeScript
+                      - generic [ref=e813]: NestJS
+                      - generic [ref=e815]: NodeJS
+                      - generic [ref=e817]: PostgreSQL
+                      - generic [ref=e819]: Github
+                      - generic [ref=e821]: Terraform
+                      - generic [ref=e823]: AWS
+                      - generic [ref=e825]: AWS-ECS
+                      - generic [ref=e827]: Fargate
+                    - generic [ref=e828]: "+2"
+                  - generic [ref=e829] [cursor=pointer]:
+                    - generic [ref=e830]: GitHub Actions 기반 CI/CD 구축 & AWS 인프라 자동화 • GitHub Actions을 이용한 CI/CD 파이프라인 구축 • Terraform을 활용하여 AWS 인프라 코드화 및 자동화 • VPC, ECS, ECS-Task, RDS, Elasticache, S3, Route53 등 전사 AWS 리소스 관리 • 배포 및 환경 셋팅 약 1시간 30분 → 5분으로 단축 (약 95% 감소) GraphQL 기반 LCA API 개발 • Apollo GraphQL을 활용한 API 설계 및 개발 • 프로젝트 생성, 복제, 삭제, 목적 및 범위 정의, 데이터 입력 및 수정 API 개발 • LCI (전 과정 목록) 데이터 입력 및 수정 API 구현
+                    - text: ... 더보기
+            - generic [ref=e136]:
+              - generic [ref=e137]: 직무 관련 활동
+              - generic [ref=e138]:
+                - generic [ref=e139]: 💡
+                - generic [ref=e140]:
+                  - generic [ref=e141]:
+                    - generic [ref=e142]:
+                      - generic [ref=e143]: toss/es-toolkit - 오픈소스 기여
+                      - generic [ref=e144]: 2024. 07
+                    - generic [ref=e146]:
+                      - generic [ref=e150]: JavaScript
+                      - generic [ref=e644]: TypeScript
+                  - generic [ref=e159]: 유틸함수인 set, uniqby, cloneDeep, memoize을 개발하였습니다
+              - generic [ref=e160]:
+                - generic [ref=e161]: 💡
+                - generic [ref=e162]:
+                  - generic [ref=e163]:
+                    - generic [ref=e164]:
+                      - generic [ref=e165]: 응급상황 모의 매칭 시스템 - OO대학교 창의학기제
+                      - generic [ref=e166]: 2023. 09- 2023. 12 ‧ 4개월
+                    - generic [ref=e168]:
+                      - generic [ref=e832]: NextJS
+                      - generic [ref=e657]: ReactJS
+                      - generic [ref=e834]: NestJS
+                      - generic [ref=e836]: Terraform
+                      - generic [ref=e838]: AWS
+                      - generic [ref=e840]: Socket.IO
+                  - generic [ref=e178] [cursor=pointer]:
+                    - generic [ref=e179]: "# 프로젝트 개요 • 병원과 구급대원(응급구조사)을 실시간으로 연결하는 응급상황 대응 시스템 • 신속한 의료 대응을 가능하게 하여 환자의 생존율을 높이는 것이 목표 # 팀 구성 • 풀스택 개발자: 2명 • 프론트엔드 개발자: 1명 • 디자이너: 1명 #기술 스택 • Backend: NestJS, Nestia, Prisma • Frontend:Tailwind, Zustand, SWR • Database: PostgreSQL, Redis • Infra: Terraform(AWS), Kafka • CI/CD: Jenkins # 주요 기능 및 역할 서버 (Backend) 개발 • 전국 병원 데이터 수집 및 가공 • 병상 수, 응급 구조 데이터 등을 수집하여의료 데이터베이스 구축 • 사용자 인증 시스템 • 위치 기반 병원 조회 API 개발 • 사용자의 현재 위치를 기반으로 가장 가까운 병원을 조회하는 기능 제공 • Kafka 및 ****.***를 활용하여 실시간 응급환자 요청 처리 및 병원 상태 관리 기능 구현 프론트엔드 (EMS - 응급구조사 앱) 개발 • EMS(구급대원) 시스템 UI 개발 • 응급구조사를 위한 인터페이스 설계 및 개발 → 재사용 가능한 UI 컴포넌트 구축 • 실시간 통신 기능 개발 • ****.***를 활용한 실시간 응급환자 매칭 기능 구현 • 카카오맵 API를 이용하여 사용자 위치 및 응급실 위치 시각화 DevOps 및 인프라 관리 • AWS 기반 인프라 통합 관리 • Terraform을 활용하여 AWS 인프라를 코드로 관리 → 인프라 효율성 및 확장성 향상 • CI/CD 파이프라인 구축 • Jenkins를 활용한 자동화 배포 및 테스트 환경 구축 • CI/CD 적용으로 배포 속도 단축 및 협업 생산성 향상"
+                    - text: ... 더보기
+              - generic [ref=e180]:
+                - generic [ref=e181]: 💡
+                - generic [ref=e182]:
+                  - generic [ref=e183]:
+                    - generic [ref=e184]:
+                      - generic [ref=e185]: 의약품 검색 서비스 (개인)
+                      - generic [ref=e186]: 2024. 01- 2024. 03 ‧ 3개월
+                    - generic [ref=e188]:
+                      - generic [ref=e663]: NextJS
+                      - generic [ref=e665]: ReactJS
+                      - generic [ref=e842]: NestJS
+                      - generic [ref=e844]: Terraform
+                      - generic [ref=e846]: AWS
+                  - generic [ref=e202] [cursor=pointer]:
+                    - generic [ref=e203]: "# 프로젝트 개요 • 분산된 의약품 데이터를 통합하여 사용자에게 효율적인 검색 기능 및 API를 제공하는 프로젝트 • 의약품 정보의 접근성을 높이고, 사용자 경험 및 헬스케어 개발자의 개발 경험을 개선하는 것을 목표로 함 # 기술 스택 • Backend: NestJS, Nestia, Prisma • Database: MongoDB (Atlas), MongoDB Search, Redis • Infra: Terraform(AWS), GitHub Actions (CI/CD) # 주요 기능 및 구현 내용 서버 구현 및 데이터 처리 • 공공데이터포털의 7개 의약품 데이터를 수집 및 가공하는 데이터 파이프라인 구축 • 자동화된 데이터 수집 및 정제 프로세스 구현 → 의약품 정보 접근성과 활용도 향상 • MongoDB Search 기능을 활용하여 검색 기능 및 자동완성 기능 개발 • 사용자 편의성을 극대화한 고성능 검색 시스템 구현 인프라 및 배포 최적화 • AWS 인프라 관리: • Terraform을 이용하여 AWS 인프라를 코드 기반으로 관리 • 배포 및 확장 과정을 자동화하여 시스템 확장성 개선 • CI/CD 파이프라인 구축: • GitHub Actions을 활용한 자동화 배포 및 테스트 • 배포 및 테스트 과정 단축으로 개발 효율성 향상 # 성능 개선 사례 측정 환경 • AWS Fargate (Memory 512MB, CPU 256 X 1), Atlas MongoDB M2 환경 검색 성능 개선 • MongoDB Search 최적화 적용 → 검색 평균 응답 시간 800ms → 150ms (약 81% 성능 향상) 페이지네이션 성능 개선 • Redis 기반 캐싱 적용 → 페이지네이션 API 속도 20TPS → 150TPS (약 650% 성능 개선)"
+                    - text: ... 더보기
+              - generic [ref=e204]:
+                - generic [ref=e205]: 💡
+                - generic [ref=e206]:
+                  - generic [ref=e207]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]: Prisma - 오픈소스 기여 [v6.4.2]
+                      - generic [ref=e210]: 2024. 05
+                    - generic [ref=e694]: TypeScript
+                  - generic [ref=e216] [cursor=pointer]:
+                    - generic [ref=e217]: 기여내용 • Prisma의 AtLeast 유틸리티 타입을 개선하여 타입 추론의 정확성을 높이고, 교차 타입 사용 시 발생하는 호환성 문제를 해결함. •기존 AtLeast 타입의 불완전한 타입 추론 문제 해결 • findUnique 등에서 다중 고유 필드 사용 시 발생하던 타입 불일치 해결 • extendedWhereUnique 기능 도입 후 발생한 타입 관련 문제 개선
+                    - text: ... 더보기
+              - generic [ref=e218]:
+                - generic [ref=e219]: 💡
+                - generic [ref=e220]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]:
+                      - generic [ref=e223]: Nestia - 오픈소스 기여
+                      - generic [ref=e224]: 2024. 01
+                    - generic [ref=e226]:
+                      - generic [ref=e706]: JavaScript
+                      - generic [ref=e708]: TypeScript
+                  - generic [ref=e249] [cursor=pointer]:
+                    - generic [ref=e250]: 기여 내용 • Swagger 문서 생성 시 발생한 컨트롤러 경로 인식 문제 해결 • ASCII가 아닌 다국어 폴더 경로에서도 Swagger 문서 빌드 가능하도록 수정 • 국제화된 프로젝트 환경에서 Nestia의 사용성과 접근성 향상 • 테스트 시나리오 추가로 라이브러리 안정성 강화 • 컨트롤러 경로 인식 문제를 재발 방지하기 위해 자동화된 테스트 케이스 추가 • 코드 변경 시 Swagger 문서 생성이 정상적으로 동작하는지 검증 가능
+                    - text: ... 더보기
+              - generic [ref=e847]:
+                - generic [ref=e848]: 💡
+                - generic [ref=e849]:
+                  - generic [ref=e850]:
+                    - generic [ref=e851]:
+                      - generic [ref=e852]: "게섯거라 - 태풍경로예측 시스템 [OO대학교 캡스톤디자인: 대상수상]"
+                      - generic [ref=e853]: 2023. 03- 2023. 06 ‧ 4개월
+                    - generic [ref=e855]:
+                      - generic [ref=e857]: TypeScript
+                      - generic [ref=e859]: NestJS
+                      - generic [ref=e861]: NodeJS
+                      - generic [ref=e863]: AWS
+                  - generic [ref=e865] [cursor=pointer]:
+                    - generic [ref=e866]: "# 프로젝트 개요 • 인공지능(AI) 기술을 활용하여 태풍의 경로와 강도를 예측하는 시스템 • 기상 데이터 분석을 통해 재난 대비 및 대응 계획의 효율성을 증대 # 팀 구성 • 백엔드 개발자: 2명 < • 프론트엔드 개발자: 1명 • AI 엔지니어: 1명 # 기술 스택 • Backend: NestJS, Prisma • Database: MySQL, Redis • Infra: AWS (EC2, RDS, Lambda), Docker # 역할 1. API 및 배치 구축 • 태풍 발생 감지 배치 시스템 개발 • 실시간 태풍 정보 감지 및 자동 업데이트 • 전세계 태풍 발생 정보를 분석하여 신속한 데이터 제공 • 태풍 조회 API 개발 • RESTful API를 통해 태풍 정보 조회 기능 제공 • 위치, 강도, 예상 경로 등 다양한 필터링 기능 지원 2. AI 학습 데이터 수집 및 가공 • 기상 데이터 수집 및 분석 • 전세계 태풍 정보를 수집하여 AI 모델 학습 데이터로 가공 • 태풍 경로, 강도, 영향 지역 데이터를 분석하여 예측 모델 최적화 3. 인프라 관리 및 최적화 • AWS EC2를 활용한 서버 배포 • 백엔드 API 서버 및 데이터베이스 서버를 AWS EC2에 배포하여 안정적인 운영 환경 구축 • EC2 확장성을 활용한 서비스 최적화 및 운영 효율성 증대 • Lambda 및 Docker를 활용한 AI 서버 배포 • AI 태풍 예측 모델을 AWS Lambda 함수로 구현하여 서버리스 환경 구축 • Docker 컨테이너를 활용하여 개발 및 운영 환경 일관성 유지 및 배포 자동화"
+                    - text: ... 더보기
+              - generic [ref=e867]:
+                - generic [ref=e868]: 💡
+                - generic [ref=e869]:
+                  - generic [ref=e870]:
+                    - generic [ref=e871]:
+                      - generic [ref=e872]: Haru - 개인용 SaaS 일정 관리 서비스 (개인)
+                      - generic [ref=e873]: 2024. 07- 현재 ‧ 1년 9개월
+                    - generic [ref=e874] [cursor=pointer]:
+                      - generic [ref=e875]:
+                        - generic [ref=e877]: NextJS
+                        - generic [ref=e879]: ReactJS
+                        - generic [ref=e881]: NestJS
+                        - generic [ref=e883]: NodeJS
+                        - generic [ref=e885]: Redis
+                        - generic [ref=e887]: Terraform
+                        - generic [ref=e889]: AWS-RDS
+                        - generic [ref=e891]: AWS-Route53
+                        - generic [ref=e893]: AWS-ECS
+                        - generic [ref=e895]: React-Query
+                        - generic [ref=e897]: Zustand
+                      - generic [ref=e898]: "+3"
+                  - generic [ref=e900] [cursor=pointer]:
+                    - generic [ref=e901]: "# 프로젝트 개요 • Haru는 사용자들이 더 나은 계획을 세우고, 다양한 사람들과 경험을 나누며, 자신의 삶을 더욱 풍부하게 만드는 것을 목표로 합니다. # 현재 진행 상황: • 회원가입 및 목표,계획 관리관련 핵심 기능 구현 완료 • 지속적인 기능 고도화 및 성능 최적화 진행 중 # 기술 스택 • Backend: NestJS, Nestia, Prisma • Frontend: Zustand, React-Query • Database: PostgreSQL, Redis • Infra: AWS (Terraform 기반 IaC) • ECS (Fargate), RDS (PostgreSQL), Elasticache (Redis) • S3, CloudFront, Route53 • EC2 (VPN, Bastion)"
+                    - text: ... 더보기
+            - generic [ref=e358]:
+              - generic [ref=e359]: 학력
+              - generic [ref=e902]:
+                - generic [ref=e904]:
+                  - img [ref=e906]
+                  - img "/college-placeholder.svg" [ref=e907]
+                - generic [ref=e909]:
+                  - generic [ref=e910]:
+                    - generic [ref=e911]:
+                      - generic [ref=e912]: OO대학교
+                      - generic [ref=e913]: 학사
+                    - generic [ref=e914]:
+                      - generic [ref=e915]: 바이오/컴퓨터공학과(복수전공)
+                      - generic [ref=e916]: 컴퓨터 관련 전공
+                  - generic [ref=e917]:
+                    - generic [ref=e918]: 2017 - 2025 ‧
+                    - generic [ref=e919]: 졸업
+            - generic [ref=e387]:
+              - generic [ref=e388]: 관심 스킬
+              - generic [ref=e389]:
+                - generic [ref=e395]: TypeScript
+                - generic [ref=e399]: NextJS
+                - generic [ref=e744]: ReactJS
+                - generic [ref=e921]: NestJS
+                - generic [ref=e923]: NodeJS
+      - generic [ref=e555]:
+        - generic [ref=e556]: 이력서 하이라이트
+        - generic [ref=e557]: 주도적인 커리어 방향 설정이 돋보이는 자기소개
+        - generic [ref=e560]:
+          - generic [ref=e924]:
+            - generic [ref=e925]: 직접 느낀 문제는 해결해내는 주도성
+            - generic [ref=e926]:
+              - generic [ref=e927]: 📍 돋보이는 표현
+              - generic [ref=e928]: “쇼핑몰을 운영하며 경쟁력 있는 상품 및 키워드 분석 업무의 비효율성을 절실히 느꼈고, 이를 해결하기 위해 프로그래밍을 시작했습니다.”
+            - generic [ref=e929]:
+              - generic [ref=e930]: 📝 이렇게 쓰세요
+              - generic [ref=e931]: 내 커리어의 방향을 직접 느낀 중요한 문제해결과 연결지어보세요. 업무를 하면서 느낀 것, 이를 통해 시도한 것을 말해주세요.
+          - generic [ref=e932]:
+            - generic [ref=e933]: 성장에 대한 높은 욕심과 의지
+            - generic [ref=e934]:
+              - generic [ref=e935]: 📍 돋보이는 표현
+              - generic [ref=e936]: “뛰어난 동료들과 함께 근무하면서, 팀원들의 장점을 흡수하며 빠르게 성장하기”
+            - generic [ref=e937]:
+              - generic [ref=e938]: 📝 이렇게 쓰세요
+              - generic [ref=e939]: 기업은 빠르게 성장할 수 있는 사람을 찾아요. 성장에 목말라있고, 빠르게 성장할 수 있음을 표현해주세요.
+    - generic [ref=e579]:
+      - generic [ref=e580]:
+        - generic [ref=e581]: 그룹바이에서 합격하는 이력서를 완성해 보세요
+        - generic [ref=e582]: 나에게 딱 맞는 채용 공고를 추천 받을 수 있어요
+      - button "지금 바로 프로필 작성하기" [ref=e583] [cursor=pointer]
+  - alert [ref=e584]: 그룹바이 | 스타트업 채용 플랫폼
+  - button "그룹바이 상담 버튼" [ref=e586]:
+    - generic [ref=e587] [cursor=pointer]:
+      - generic [ref=e588]: 그룹바이 상담 버튼
+      - img [ref=e590]

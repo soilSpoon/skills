@@ -1,0 +1,233 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 8/13
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 스카웃 제안 1회, 서류합격 2회 후 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 김**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 2년
+                  - generic [ref=e95]: 백엔드
+            - generic [ref=e97]:
+              - generic [ref=e98]: 💎
+              - text: 첫 제안 수락률 높음
+          - generic [ref=e100]:
+            - generic [ref=e101]: 자기소개
+            - generic [ref=e102]:
+              - generic [ref=e103]: 커뮤니케이션 잘하는
+              - generic [ref=e104]: 열정이 강한
+              - generic [ref=e105]: 밝은 에너지
+            - generic [ref=e107] [cursor=pointer]:
+              - generic [ref=e108]: "\"복잡한 요구사항을 기능으로 풀어내는 프로덕트 메이커, 김OO입니다.” 안녕하세요. 다양한 이해관계자들의 복잡한 요구를, 실제로 작동하는 기능으로 구현하는 백엔드 개발자 김OO입니다. 동시성 처리와 외부 서비스 연동에 대한 경험을 가지고 있으며, B2C SaaS부터 B2B 데이터 프로덕트까지, 제품의 본질적인 문제 해결에 집중해 왔습니다. [동시성 처리를 고려한 기능 설계 경험] 프로젝트를 진행하면서 자연스럽게 동시성 처리에 대해 고민하고 설계할 수 있었던 경험이 있습니다. 특히 예약 기능과 결제 쿼터 시스템을 개발하며, 여러 사용자의 요청이 동시에 들어올 때 정합성을 어떻게 보장할지, 그리고 단순한 실패 처리를 넘어서 비즈니스 관점에서 어떻게 활용할 수 있을지를 중심으로 설계 방향을 결정하였습니다. 첫 번째는 세일즈맨을 위한 스케줄링 서비스에서의 경험입니다. 사용자가 외부 고객과 미팅을 예약하는 기능을 개발하면서, 같은 시간대에 두 명 이상이 동시에 예약을 시도하면 하나만 성공하고 나머지는 실패해야 한다는 요구사항이 있었습니다. 처음에는 Redis 기반의 메모리 락, 낙관적 락과 같은 여러 동시성 제어 기법을 검토하였습니다. 그러나 해당 케이스에서는 하나의 요청만 성공하고 나머지는 단순히 롤백되어도 문제가 없는 구조였기 때문에, 가장 간단하고 확실한 방식인 DB 제약 조건 기반의 복합 유니크 키를 적용하였습니다. 이벤트 ID + 시작 시간 조합을 복합 유니크 키로 설정함으로써, 중복된 예약 요청은 데이터베이스 레벨에서 자연스럽게 차단되었고, 락을 별도로 관리하지 않아도 안정적으로 동시성 문제가 해결되었습니다. 두 번째는 구독 결제 기능을 개발하면서 경험한 쿼터 제어 로직입니다. 제가 참여한 서비스는 세일즈맨을 위한 B2B SaaS 서비스로, 기업으로 인바운드 문의가 들어오면 자동으로 세일즈맨을 배정하고 일정을 잡아주는 구조였습니다. 이때 유료 결제를 완료한 사용자에게만 일정 수의 예약 가능 횟수를 부여하였고, 이를 초과할 경우 단순히 실패시키는 대신, 비즈니스적으로 활용할 수 있는 구조를 고려해야 했습니다. 예를 들어, 사용자가 삼성과 같은 대기업 고객사의 인바운드 예약을 받았지만, 요금제 쿼터 부족으로 인해 예약이 거절되었다면, *\"이런 좋은 기회를 놓치셨습니다. 요금제를 업그레이드해보세요.\"* 와 같은 리텐션 메시지로 활용할 수 있어야 했습니다. 이를 위해 저는 Redis 기반의 큐를 도입하였고, 예약 요청이 들어오면 순서를 보장하면서 하나씩 처리하였습니다. 쿼터를 초과한 요청은 실패로 끝나는 것이 아니라, 별도로 저장하여 마케팅 및 사용자 안내 목적으로 활용할 수 있도록 처리하였습니다. 이러한 경험을 통해 저는 단순히 동시성 문제를 기술적으로 해결하는 것을 넘어, 비즈니스 요구사항과 연결하여 설계하고 대응하는 역량을 키울 수 있었습니다. 다양한 선택지 속에서 상황에 맞는 방식으로 판단하고 구현하는 과정을 항상 중요하게 생각하고 있습니다. [운영 환경에서의 데이터 처리 경험] 기능을 구현하는 것도 중요하지만, 실제 운영 환경에서 데이터를 안정적으로 다루는 것의 중요성도 느끼고 있습니다. 마이그레이션, 정합성 검증, 성능 병목 대응 같은 이슈들은 예상치 못한 상황에서 자주 마주치게 되고, 프로젝트를 진행하면서 이런 문제들을 직접 겪고 개선했던 경험이 있습니다. 세일즈맨을 위한 스케줄링 서비스에서 기존에는 1회성 결제 기반으로 서비스를 운영했지만, 사업 확장을 위해 Paddle 기반의 구독 결제 시스템을 도입하게 되었습니다. 문제는 글로벌 고객사들이 이미 실사용 중이라는 점이었고, 특히 시간대 차이로 인해 한국 시간 기준 새벽에도 트래픽이 발생하고 있었습니다. 이로 인해 전체 고객 데이터를 새로운 구조로 옮기는 작업을 다운타임 없이 진행해야 했습니다. 이 과정에서 다음과 같은 전략으로 마이그레이션을 수행했습니다: - 결제 관련 테이블 스키마를 미리 production 환경에 배포 - Paddle API를 통해 기존 고객 데이터를 등록하고, Paddle에서 발생하는 webhook 이벤트를 수신하여 실제 데이터를 적재 - 임시 테이블을 구성해 모든 고객사의 webhook 이벤트가 정상적으로 수신되었는지 검증 - 기존 예약 기록을 분석해, 각 고객사의 현재 쿼터 수치를 계산해 저장 - 모든 준비가 완료된 뒤 결제 기능 및 쿼터 제한 로직을 릴리즈 이 과정에서 가장 중요했던 건 실시간 webhook 기반 데이터 수신이 정확히 이루어졌는지를 검증하고, 이후 기능을 안전하게 전환하는 것이었습니다. 현재 회사에서는 고객사의 인프라, 컨테이너 상태, 로그 데이터를 시각화하는 실시간 대시보드 기능을 유지보수하고 있습니다. 특정 고객사 환경에서 1~2분 간격으로 대시보드가 공백 상태로 표시되는 이슈가 반복적으로 발생했으며, 폐쇄망 환경이라 원격 디버깅도 어려운 상황이었습니다. 현장에 방문해 확인한 결과, 다음과 같은 문제를 발견했습니다: - 고객사 로그가 delete로 주기적으로 정리되면서, PostgreSQL 내부에서 dead tuple이 대량으로 발생 - dead tuple 증가로 인해 일부 조회 쿼리의 응답 시간이 10초를 초과 - 대시보드는 10초마다 갱신 요청을 보내는데, 이 시간이 넘어가면 화면이 비워지는 문제가 발생 해결을 위해 저는 다음과 같은 개선 작업을 진행했습니다: - 실시간 요청마다 고객사 DB를 직접 조회하던 구조를 제거 - 일정 간격으로 짧은 주기의 배치 작업을 실행해, 미리 통계 데이터를 수집하고 별도 테이블로 저장 - 예전 데이터를 활용해서 해당 배치 작업으로 계산된 통계 데이터가 정확한지 검증 후 prod 반영 이 변경 이후 대시보드 공백 문제는 해결되었고, 전체 시스템 응답 속도도 유의미하게 개선되었습니다. 이 두 가지 경험을 통해 저는, 기능을 설계할 때 단순히 “잘 동작하는지” 뿐 아니라 그 기능이 실제 운영 환경에서 어떻게 동작할지, 사용자 입장에서는 어떻게 보일지를 항상 같이 생각하게 되었습니다. 데이터 흐름 전반에 대한 이해와, 정합성과 성능을 함께 고려한 설계 역량을 키워나가고 있습니다. [다양한 요구사항을 반영할 수 있는 확장성 있는 코드 설계 경험] 서비스를 운영하다 보면 처음부터 완벽하게 모든 케이스를 커버할 수는 없기 때문에, 처음 설계할 때부터 변화 가능성을 고려한 유연한 구조를 갖추는 것이 중요합니다. 특히 SaaS 기반 서비스에서는 고객마다 사용하는 도구, 요구사항이 다르기 때문에 동일한 비즈니스 로직도 각 상황에 맞게 유연하게 적용할 수 있는 설계가 필요했습니다. 세일즈맨용 스케줄링 SaaS 서비스를 개발하면서, 고객마다 사용하는 캘린더 환경이 달랐습니다. 어떤 고객은 Google Calendar를, 어떤 고객은 Outlook을 사용했고, 추후에는 ****.*** 등의 타사 캘린더 연동 요구도 생겼습니다. 처음부터 특정 캘린더 API에 의존하지 않도록, Strategy 패턴을 활용하여 각 캘린더 종류별로 연동 방식을 분리해 구현했습니다. 고객이 선택한 캘린더 종류에 따라 적절한 전략이 동작하도록 구성했고, 연동 대상이 추가되더라도 기존 코드 수정 없이 전략 클래스를 추가하여 대응할 수 있도록 했습니다. Notification 로직에서도 동일한 일정 변경 이벤트라도 Slack, NHN Cloud 등 채널마다 요구하는 요청 형식이 달랐기 때문에, Factory 패턴을 활용하여 공통 이벤트를 각 채널에 맞는 형태로 가공해 보낼 수 있도록 구현했습니다. 외부 자동화 도구인 Zapier와 연동하는 기능을 개발할 때는 버전 호환성을 고려해야 했습니다. Zapier는 사용자가 직접 시나리오를 구성해두기 때문에, 한번 연동된 시스템은 새 버전이 나와도 바꾸지 않는 경우가 대부분입니다. 이런 구조적 특성상, 기존에 Zap v1 연동을 사용 중인 고객은 v2 이상의 연동이 나와도 기존 방식 그대로 유지될 수 있어야 했고, 신규 고객은 최신 버전을 적용받을 수 있어야 했습니다. 이 때는 Strategy 패턴을 활용해 버전 기반 핸들러 구조를 설계해, Payload에 포함된 버전에 따라 알맞은 handler가 동작하도록 처리했습니다. 기존 로직을 변경하지 않고도, 신규 버전을 확장하는 방식으로 기능 추가와 유지보수를 동시에 만족시킬 수 있었습니다. 기능을 처음 설계할 때부터 확장성과 유연성을 고려하는 것은 개발자의 편의를 넘어서, 서비스의 지속성과 고객 만족도에 직결되는 중요한 요소입니다. 단순히 동작하는 코드를 만드는 것을 넘어, 나중에 변경이 생겨도 쉽게 대응할 수 있는 구조를 고민하고 구현하는 것이 제가 서비스를 설계할 때 가장 중요하게 생각하는 부분 중 하나입니다."
+              - text: ... 더보기
+          - generic [ref=e109]:
+            - generic [ref=e110]:
+              - generic [ref=e111]: 스타트업에 기대하는 점
+              - generic [ref=e112]:
+                - generic [ref=e113]: 풍부한 대화
+                - generic [ref=e114]: 도전적인 문제
+                - generic [ref=e115]: 주도성
+            - generic [ref=e117]:
+              - generic [ref=e118]: 경력
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - generic [ref=e122]:
+                    - generic [ref=e124]:
+                      - img [ref=e126]
+                      - img "/company-placeholder.svg" [ref=e127]
+                    - generic [ref=e128]:
+                      - generic [ref=e130]: IT솔루션 중소기업
+                      - generic [ref=e131]: Backend Developer
+                      - generic [ref=e132]: B2B
+                  - generic [ref=e133]: 2024. 07 - 재직중 ‧ 1년 9개월
+                - generic [ref=e134]:
+                  - generic [ref=e136]:
+                    - generic [ref=e138]: Java
+                    - generic [ref=e140]: Kotlin
+                    - generic [ref=e142]: PostgreSQL
+                  - generic [ref=e143] [cursor=pointer]:
+                    - generic [ref=e144]: 📄 고객사의 데이터를 수집·정제하여 시각화하는 B2B 데이터 플랫폼을 개발하고 있습니다. 📌 내부 데이터 수집 자동화 툴 유지보수 및 성능 개선 다양한 고객사 환경에서 실행되는 데이터 수집 및 정제 자동화 툴을 유지보수하며, 성능 병목을 개선하고, 주요 컴포넌트의 Kotlin / WebFlux 기반 마이그레이션을 진행했습니다. - Spring 기반 데이터 수집 툴의 유지보수 및 장애 대응 - 고객사별 스키마/쿼리에 대응한 수집 쿼리 최적화 및 PostgreSQL 성능 개선 - 일부 모듈을 Kotlin + Spring WebFlux 기반으로 리팩토링하여 비동기 처리를 도입 중 - 수집 툴이 다양한 포맷(CSV, Excel, API 등)을 안정적으로 처리할 수 있도록 변환 로직 유지보수 및 테스트 작성
+                    - text: ... 더보기
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - generic [ref=e148]:
+                    - generic [ref=e150]:
+                      - img [ref=e152]
+                      - img "/company-placeholder.svg" [ref=e153]
+                    - generic [ref=e154]:
+                      - generic [ref=e155]:
+                        - generic [ref=e156]: IT SaaS 스타트업
+                        - generic [ref=e157]: 스타트업
+                      - generic [ref=e158]: Backend Developer
+                      - generic [ref=e159]: B2B ‧ SaaS
+                  - generic [ref=e160]: 2022. 11 - 2023. 12 ‧ 1년 2개월
+                - generic [ref=e161]:
+                  - generic [ref=e162] [cursor=pointer]:
+                    - generic [ref=e163]:
+                      - generic [ref=e165]: TypeScript
+                      - generic [ref=e167]: ReactJS
+                      - generic [ref=e169]: NestJS
+                      - generic [ref=e171]: PostgreSQL
+                      - generic [ref=e173]: Docker
+                      - generic [ref=e175]: Google-Cloud-Build
+                      - generic [ref=e177]: Docker Compose
+                    - generic [ref=e178]: "+1"
+                  - generic [ref=e179] [cursor=pointer]:
+                    - generic [ref=e180]: "세일즈맨을 대상으로 하는 신규 스케줄링 SaaS 서비스 개발에 참여했습니다. - 데이터베이스 스키마 변경: TypeORM Migration을 사용하여 비즈니스 로직 업데이트에 따른 RDBMS 마이그레이션을 성공적으로 수행. - 결제 서비스 이관: Paddle 결제 서비스 도입을 통해 기존 PG사의 100여 개 고객사 데이터를 성공적으로 이관하고, 데이터 전략 설계 및 임시테이블을 활용한 데이터 추출 작업을 주도. - 캘린더 서비스 통합: Google Calendar와 Outlook API를 통해 캘린더 서비스를 통합하여 효율적인 일정 조율 서비스 구현. - 서드파티 서비스 연동 기능 제공 : Slack, Sendgrind 알람 전송 기능, Zapier 연동 기능 구현 - 프론트엔드 업무 수행 : React를 활용하여 일부 기능의 프론트엔드 작업을 수행"
+                    - text: ... 더보기
+            - generic [ref=e182]:
+              - generic [ref=e183]: 직무 관련 활동
+              - generic [ref=e184]:
+                - generic [ref=e185]: 💡
+                - generic [ref=e186]:
+                  - generic [ref=e187]:
+                    - generic [ref=e188]:
+                      - generic [ref=e189]: DG Times
+                      - generic [ref=e190]: 2022. 08- 2022. 09 ‧ 2개월
+                    - generic [ref=e192]:
+                      - generic [ref=e194]: Java
+                      - generic [ref=e196]: RabbitMQ
+                      - generic [ref=e198]: SpringBoot
+                      - generic [ref=e200]: MySQL
+                      - generic [ref=e202]: Docker
+                      - generic [ref=e204]: AWS
+                  - generic [ref=e206] [cursor=pointer]:
+                    - generic [ref=e207]: 항해 99에서 진행한 프로젝트로 키워드 기반의 빠르고 간편한 뉴스 검색 및 분석 서비스 입니다. - 뉴스 데이터 300만 건의 키워드 검색 성능을 향상시키기 위해서 Full Text Search 를 도입해, 키워드 검색 조회 시간 2,150% 개선(18초 → 0.8초) - 실제 사용자 트래픽을 고려하여 Main - Replica DB 이중화 방식으로 구축하여 시간당 읽기 1만 건, 쓰기 2500건 동시 처리 - 뉴스 키워드 분석 조회 성능을 향상시키기 위해 Redis로 캐싱 기능을 구축하여 키워드 분석 조회 시간 91% 단축(4초 → 0.3초) - 뉴스 데이터 300만 건 수집 성능 향상을 위해 Rabbitmq와 Spring Scheduled & Async를 활용한 데이터 파이프라인을 구축하여 수집 성능 530% 향상(19H → 3H)
+                    - text: ... 더보기
+              - generic [ref=e208]:
+                - generic [ref=e209]: 💡
+                - generic [ref=e210]:
+                  - generic [ref=e211]:
+                    - generic [ref=e212]:
+                      - generic [ref=e213]: OO대 커뮤니티
+                      - generic [ref=e214]: 2022. 03- 2023. 03 ‧ 1년 1개월
+                    - generic [ref=e216]:
+                      - generic [ref=e218]: TypeScript
+                      - generic [ref=e220]: NestJS
+                      - generic [ref=e222]: MySQL
+                      - generic [ref=e224]: AWS-ECS
+                  - generic [ref=e226] [cursor=pointer]:
+                    - generic [ref=e227]: OO대학교 학생들이 운영하는 MAU 3만 명 규모의 OO대 대표 커뮤니티입니다. - 학교 공지사항 및 학사 일정 등 수작업으로 진행하던 데이터 수집 과정을 Python & Scheduled를 활용하여 자동화 구축 - 서버 유지보수를 위해 PHP 기반의 서버를 Nest js로 마이그레이션 프로젝트 진행 중 - 졸업으로 인한 초기 개발자 이탈로 인한 인수 인계 문제를 스터디를 진행하여 해결, (2022년 기준 총 7명의 개발팀원 진행) - 수강 신청 등의 특정 이벤트에서 유저 급증에 따른 알림 로그 수집으로 인한 데이터베이스 메모리 부족 문제를 해결하기 위해, DB 스케일업을 통해 해결, 이를 통해 2022년 3월 기준 MAU 3만명을 안정적으로 처리
+                    - text: ... 더보기
+            - generic [ref=e229]:
+              - generic [ref=e230]: 학력
+              - generic [ref=e231]:
+                - generic [ref=e233]:
+                  - img [ref=e235]
+                  - img "/college-placeholder.svg" [ref=e236]
+                - generic [ref=e238]:
+                  - generic [ref=e239]:
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: OO대학교
+                      - generic [ref=e242]: 학사
+                    - generic [ref=e243]:
+                      - generic [ref=e244]: 컴퓨터공학
+                      - generic [ref=e245]: 컴퓨터 관련 전공
+                  - generic [ref=e246]:
+                    - generic [ref=e247]: 2015 - 2022 ‧
+                    - generic [ref=e248]: 졸업
+            - generic [ref=e250]:
+              - generic [ref=e251]: 관심 스킬
+              - generic [ref=e252]:
+                - generic [ref=e254]: Java
+                - generic [ref=e256]: TypeScript
+                - generic [ref=e258]: NestJS
+                - generic [ref=e260]: SpringBoot
+                - generic [ref=e262]: MySQL
+            - generic [ref=e264]:
+              - generic [ref=e265]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e266] [cursor=pointer]:
+                - generic [ref=e267]:
+                  - generic [ref=e268]:
+                    - img [ref=e270]
+                    - img "kakao-login-button" [ref=e271]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e273]:
+        - generic [ref=e274]: 이력서 하이라이트
+        - generic [ref=e275]: 고민의 흔적을 상세히 작성하며 주도적 문제해결 역량 어필
+        - generic [ref=e278]:
+          - generic [ref=e279]:
+            - generic [ref=e280]: 다양한 유형의 제품과 다양한 기능 구현 가능
+            - generic [ref=e281]:
+              - generic [ref=e282]: 📍 돋보이는 표현
+              - generic [ref=e283]: “동시성 처리와 외부 서비스 연동에 대한 경험을 가지고 있으며, B2C SaaS부터 B2B 데이터 프로덕트까지, 제품의 본질적인 문제 해결에 집중해 왔습니다.”
+            - generic [ref=e284]:
+              - generic [ref=e285]: 📝 이렇게 쓰세요
+              - generic [ref=e286]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시
+          - generic [ref=e288]:
+            - generic [ref=e289]: 자신만의 개발 철학
+            - generic [ref=e290]:
+              - generic [ref=e291]: 📍 돋보이는 표현
+              - generic [ref=e292]: “로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용”
+            - generic [ref=e294]:
+              - generic [ref=e295]: 📝 이렇게 쓰세요
+              - generic [ref=e296]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로
+          - generic [ref=e299]:
+            - generic [ref=e300]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e301] [cursor=pointer]:
+              - generic [ref=e302]:
+                - generic [ref=e303]:
+                  - img [ref=e305]
+                  - img "kakao-login-button" [ref=e306]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e307]
+  - button "그룹바이 상담 버튼" [ref=e309]:
+    - generic [ref=e310] [cursor=pointer]:
+      - generic [ref=e311]: 그룹바이 상담 버튼
+      - img [ref=e313]

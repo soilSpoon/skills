@@ -1,0 +1,268 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]:
+        - img [ref=e10]
+        - img "logo" [ref=e11] [cursor=pointer]
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "스카우트 제안받기" [ref=e14] [cursor=pointer]:
+            - /url: /scouts
+            - heading "스카우트 제안받기" [level=2] [ref=e15]
+          - link "채용 공고" [ref=e16] [cursor=pointer]:
+            - /url: /positions
+            - heading "채용 공고" [level=2] [ref=e17]
+          - link "이력서 팁" [ref=e18] [cursor=pointer]:
+            - /url: /landing/resume
+            - heading "이력서 팁" [level=2] [ref=e19]
+          - link "연봉 진단" [ref=e20] [cursor=pointer]:
+            - /url: /salary-analysis/landing
+            - heading "연봉 진단" [level=2] [ref=e21]
+          - link "취업 세미나" [ref=e22] [cursor=pointer]:
+            - /url: https://zero-base.co.kr/event/career_agency_live_3_4th_groupby
+            - heading "취업 세미나" [level=2] [ref=e23]
+        - generic [ref=e25]:
+          - img [ref=e29] [cursor=pointer]
+          - generic [ref=e32]:
+            - button "회원가입 · 로그인" [ref=e33] [cursor=pointer]
+            - link "기업 서비스" [ref=e34] [cursor=pointer]:
+              - /url: /biz
+              - button "기업 서비스" [ref=e35]
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 합격하는 이력서
+        - generic [ref=e40]: 그룹바이가 엄선한 매력적인 프로필에서 합격 노하우를 발견하세요
+      - generic [ref=e41]:
+        - generic [ref=e43] [cursor=pointer]: 전체
+        - generic [ref=e45] [cursor=pointer]: 개발
+        - generic [ref=e47] [cursor=pointer]: 마케팅
+        - generic [ref=e49] [cursor=pointer]: 디자인
+        - generic [ref=e51] [cursor=pointer]: 기획
+        - generic [ref=e53] [cursor=pointer]: 영업/세일즈
+        - generic [ref=e55] [cursor=pointer]: 사업개발
+        - generic [ref=e57] [cursor=pointer]: 경영지원
+        - generic [ref=e59] [cursor=pointer]: CX/CS
+    - generic [ref=e63]:
+      - generic [ref=e64] [cursor=pointer]:
+        - img [ref=e65]
+        - generic [ref=e67]: 이전
+      - generic [ref=e68]: 12/73
+      - generic [ref=e69] [cursor=pointer]:
+        - generic [ref=e70]: 다음
+        - img [ref=e71]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e77]: 🏆 스카웃 제안 1회, 서류합격 1회 후 최종합격 했어요.
+        - generic [ref=e79]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - img "유저아이콘" [ref=e88]
+              - generic [ref=e89]:
+                - generic [ref=e91]: 박**
+                - generic [ref=e92]:
+                  - generic [ref=e93]: 2년
+                  - generic [ref=e95]: 프론트엔드
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: 🔥
+                - text: 적극 구직 중
+              - generic [ref=e99]:
+                - generic [ref=e100]: 💎
+                - text: 첫 제안 수락률 높음
+              - generic [ref=e101]:
+                - generic [ref=e102]: 👥
+                - text: 사용자 있는 프로젝트
+              - generic [ref=e103]:
+                - generic [ref=e104]: 🌱
+                - text: 성장 기록
+          - generic [ref=e106]:
+            - generic [ref=e107]: 자기소개
+            - generic [ref=e108]:
+              - generic [ref=e109]: 성실한
+              - generic [ref=e110]: 책임감이 강한
+              - generic [ref=e111]: 시간을 잘 지키는
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]: 핵심역량 · 보험 및 교육 도메인 중심의 사내 시스템 및 웹 서비스 개발 경험 · 프로젝트 기획부터 UI/UX 설계, 프론트엔드 개발까지 전 과정 참여 역량 · SSR 기반 성적표 렌더링 서비스 및 보험 청구 시스템 개발 경험 · Figma 기반 인터페이스 설계 및 Jira, Notion을 활용한 팀 협업 경험 · 필요 시 Flask, Nest.js를 활용한 간단한 백엔드 개발 수행 가능 · 코드 품질 향상 및 빌드 최적화를 통한 개발 환경 개선 경험 자기소개 웹 서비스의 구조적 설계와 UI/UX 개선에 강점을 가진 프론트엔드 개발자입니다. 보험 도메인의 청구 시스템과 교육 도메인의 강사용 백오피스, 학생 성적 관리 시스템 등 다양한 비즈니스 기능을 구현해왔으며, SSR 기반 렌더링부터 복잡한 업무 로직까지 효율적으로 풀어내는 데 집중해왔습니다. 기획부터 개발까지 전 과정에 주도적으로 참여하며, 실무에서 요구되는 커뮤니케이션 능력과 기술적 유연성을 겸비하고 있습니다. 작은 개선에도 의미를 부여하며 지속적으로 성장하는 개발자입니다.
+              - text: ... 더보기
+          - generic [ref=e115]:
+            - generic [ref=e116]:
+              - generic [ref=e117]: 스타트업에 기대하는 점
+              - generic [ref=e118]:
+                - generic [ref=e119]: 성장 지원 복지
+                - generic [ref=e120]: 새로운 일에 도전
+                - generic [ref=e121]: 트렌디한 기술
+              - generic [ref=e123] [cursor=pointer]:
+                - generic [ref=e124]: "- 트렌디한 기술 스택을 자유롭게 도입하고 실험해볼 수 있는 기술적 자율성을 기대합니다. - 빠른 의사결정으로 새로운 시도와 도전을 할 수 있는 환경을 경험하고 싶습니다. - 적극적인 성장 지원을 통해 꾸준히 발전할 수 있는 기회를 얻고 싶습니다. - 열정 있는 동료들과 함께 기술적 고민을 나누며 함께 성장하고 싶습니다. - 수평적인 문화 속에서 자유롭게 의견을 제시하고 토론할 수 있는 환경을 기대합니다."
+                - text: ... 더보기
+            - generic [ref=e126]:
+              - generic [ref=e127]: 이직하는 이유
+              - generic [ref=e129] [cursor=pointer]:
+                - generic [ref=e130]: 현재 회사에서의 2년간 경험을 통해 많은 것을 배웠지만, 빠르게 발전하는 프론트엔드 생태계에서 새로운 도전이 필요하다고 느꼈습니다. 기존 기술 스택만을 사용하다 보니 기술적 성장에 한계를 느끼고 있으며, 프론트엔드 개발 시장의 빠른 변화 속에서 뒤처지지 않기 위해 새로운 기술을 적극적으로 도입하고 경험해볼 수 있는 환경에서 성장하고 싶기 때문에 이직을 결정하게 되었습니다.
+                - text: ... 더보기
+            - generic [ref=e132]:
+              - generic [ref=e133]: 경력
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - generic [ref=e137]:
+                    - generic [ref=e139]:
+                      - img [ref=e141]
+                      - img "/company-placeholder.svg" [ref=e142]
+                    - generic [ref=e143]:
+                      - generic [ref=e144]:
+                        - generic [ref=e145]: 에듀스타트업
+                        - generic [ref=e146]: 스타트업
+                      - generic [ref=e147]: 프론트엔드 개발
+                      - generic [ref=e148]: B2B ‧ B2C ‧ B2B2C ‧ 에듀테크
+                  - generic [ref=e149]: 2025. 07 - 재직중 ‧ 9개월
+                - generic [ref=e150]:
+                  - generic [ref=e152]:
+                    - generic [ref=e154]: Emotion
+                    - generic [ref=e156]: NextJS
+                    - generic [ref=e158]: ReactJS
+                    - generic [ref=e160]: Lottie
+                    - generic [ref=e162]: Github
+                    - generic [ref=e164]: React-Query
+                    - generic [ref=e166]: Vite
+                  - generic [ref=e167] [cursor=pointer]:
+                    - generic [ref=e168]: "● 강사용 백오피스 시스템 개발 (2025.07 - 2024.08) · 강사가 사용하는 원생 관리용 백오피스 개발 · 학생 관리, 과제 추가, 리포트 등록, 성적표 조회 등 주요 기능 구현 · GA4를 통한 강사 행동 패턴 분석 및 주요 기능별 사용률 측정 · MS Clarity로 사용자 세션 리플레이 및 히트맵 분석을 통한 UX 개선 · Statsig 활용하여 신규 기능 배포 시 킬스위치 및 단계적 출시 관리 · 사용기술: Next.js, Emotion, Zustand, React Query ● 학생 성적 조회 웹뷰 개발 (2025.07 - 2025.07) · 학생이 자신의 성적 데이터를 확인할 수 있는 웹 서비스 개발 · 성적 요약 및 지난 성적 확인 등 학생 맞춤형 UI 구현 · Emotion 스타일링과 React Query를 활용해 가볍고 반응성 높은 UI 제공 · 사용기술: React, Vite, Emotion, Zustand, React Query ● 성적표 렌더링 서비스 개발 (2025.07 - 2024.07) · 학생 개별 성적표를 SSR 기반으로 렌더링하는 서비스 개발 · Next.js SSR을 활용해 안정적인 성적표 렌더링 및 배포 성능 최적화 · Emotion 기반 컴포넌트 스타일링과 Zustand + React Query로 상태 관리/데이터 통신 구조화 · 사용기술: Next.js (SSR), Emotion, Zustand, React Query"
+                    - text: ... 더보기
+              - generic [ref=e170]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]:
+                    - generic [ref=e174]:
+                      - img [ref=e176]
+                      - img "/company-placeholder.svg" [ref=e177]
+                    - generic [ref=e178]:
+                      - generic [ref=e179]:
+                        - generic [ref=e180]: 증권스타트업
+                        - generic [ref=e181]: 스타트업
+                      - generic [ref=e182]: 개발팀/프론트엔드 개발자
+                      - generic [ref=e183]: B2B ‧ B2B2C
+                  - generic [ref=e184]: 2022. 11 - 2024. 12 ‧ 2년 2개월
+                - generic [ref=e185]:
+                  - generic [ref=e186] [cursor=pointer]:
+                    - generic [ref=e187]:
+                      - generic [ref=e189]: TypeScript
+                      - generic [ref=e191]: NextJS
+                      - generic [ref=e193]: Recoil
+                      - generic [ref=e195]: Flask
+                      - generic [ref=e197]: NestJS
+                      - generic [ref=e199]: MySQL
+                      - generic [ref=e201]: HTML/CSS
+                      - generic [ref=e203]: Jira
+                      - generic [ref=e205]: GitLab
+                      - generic [ref=e207]: Figma
+                    - generic [ref=e208]: "+2"
+                  - generic [ref=e209] [cursor=pointer]:
+                    - generic [ref=e210]: "● 단체상해보험 청구 시스템 및 관리자 포털 개발 (2024.07 - 2024.08) · 보험금 청구 웹 서비스 및 백오피스 시스템 개발 · 보험사 파일 업로드 제한(10MB) 이슈를 해결하기 위해 이미지 리사이징 및 파일 검증 로직을 구현, 대용량 첨부로 인한 청구 실패 사례 방지 · 다중 보험금 항목을 효율적으로 처리할 수 있도록 청구 시스템 구조 설계 및 구현 · 그룹별 담보 설정, 보험료 관리, 담당자 할당 등 계약 중심의 백오피스 기능 개발 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil ● OO케어 서비스 관리 백오피스 시스템 개발 (2024.06 - 2024.10) · OO케어 서비스 관리 백오피스 시스템 개발 · 사용자 권한 기반 수리비 청구 관리, 필터링 및 무한 스크롤을 통한 데이터 접근성 개선 · Loss-cap 현황 시각화 차트 및 보장 부위 다중 표현으로 손해사정사가 필요한 정보를 직관적으로 파악 가능하도록 개선 · 서류 일괄 다운로드 및 이미지 미리보기 기능 도입으로 손해사정 업무의 반복 작업 감소 및 처리 편의성 향상 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil, Recharts ● DNO(임원배상책임보험) 웹 서비스 개발 (2023.12 - 2023.12) · DNO(임원배상책임보험) 서비스 프론트엔드 및 백엔드 개발 · 보험 가입 시 필요한 기업 정보(KOSPI 상장일, 산업분류코드 등)를 사전 DB로 구축하여 사용자 입력 편의성 확보 · 사용자(예: 기업 대표)가 문서 작성 시 필요한 정보를 한눈에 확인하고 빠르게 입력할 수 있도록 UI/데이터 구조 설계 · 반복적인 정보 입력을 줄여 보험사/가입자 모두의 업무 효율 향상에 기여 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil, Flask, MySQL ● 영업정지보상보험 보험금 청구 웹 서비스 개발 (2023.11 - 2023.12) · 영업정지보상보험 웹 서비스 개발 · 가입부터 보험금 청구까지 전 과정을 모바일 환경에 맞춰 구현하여 사용자 접근성 향상 · PASS 본인인증 및 PG사 결제 모듈 연동으로 안정적인 인증 및 결제 플로우 구축 · 관리자용 백오피스를 통해 가입자 정보, 청구 내역, 계약 철회/해지 등을 통합적으로 관리 가능하도록 개발 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil ● 빌드 프로세스 개선 (2023.10 - 2023.10) · EC2 서버의 리소스 한계로 인해 애플리케이션 빌드 자체가 실패하는 문제 해결을 위한 빌드 프로세스 개선 · 로컬 환경에서 도커 이미지를 사전 빌드 후 DockerHub에 업로드, EC2에서는 컨테이너만 배포하는 구조로 전환하여 리소스 부담 해소 · Next.js standalone 기능 활용으로 이미지 크기 최적화 및 빌드 시간 약 3분 이내로 단축 · blue-green 방식의 무중단 배포 자동화 스크립트 구축으로 운영 안정성과 배포 효율성 향상 · 사용기술: Docker, DockerHub, AWS EC2 ● 공통 컴포넌트 라이브러리 개발 (2023.07 - 2023.07) · 폴리레포 구조의 코드 중복 문제 해소를 위해 공통 컴포넌트 라이브러리 설계 및 초기 개발 주도 · Rollup 기반 번들링 및 상세 문서화 후 npm 배포, 3개 사내 프로젝트에 적용되어 컴포넌트 재사용 구조 기반 마련 · 인력 부족 및 유지보수 한계로 전체 적용은 어려웠으나, 사내 공통화 방향성 제시 및 코드 통일성 개선에 기여 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil, Rollup, npm ● 본인인증 서버 시스템 개발 (2023.05 - 2023.05) · Express/JS 기반 PASS 본인인증 레거시 코드를 Nest.js 기반으로 재구축하여 유지보수성과 안정성 향상 · 공통 인증 서버를 구축하여 3개 이상의 서비스에 재사용, 인증 요청 시 서비스별 키 발급 및 유저 정보 저장 방식 분리 설계 · 본인인증 로직의 일관성 확보와 프로젝트 간 중복 구현 방지에 기여 · 사용기술: Nest.js, TypeScript, MySQL ● 보험상품관리 백오피스 프로그램 개발 (2023.02 - 2023.05) · 보험상품 가입 및 보험금 청구/지급 관리를 위한 백오피스 시스템 개발 · 테이블 기반 데이터 UI 및 컬럼별 필터링 기능 구현으로 정보 접근성 향상 · 클라이언트 및 자사 보험상품 운영 효율성 개선 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil ● 프론트엔드 환경 개선 및 기술 스택 리팩토링 (2022.12 - 2023.02) · React 17 18, Next.js 12 13 마이그레이션을 통해 최신 환경으로 안정성 확보 · 레거시 및 deprecated 라이브러리 제거 및 교체로 번들 사이즈 및 로딩 속도 개선 · SWC 도입과 Babel 제거를 통해 빌드 시간 약 40% 단축 · ESLint 및 Prettier 기반 코드 컨벤션 정립으로 협업 효율 및 코드 일관성 강화 · 전반적인 코드 품질 향상 및 장기 유지보수성 개선에 기여 · 사용기술: React, Next.js, TypeScript, SWC, ESLint, Prettier ● 사내 ERP 시스템 유지보수 및 개발 (2022.11 - 2024.11) · 사내 ERP 및 어드민 시스템 유지보수 및 개발을 단독으로 담당, 주요 기능 구조 개선 및 UI 재설계 주도 · 폴더 구조 재정비 및 공통 컴포넌트 분리(예: Table, Modal, Input 등)로 재사용성 및 유지보수 효율 향상 · 회원관리, 검색/필터 기능 등을 도입하여 운영팀의 데이터 조회 시간 개선 · 실사용자 피드백을 기반으로 UI/UX를 지속 개선하며 업무 만족도 및 사용성 향상에 기여 · 사용기술: Next.js, Tailwind CSS, TypeScript, Recoil ● UI/UX 기획 및 디자인 작업 (2022.11 - 2024.11) · Figma를 활용해 기획 단계부터 디자인 완성까지 전 과정을 주도적으로 수행 · 와이어프레임 및 프로토타입 제작을 통해 팀원들과의 효율적인 커뮤니케이션 지원 · 사용도구: Figma"
+                    - text: ... 더보기
+            - generic [ref=e212]:
+              - generic [ref=e213]: 학력
+              - generic [ref=e214]:
+                - generic [ref=e216]:
+                  - img [ref=e218]
+                  - img "/college-placeholder.svg" [ref=e219]
+                - generic [ref=e221]:
+                  - generic [ref=e222]:
+                    - generic [ref=e223]:
+                      - generic [ref=e224]: OO대학교
+                      - generic [ref=e225]: 학사
+                    - generic [ref=e227]: 경영학과
+                  - generic [ref=e228]:
+                    - generic [ref=e229]: 2016 - 2019 ‧
+                    - generic [ref=e230]: 졸업
+            - generic [ref=e232]:
+              - generic [ref=e233]: 관심 스킬
+              - generic [ref=e234]:
+                - generic [ref=e236]: JavaScript
+                - generic [ref=e238]: TypeScript
+                - generic [ref=e240]: Emotion
+                - generic [ref=e242]: NextJS
+                - generic [ref=e244]: ReactJS
+                - generic [ref=e246]: Redux
+                - generic [ref=e248]: Recoil
+                - generic [ref=e250]: Tailwind
+                - generic [ref=e252]: NGINX
+                - generic [ref=e254]: NestJS
+                - generic [ref=e256]: MySQL
+                - generic [ref=e258]: Docker
+                - generic [ref=e260]: Github
+                - generic [ref=e262]: Github-Action
+                - generic [ref=e264]: RESTful API
+                - generic [ref=e266]: Jira
+                - generic [ref=e268]: Git
+                - generic [ref=e270]: GitLab
+                - generic [ref=e272]: Figma
+                - generic [ref=e274]: Styled-Component
+                - generic [ref=e276]: React-Query
+                - generic [ref=e278]: Prettier
+                - generic [ref=e280]: Supabase
+            - generic [ref=e281]:
+              - generic [ref=e282]: 인재 배지
+              - generic [ref=e283]:
+                - generic [ref=e284]:
+                  - generic [ref=e285]:
+                    - img "사용자 있는 프로젝트" [ref=e288]
+                    - generic [ref=e289]:
+                      - generic [ref=e290]:
+                        - generic [ref=e291]: 사용자 있는 프로젝트
+                        - generic [ref=e292]:
+                          - generic [ref=e293]: 자기주도성
+                          - generic [ref=e294]: 오너십
+                          - generic [ref=e295]: 문제해결력
+                      - generic [ref=e296]:
+                        - img [ref=e297]
+                        - generic [ref=e299]: 프로젝트를 주도하여 실제 사용자를 만들어보았어요
+                  - generic [ref=e301]:
+                    - generic [ref=e302]: 진행하며 만난 가장 큰 문제는 무엇이었으며 어떻게 해결했나요?
+                    - generic [ref=e304]: 결제모듈을 연동이 가장 어려웠던 부분이였습니다. 처음 해보는 일이기도 하고 관련 자료가 많지 않았습니다.
+                - generic [ref=e305]:
+                  - generic [ref=e306]:
+                    - img "성장 기록" [ref=e309]
+                    - generic [ref=e310]:
+                      - generic [ref=e311]:
+                        - generic [ref=e312]: 성장 기록
+                        - generic [ref=e313]:
+                          - generic [ref=e314]: 자기주도성
+                          - generic [ref=e315]: 실무 능력
+                      - generic [ref=e316]:
+                        - img [ref=e317]
+                        - generic [ref=e319]: 성장 과정을 블로그 등에 꾸준히 기록해요
+                  - generic [ref=e321]:
+                    - generic [ref=e322]: 주로 어떤 기록을 작성하시나요?
+                    - generic [ref=e324]: 개발 중에 발생한 오류나 문제점들을 정리해서 기록하고, 그날 진행한 작업이나 있었던 일들도 함께 적고 있습니다. 같은 이슈를 반복해서 겪지 않도록 원인과 해결 과정을 간단히 메모해두고, 개발일지 형태로 하루의 작업 내용을 정리하는 편입니다.
+            - generic [ref=e327]:
+              - generic [ref=e328]: 그룹바이 로그인하고 모든 이력서를 무료로 확인해보세요
+              - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e329] [cursor=pointer]:
+                - generic [ref=e330]:
+                  - generic [ref=e331]:
+                    - img [ref=e333]
+                    - img "kakao-login-button" [ref=e334]
+                  - text: 카카오로 3초만에 로그인하기
+      - generic [ref=e336]:
+        - generic [ref=e337]: 이력서 하이라이트
+        - generic [ref=e338]: 프론트엔드 개발자로서 더 성장하고 싶은 의지
+        - generic [ref=e341]:
+          - generic [ref=e342]:
+            - generic [ref=e343]: 메타인지와 성장욕심이 나타나는 이직 사유
+            - generic [ref=e344]:
+              - generic [ref=e345]: 📍 돋보이는 표현
+              - generic [ref=e346]: “현재 회사에서의 2년간 경험을 통해 많은 것을 배웠지만, 빠르게 발전하는 프론트엔드 생태계에서 새로운 도전이 필요하다고 느꼈습니다. ”
+            - generic [ref=e347]:
+              - generic [ref=e348]: 📝 이렇게 쓰세요
+              - generic [ref=e349]: 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면 자세한 내용을 바로 확인하실 수 있어요. 로그인하시면
+          - generic [ref=e352]:
+            - generic [ref=e353]: 그룹바이 로그인하고 모든 하이라이트를 무료로 확인해보세요
+            - button "kakao-login-button 카카오로 3초만에 로그인하기" [ref=e354] [cursor=pointer]:
+              - generic [ref=e355]:
+                - generic [ref=e356]:
+                  - img [ref=e358]
+                  - img "kakao-login-button" [ref=e359]
+                - text: 카카오로 3초만에 로그인하기
+  - alert [ref=e360]
+  - button "그룹바이 상담 버튼" [ref=e362]:
+    - generic [ref=e363] [cursor=pointer]:
+      - generic [ref=e364]: 그룹바이 상담 버튼
+      - img [ref=e366]
