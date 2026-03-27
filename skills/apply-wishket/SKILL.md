@@ -153,33 +153,90 @@ WebFetch로 `https://www.wishket.com/project/{ID}/` 접근하여 추출:
 
 프로젝트가 2건 이상이면 병렬 에이전트를 활용한다.
 
+### 왜 Wave 0이 필요한가
+
+N개 에이전트가 독립적으로 최적 경험을 선택하면 범용성 높은 경험(HR, SIM)만 반복된다. 테스트에서 확인: 3회 iteration 모두 배치 2건이 HR+SIM 동일 조합을 선택했다. 클라이언트에게 "같은 이야기 반복"으로 보일 위험이 있다.
+
+이를 방지하기 위해 메인 세션이 Wave 1 전에 **경험 배분 계획**을 수립한다.
+
+### 실행 흐름
+
 ```
+[Wave 0] 경험 배분 계획 — 메인 세션 직접 수행
+  1. N개 프로젝트 URL을 병렬 WebFetch로 요구사항 키워드 빠르게 파악
+  2. experience-pool.md의 6개 경험 코드를 로드
+  3. 프로젝트별 경험 2-3개를 사전 배정:
+     - 1순위: 가장 직접적 매칭 (겹쳐도 OK)
+     - 2순위: N건 전체에서 다양하게 분산
+     - 동일 조합이 3건+ 반복 금지
+  4. 배분표 작성 (아래 예시)
+
+  | 프로젝트 | 경험 1 (핵심) | 경험 2 (분산) |
+  |---------|-------------|-------------|
+  | A (SaaS) | HR | MES |
+  | B (AI)  | SIM | MENU |
+  | C (대시보드) | MES | TOK |
+  | D (CMS) | HR | OSS |
+
 [Wave 1] 생성 — N개 병렬 (background)
-  각 에이전트: agents/proposal-writer.md 프롬프트로 Phase 1~5 독립 수행
-  → proposals/{ID}.md 저장
+  각 에이전트 프롬프트에 포함할 정보:
+    프로젝트 ID: {ID}
+    사전 배정 경험: {코드1}, {코드2}  ← Wave 0에서 결정
+    스킬 디렉토리: {skill-dir}
+    Master YAML: {path}
+    출력 경로: {output-dir}/{ID}.md
+  → agents/proposal-writer.md 절차 수행 → proposals/{ID}.md 저장
 
   (전체 완료 대기)
 
 [Wave 2] 검증 — 에이전트 2개 (병렬, background)
-  Verifier: agents/verifier.md — 수치/경험 fact-check + 크로스 일관성
-  Estimator: agents/estimator.md — 공수 추정 독립 검증 (프로젝트별)
+  **명시적 핸드오프** — 각 에이전트에게 전달:
+    생성된 파일 목록: ["proposals/A.md", "proposals/B.md", ...]
+    Master YAML: {path}
+    스킬 디렉토리: {skill-dir}
 
-  (완료 대기)
+  Verifier (agents/verifier.md):
+    - 모든 proposals/*.md를 읽고 수치/경험 fact-check
+    - 다건 간 크로스 일관성 (동일 수치 다르게 인용 여부)
+  Estimator (agents/estimator.md):
+    - 각 프로젝트 URL을 **독립적으로 re-fetch**
+    - estimation-guide.md로 별도 공수 산정
+    - proposal-writer 추정과 ±20% 비교
 
-[Wave 2.5] 구조 검사 — 메인 세션에서 직접 수행
+  (전체 완료 대기)
+
+[Wave 2.5] 구조 검사 — 메인 세션에서 직접 (grep/wc)
 
 [Wave 3] 수정 — FAIL 건만 (있으면 병렬)
-  FAIL 사유 + 파일 경로 전달 → 해당 부분만 수정
+  구체적 FAIL 사유 전달:
+    "153999.md: '70% 단축' → master.yaml에는 '50% 단축'"
+  → 해당 부분만 수정
 
 Phase 7: 사용자 리뷰 — 메인 세션
 ```
 
-**디스패치 규칙:**
-- Wave 1: 단일 메시지에 N개 Agent 호출, `run_in_background: true`
-- Wave 2: Wave 1 전체 완료 후 실행
-- 각 에이전트에 전달: 프로젝트 ID, 공유 리소스 경로, `<skill-dir>` 경로
+### 디스패치 규칙
 
-**단건이면** 에이전트 없이 메인 세션에서 Phase 1~7을 직접 수행.
+**Wave 0 (메인 세션, 에이전트 없음):**
+- WebFetch 병렬 호출로 프로젝트 요구사항 빠르게 파악
+- experience-pool.md 읽고 배분표 작성
+- 이 단계는 빠름 (fetch + 테이블)
+
+**Wave 1 (N개 에이전트):**
+- 단일 메시지에 N개 Agent 호출, `run_in_background: true`
+- 각 에이전트에 **사전 배정된 경험 코드** 전달 (Wave 0 결과)
+- agents/proposal-writer.md를 읽고 절차 수행
+- 공유 파일(master.yaml, docs/*.md)은 읽기 전용 → 동시 접근 안전
+
+**Wave 2 (2개 에이전트):**
+- Wave 1 **전체** 완료 확인 후에만 실행
+- **파일 목록을 명시적으로 전달** (암묵적 "proposals/ 읽어라" 금지)
+- Estimator는 프로젝트 URL을 독립적으로 re-fetch해야 함을 명시
+
+**Wave 3 (수정):**
+- FAIL 사유를 구체적으로: 파일명 + 위치 + 틀린 수치 + master.yaml 정답
+
+**단건이면** Wave 0~1 건너뛰고 메인 세션에서 Phase 1~7 직접 수행.
 
 ---
 

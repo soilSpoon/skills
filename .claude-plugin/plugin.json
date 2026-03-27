@@ -11,6 +11,7 @@
   "skills": [
     "./skills/tailor-resume/SKILL.md",
     "./skills/fact-check/SKILL.md",
-    "./skills/apply-wishket/SKILL.md"
+    "./skills/apply-wishket/SKILL.md",
+    "./skills/human-like-browser/SKILL.md"
   ]
 }

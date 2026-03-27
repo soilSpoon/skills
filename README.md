@@ -37,12 +37,32 @@ npx skills add soilSpoon/skills@fact-check
 - Auto-searches for higher-tier sources when only Tier 3-4 found
 - Outputs structured report with verdicts, conflicts, and diff-style fix suggestions
 
+### human-like-browser
+
+Human-like browser automation that bypasses bot detection systems.
+
+```bash
+npx skills add soilSpoon/skills@human-like-browser
+```
+
+**What it does:**
+- Bezier-curve mouse movements with micro-tremor and Fitts's Law timing
+- Log-normal typing delays with digraph timing and typo simulation (~600 chars/min)
+- Smooth inertia scrolling with trackpad/mousewheel mix
+- FCaptcha keystroke biometrics bypass (autocorrelation, dwell variance, log-normal fit)
+- Comprehensive anti-fingerprinting stealth (navigator.webdriver, hardware, WebGL, CDP artifacts)
+- Auto-stealth on navigation, idle fidget, element-scoped scrolling
+
+**Bundled scripts:**
+- `scripts/human-behavior.js` — Initialization block reference (paste into Playwright `browser_run_code`)
+
 ## Installation
 
 ```bash
 # Install a specific skill
 npx skills add soilSpoon/skills@tailor-resume
 npx skills add soilSpoon/skills@fact-check
+npx skills add soilSpoon/skills@human-like-browser
 ```
 
 ## License
