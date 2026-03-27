@@ -27,9 +27,11 @@ URL에서 ID 추출: `/project/(\d+)/` 패턴 매칭.
 | 파일 | 용도 | 언제 읽는가 |
 |------|------|-----------|
 | `<skill-dir>/docs/experience-pool.md` | 경험 코드 테이블, 매칭 규칙, 익명화 규칙, 포트폴리오 매핑 | Phase 2 시작 시 |
-| `<skill-dir>/docs/proposal-rules.md` | 지원서 템플릿, DO/DON'T, 금액 산정 로직 | Phase 3-4 시작 시 |
+| `<skill-dir>/docs/proposal-rules.md` | 지원서 템플릿, DO/DON'T, 금액 산정 로직 (7단계) | Phase 3 시작 시 |
+| `<skill-dir>/docs/estimation-guide.md` | 공수 추정 방법론: 기능 분해, 복잡도, 생산성 계수, 상식 체크 | Phase 3 공수 추정 시 |
 | `<skill-dir>/agents/proposal-writer.md` | 생성 에이전트 프롬프트 (다건 병렬 시) | Wave 1 디스패치 시 |
-| `<skill-dir>/agents/verifier.md` | 검증 에이전트 프롬프트 | Wave 2 디스패치 시 |
+| `<skill-dir>/agents/verifier.md` | 수치/경험 fact-check 에이전트 프롬프트 | Wave 2 디스패치 시 |
+| `<skill-dir>/agents/estimator.md` | 공수 추정 독립 검증 에이전트 프롬프트 | Wave 2 디스패치 시 |
 
 프로젝트 루트의 파일:
 | 파일 | 용도 |
@@ -74,11 +76,21 @@ WebFetch로 `https://www.wishket.com/project/{ID}/` 접근하여 추출:
 
 경험을 선택할 때 중요한 것은 기술 키워드 일치가 아니라, 클라이언트가 "이 사람이 우리 프로젝트의 어려운 점을 이미 경험해봤구나"라고 느낄 수 있는 스토리를 고르는 것이다. 프로젝트의 예상 이슈와 직접 연결되는 경험이 최우선.
 
-### Phase 3: 금액/기간 산정
+### Phase 3: 공수 추정 + 금액/기간 산정
 
-`<skill-dir>/docs/proposal-rules.md`의 금액 산정 섹션을 읽고 4단계 분석을 수행한다.
+**3-1. 공수 추정** — `<skill-dir>/docs/estimation-guide.md`를 읽고 5단계로 수행:
+1. 기능 분해 (명시적 + 암묵적 기능 모두 추출)
+2. 기능별 복잡도 평가 (S/M/L/XL + 체크리스트)
+3. 생산성 계수 적용 (기술 매칭도에 따라 ×1.0~2.0)
+4. 총 공수 산정 (기능 합계 + QA 20%)
+5. 상식 체크 (규모별 기대 범위와 비교)
 
-핵심: "예산 동일"로 끝내지 않고, 스코프 → 공수 → 일당 → 시장 비교 → 최종 결정의 근거 체인을 남긴다. 클라이언트 예산이 비현실적일 수 있으므로, 일당 단가가 시장 범위(25~40만)를 벗어나면 지원서에서 스코프 조율이나 우선순위 논의를 자연스럽게 언급한다.
+공수 추정은 기능별 테이블로 근거를 남긴다. "대략 50인일" 같은 감이 아니라, 각 기능의 복잡도와 인일을 명시.
+
+**3-2. 금액/기간 산정** — `<skill-dir>/docs/proposal-rules.md`의 7단계 분석:
+스코프 → 공수 → 강도(빡빡한 정도) → 예산 현실성 → 제안 금액 → 이탈도 체크 → 벤치마크 비교
+
+빡빡한 일정일수록 일당이 높아야 한다 — 그만큼 하루에 더 많은 시간을 투입해야 하기 때문이다. 강도 1.0을 넘으면 야근/주말이 필요하므로 프리미엄을 부과한다.
 
 ### Phase 4: 지원서 작성
 
@@ -148,9 +160,9 @@ WebFetch로 `https://www.wishket.com/project/{ID}/` 접근하여 추출:
 
   (전체 완료 대기)
 
-[Wave 2] 검증 — 에이전트 1개 (background)
-  agents/verifier.md 프롬프트로 전체 proposals/ + master.yaml 대조
-  → 수치 검증 + 크로스 일관성 검사
+[Wave 2] 검증 — 에이전트 2개 (병렬, background)
+  Verifier: agents/verifier.md — 수치/경험 fact-check + 크로스 일관성
+  Estimator: agents/estimator.md — 공수 추정 독립 검증 (프로젝트별)
 
   (완료 대기)
 
@@ -183,11 +195,13 @@ Phase 7: 사용자 리뷰 — 메인 세션
 
 ```
 apply-wishket/
-├── SKILL.md              # 이 파일
+├── SKILL.md                # 이 파일 — 워크플로우 + 에이전트 아키텍처
 ├── docs/
 │   ├── experience-pool.md  # 경험 코드, 매칭 규칙, 익명화, 포트폴리오 매핑
-│   └── proposal-rules.md   # 템플릿, DO/DON'T, 금액 산정
+│   ├── proposal-rules.md   # 템플릿, DO/DON'T, 금액 산정 7단계
+│   └── estimation-guide.md # 공수 추정: 기능 분해, 복잡도, 생산성 계수
 └── agents/
-    ├── proposal-writer.md   # 생성 에이전트 프롬프트
-    └── verifier.md          # 검증 에이전트 프롬프트
+    ├── proposal-writer.md  # 생성 에이전트 (Phase 1~5)
+    ├── verifier.md         # 수치/경험 fact-check 에이전트
+    └── estimator.md        # 공수 추정 독립 검증 에이전트
 ```

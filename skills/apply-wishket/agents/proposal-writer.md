@@ -6,21 +6,32 @@
 
 - `PROJECT_ID`: 위시켓 프로젝트 ID
 - `MASTER_YAML_PATH`: cv/master.yaml 경로
-- `EXPERIENCE_POOL_PATH`: docs/experience-pool.md 경로
-- `PROPOSAL_RULES_PATH`: docs/proposal-rules.md 경로
+- `SKILL_DIR`: 스킬 디렉토리 경로 (docs/, agents/ 포함)
 - `OUTPUT_PATH`: 결과 파일 저장 경로
 
 ## 절차
 
 1. **프로젝트 상세 Fetch**: WebFetch로 `https://www.wishket.com/project/{PROJECT_ID}/` 접근
-2. **경험 풀 읽기**: experience-pool.md에서 매칭 테이블 로드
-3. **master.yaml 읽기**: 경험 원천 데이터 확인 (수치, 기간, 기술 스택)
-4. **작성 규칙 읽기**: proposal-rules.md 숙지
-5. **경험 매칭**: 프로젝트 요구사항 vs 경험 풀 대조, 2-3개 선택
-6. **금액/기간 산정**: 4단계 분석 (스코프→공수→단가→최종)
-7. **지원서 작성**: 4단 템플릿으로 조립
-8. **포트폴리오 선택**: experience-pool.md 매핑 테이블에서 2-3개
-9. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
+2. **참조 파일 읽기**:
+   - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
+   - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계
+   - `{SKILL_DIR}/docs/estimation-guide.md` — 공수 추정 방법론
+   - `{MASTER_YAML_PATH}` — 경험 원천 데이터
+3. **경험 매칭**: 프로젝트 요구사항 vs 경험 풀 대조, 2-3개 선택
+4. **공수 추정** (estimation-guide.md 따라):
+   - 기능 분해 (명시적 + 암묵적)
+   - 기능별 복잡도 (S/M/L/XL) + 근거
+   - 생산성 계수 적용
+   - 총 공수 + QA 버퍼 + 상식 체크
+5. **금액/기간 산정** (proposal-rules.md 7단계):
+   - 강도 계산 (공수 ÷ 가용 작업일)
+   - 클라이언트 기대 일당 + 강도 보정
+   - 제안 금액/기간 + 프리미엄
+   - 이탈도 체크 (±20% 이내)
+   - 벤치마크 비교
+6. **지원서 작성**: 4단 템플릿으로 조립
+7. **포트폴리오 선택**: experience-pool.md 매핑 테이블에서 2-3개
+8. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
 
 ## 출력 형식
 
