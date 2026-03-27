@@ -1,6 +1,6 @@
 # Skills
 
-AI agent skills for resume tailoring and job application automation.
+AI agent skills collection.
 
 ## Available Skills
 
@@ -21,10 +21,28 @@ npx skills add soilSpoon/skills@tailor-resume
 **Bundled scripts:**
 - `scripts/groupby-api.mjs` — Groupby resume analysis API client (no browser needed)
 
+### fact-check
+
+Fact-check articles, newsletters, and written content by dispatching 6 parallel verification agents.
+
+```bash
+npx skills add soilSpoon/skills@fact-check
+```
+
+**What it does:**
+- Accepts text, file path, or URL as input
+- Extracts claims and classifies risk (high/medium/low)
+- Dispatches 6 parallel agents: source verify, number check, freshness check, context check, link check, assumption check
+- Cross-references results with Tier 1-4 source credibility system
+- Auto-searches for higher-tier sources when only Tier 3-4 found
+- Outputs structured report with verdicts, conflicts, and diff-style fix suggestions
+
 ## Installation
 
 ```bash
+# Install a specific skill
 npx skills add soilSpoon/skills@tailor-resume
+npx skills add soilSpoon/skills@fact-check
 ```
 
 ## License
