@@ -1,305 +1,105 @@
 ---
 name: tailor-resume
-description: Tailor resume and career description for a specific job posting. Use when the user provides a job posting URL and wants their resume customized for that position — analyzing requirements, filtering relevant experience/skills/projects from master.yaml, generating a variant, building PDFs, and evaluating via groupby. Triggers on "이 공고에 맞게 이력서 만들어줘", "tailor my resume for this job", "이 포지션에 지원하려는데", or any request combining a job URL with resume preparation.
+description: Tailor resume and career description for a specific job posting. Analyze requirements, research the company, filter relevant experience from master.yaml, generate a variant, build PDFs, and evaluate via groupby. Triggers on job URL + resume request ("이 공고에 맞게 이력서 만들어줘", "tailor my resume for this job", "이 포지션에 지원하려는데").
 ---
 
 # Tailor Resume
 
-Customize resume + career description for a specific job posting by filtering the master data and generating an optimized variant.
-
-## Overview
-
-The user maintains a single `cv/master.yaml` containing ALL experience, projects, skills, and details. Different job applications use different **variants** (`cv/variants/*.yaml`) that filter this master data by tags. This skill creates a new variant tailored to a specific job posting.
+Create a job-specific resume + career description variant from `cv/master.yaml`.
 
 ## Workflow
 
-### Step 1: Read Guidelines
+### 1. Read Guidelines
 
-Before starting, read these files bundled with this skill (`<skill-dir>/` = this skill's directory):
-- **`<skill-dir>/docs/resume-guidelines.md`** — 통합 가이드라인 (필수 준수)
-- **`<skill-dir>/docs/resume-restructure-analysis.md`** — master.yaml 이슈별 재구성 분석
-- **`<skill-dir>/benchmark/README.md`** — 벤치마크 패턴 요약
+Read `<skill-dir>/references/resume-guidelines.md` before starting. It contains mandatory content, design, and structure rules.
 
-These contain mandatory rules for content, design, and structure. Every variant must follow them.
+### 2. Research Company + Job Posting
 
-### Step 2: Analyze the Job Posting + Company Research
+**Job posting**: Fetch URL → extract required/preferred skills, responsibilities, team context, seniority signals.
 
-**2-1. Job Posting** — Fetch the posting URL and extract:
-- **Required skills** (languages, frameworks, tools)
-- **Preferred/bonus skills**
-- **Key responsibilities** (what the role does day-to-day)
-- **Team/domain context** (e.g., fintech, e-commerce, infra)
-- **Seniority signals** (leadership, mentoring, architecture)
+**Company deep research** (go beyond the posting):
+- Search "{company} 기술 블로그", "{company} 개발 문화" → engineering values, tech stack, migration plans
+- Check official careers/culture page → 인재상, core values
+- Search "{company} 면접 합격 후기" → interview process, evaluation criteria
+- Identify recent tech initiatives → what problems they're solving now
 
-**2-2. Company Deep Research** — Go beyond the posting:
-- **Team culture & engineering blog** — Search "{company} 기술 블로그", "{company} 개발 문화" to understand how they work, what they value
-- **Careers page** — Check the company's official careers/culture page for 인재상, core values
-- **Success cases** — Search "{company} 프론트엔드 면접 합격 후기" for interview process, what they evaluate
-- **Recent tech initiatives** — What tech stack are they migrating to? What problems are they solving?
+Use findings to frame summary, highlights, and experience prioritization.
 
-This research informs how to frame summary, highlights, and which experiences to prioritize. For example, if the company is migrating from legacy to React (like 리디), emphasize the jQuery→React migration experience.
+### 3. Match and Prioritize
 
-Summarize findings as a structured list before proceeding.
+Read `cv/master.yaml`. For each job requirement, identify relevant projects, bullets, details, and skills. Create a relevance ranking — include only what makes the strongest case for THIS role.
 
-### Step 3: Read Master Data
+### 4. Generate Variant
 
-Read `cv/master.yaml` in the project root (`/Users/dh/dev/portfolio/cv/master.yaml`). Understand:
-- All projects and their `tags` (general, toss, instructor, freelancer, etc.)
-- All bullets and details within each project
-- Skills categories
-- Open source contributions
-
-### Step 4: Match and Prioritize
-
-For each job requirement, identify which master.yaml items are relevant:
-- Which projects demonstrate the required skills?
-- Which bullets/details show the most relevant experience?
-- Which skills categories should be included?
-
-Create a relevance ranking. Not everything needs to be included — focus on what makes the strongest case for THIS specific role.
-
-### Step 5: Generate Variant
-
-Create a new variant yaml at `cv/variants/{company-slug}.yaml`. Use `summary_text` and `highlight_bullets_text` to write inline content directly in the variant — this keeps master.yaml untouched.
+Create `cv/variants/{company-slug}.yaml`:
 
 ```yaml
 variant: {company-slug}
 title: '이력서 ({company})'
 career_title: 경력기술서
-subtitle: '{position title} 지원용'
+subtitle: '{position} 지원용'
 theme: default
-modes:
-  - resume
-  - career
+modes: [resume, career]
 
-# Inline summary — no need to add keys to master.yaml
 summary_text: |
-  공고에 맞춘 맞춤 summary 텍스트...
+  공고+회사 리서치에 맞춘 맞춤 summary (명사형 어미)
 
-# Inline highlight bullets
 highlight_bullets_text:
-  - 공고 요구사항에 맞는 핵심 불릿 1
-  - 공고 요구사항에 맞는 핵심 불릿 2
-  - 공고 요구사항에 맞는 핵심 불릿 3
-  - 공고 요구사항에 맞는 핵심 불릿 4
+  - 공고 핵심 요구에 맞는 불릿 (임팩트 수치만, 활동 카운트 금지)
 
 sections:
   - type: experience
     filter: [all]
   - type: projects
-    include: [everydrone, gwnote, oss]     # slug-based selection (preferred)
-    filter: [{company-slug}, general, all]  # fallback: tag-based filtering
-    max: 3                                   # resume only — career mode ignores max
+    include: [slug1, slug2, slug3]  # slug 기반 선택 (권장)
+    filter: [general, all]           # include 없을 때 fallback
+    max: 3                           # resume에만 적용, career는 무시
   - type: oss
-    filter: [{company-slug}, general, all]  # filter 필수 — 없으면 general_md 등 모든 태그 노출
-  - type: sideProjects
-    filter: [{company-slug}, general, all]
+    filter: [general, all]           # filter 필수 — 없으면 raw markdown 노출
 ```
 
-**Project selection**: Use `include: [slug1, slug2, ...]` to explicitly select projects by slug. This is preferred over tag-based filtering because it gives precise control per variant. Display order follows master.yaml (time-based). `filter` is used as fallback when `include` is absent.
+**Key rules:**
+- `include`: slug 기반 프로젝트 선택. 표시 순서는 master.yaml 시간순 유지.
+- `max`: resume 모드에서만 적용. career 모드는 모든 매칭 프로젝트 포함.
+- `summary_text` / `highlight_bullets_text`: variant에 인라인. master.yaml 수정 불필요.
+- oss 섹션에 filter 필수 — 없으면 `general_md` 태그 항목의 `**bold**`가 raw 노출.
 
-**Career mode**: `max` only applies to resume mode. Career descriptions always include all matching projects — no truncation.
+### 5. Verify Layout
 
-**OSS 섹션 filter 주의**: filter 없이 `- type: oss`만 쓰면 `general_md` 태그 항목(bold 마크다운 포함)이 함께 노출된다. 마크다운 렌더링이 안 되는 레이아웃에서는 `**text**`가 raw로 보임. 반드시 filter를 지정할 것.
+Playwright로 PDF 생성 (dev server localhost:5173 필요):
+- Resume: `resume-{slug}` → A4, printBackground: true → 1페이지 필수
+- Career: `career-{slug}` → A4, printBackground: false → 빈 여백 최소화
+- 스크린샷으로 시각 확인: 텍스트 깨짐, bold 렌더링, 페이지 분리 점검
 
-If existing tags (general, toss) already cover what's needed, reuse them. Only add new tags to master.yaml bullets if absolutely necessary for filtering.
+### 6. Evaluate with Groupby
 
-Alternatively, if the default summary/highlights are already well-aligned with the posting, reference them by key:
-```yaml
-summary: default
-highlight_bullets: default
-```
-
-### Step 6: Verify Layout
-
-**6-1. Build PDFs** (dev server must be running at localhost:5173):
-```javascript
-// Playwright headless로 PDF 생성
-const { chromium } = require('playwright');
-const browser = await chromium.launch();
-const page = await browser.newPage();
-
-await page.goto('http://localhost:5173/cv/resume-{company-slug}', { waitUntil: 'networkidle' });
-await page.pdf({ path: 'cv/output/resume-{company-slug}.pdf', format: 'A4', printBackground: true });
-
-await page.goto('http://localhost:5173/cv/career-{company-slug}', { waitUntil: 'networkidle' });
-await page.pdf({ path: 'cv/output/career-{company-slug}.pdf', format: 'A4', printBackground: true });
-await browser.close();
-```
-
-Merge into combined.pdf:
-```python
-from pypdf import PdfWriter, PdfReader
-w = PdfWriter()
-for f in ['cv/output/resume-{slug}.pdf', 'cv/output/career-{slug}.pdf']:
-    for p in PdfReader(f).pages:
-        w.add_page(p)
-w.write('cv/output/combined.pdf')
-```
-
-**6-2. 1페이지 검증** — 반드시 print media 에뮬레이션으로 확인:
-```javascript
-const page = await browser.newPage({ viewport: { width: 794, height: 1123 } }); // A4 96dpi
-await page.emulateMedia({ media: 'print' });
-await page.goto('http://localhost:5173/cv/resume-{company-slug}', { waitUntil: 'networkidle' });
-
-const height = await page.evaluate(() => document.documentElement.scrollHeight);
-// height > 1123이면 overflow — sections 조정 필요
-```
-
-**주의**: viewport scrollHeight (media: 'screen')는 print layout과 다르다. 반드시 `emulateMedia({ media: 'print' })`로 확인할 것.
-
-**6-3. 시각적 확인** — 스크린샷을 찍어서 직접 확인:
-```javascript
-await page.screenshot({ path: 'cv/output/resume-check.png', fullPage: true });
-```
-Read 도구로 스크린샷을 열어 레이아웃, bold 렌더링, 텍스트 깨짐 등을 확인한다.
-
-Check that:
-- Resume fits on 1 page (A4) without excessive whitespace
-- Career description sections break at logical points
-- No orphaned headers at page bottoms
-- `**bold**` 마크다운이 raw로 노출되지 않는지 확인
-- 콘텐츠가 잘리거나 겹치지 않는지 확인
-
-### Step 7: Evaluate with Groupby
-
-Run both evaluations (팩폭 + 합격률 예측) in one command:
 ```bash
 npx zx <skill-dir>/scripts/groupby-api.mjs both cv/output/combined.pdf "{posting-url}"
 ```
 
-Script uses **positional args**: `<mode> <pdf-path> <job-url>`. Modes: `improve` (팩폭), `job-match` (합격률), `both`.
+Modes: `improve` (팩폭), `job-match` (합격률), `both`. 90+ 점수 목표.
 
-Review the results:
-- **합격률 예측**: Aim for 90+ score, check which requirements are "충족" vs "부족"
-- **팩폭**: Check for structural/content weaknesses the score doesn't capture
+### 7. Iterate
 
-### Step 8: Iterate
+Groupby 피드백 기반으로 variant 조정 → 재빌드 → 재평가.
 
-Based on groupby feedback:
-- If a requirement shows as "부족", check if master.yaml has relevant experience that wasn't included
-- Adjust the variant's project selection (max count, tag filters)
-- If summary doesn't address key requirements, write a custom one
-- Re-run evaluation until satisfied
+## Content Rules (Quick Reference)
 
-## Important Rules
+Full rules in `<skill-dir>/references/resume-guidelines.md`. Key points:
 
-- **Never invent experience or skills.** Only use what exists in master.yaml.
-- **Don't modify master.yaml** for a specific application. Variants are the customization mechanism.
-- **Use `summary_text` / `highlight_bullets_text`** in variant yaml for inline content — no master.yaml keys needed.
-- **You CAN add new tags** to existing bullets in master.yaml only if existing tags can't provide the right filtering.
-- **Keep resume to 1 page.** Use `max` in sections and selective filtering to control length.
-- **Career description can be multi-page** but should only include relevant details.
+- **서사 구조**: 비효율 상황 → 개선 → 효율 증진
+- **제목**: 역량 영역이 제목. 작업 나열 금지.
+- **Bold**: 개선 사항에서 제거. 적용 결과에서만 성과/수치를 Bold.
+- **활동 카운트 금지**: PR 개수, 포크 수 무의미. 왜 했고 뭘 개선했고 어떤 효과인지.
+- **어미**: 명사형 통일 ("~제거", "~구축"). 동사형/혼재 금지.
+- **master.yaml 수정 금지**: variant가 커스텀 수단. 경험/스킬 날조 금지.
 
-## Content Quality Rules
+## References
 
-These rules come from expert review and are **mandatory**. See `docs/resume-guidelines.md` for full details.
-
-### Narrative Structure
-
-Every career description item must follow: **비효율 상황 → 불편함 인식 → 개선 → 효율 증진**
-
-Three strengths to consistently highlight:
-1. **비효율 해결사** — 비효율을 보면 해결 방법을 찾는 사람. 오픈소스 기여도 이 맥락.
-2. **빠른 기술 적응력** — 새로운 툴을 워크플로우에 가장 먼저 도입.
-3. **AI 시대 적합 인재** — 새 기술을 먼저 써보고 효율화에 연결하는 사람.
-
-### Title Framing
-
-Titles must show **역량 영역**, not task lists.
-- Bad: "C++ CAD 엔진의 Emscripten WASM 컴파일 및 Next.js SSR 브라우저 이식"
-- Good: "React, TypeScript, Next.js 기반 프로덕트 아키텍처 설계 — jQuery 레거시 전환부터 Chakra UI 53개 공통 컴포넌트 체계까지"
-
-### Bold Rules
-
-- **개선 사항**: Bold 전부 제거
-- **적용 결과**: 여기서만 성과/수치를 Bold
-- 동사("구현하여", "도입하고")에 Bold 금지
-
-### No Activity Counts — Anywhere
-
-활동 카운트(PR 개수, 포크 수 등)는 summary, highlights, 경력기술서 모두에서 무의미. 핵심은 **왜 했고, 뭘 개선했고, 어떤 효과**인지.
-- Bad: "laravel-mix 12 PRs merged", "30+ 포크 파생", "5개 PR merged"
-- Good: "webpack 내부 분석 후 React Fast Refresh 구현, laravel-mix 전체 사용자에게 기능 제공"
-- Bad: "23개 오픈소스 프로젝트에 소스 분석 후 PR로 직접 기여"
-- Good: "사용 중 발견한 비효율은 소스까지 파고들어 직접 해결하며 오픈소스에 기여"
-- OK: 임팩트 수치 ("개발 시간 50% 단축", "UI 프리징 해소", "빌드 크기 ~200MB 절감")
-
-### Writing Style
-
-- 어미 통일: 명사형 어미 ("~제거", "~구축", "~확보"). "~했다/하다" 동사형 금지. 혼재 금지.
-- 상황 설명 NO — 내가 한 것 어필 중심
-- 중요한 것을 문두에 배치
-
-### Summary (확정)
-
-Default summary text:
-> 사용자 업무 프로세스를 이해하고 비효율을 구조적으로 제거하는 데 집중합니다. 새로운 기술을 프로덕트에 가장 먼저 도입하되, 표면 적용에 그치지 않고 소스 레벨까지 파고들어 근본을 개선합니다.
-
-## Benchmark Patterns (합격 프로필에서 추출)
-
-Groupby 합격 프로필 13개에서 추출한 공통 패턴:
-
-| 패턴 | 설명 |
-|------|------|
-| 수치 기반 성과 | "검색 응답 800ms→150ms (81%↑)", "배포 시간 95%↓" |
-| 문제→해결→성과 서사 | 단순 나열 아닌 스토리텔링 |
-| 기술 선택 이유 | "왜 이 기술을 선택했는지"가 드러남 |
-| 짧은 자기소개 | 핵심 강점 1-2줄 압축 |
-| 강점 초반 명시 | "대규모 트래픽 처리와 비즈니스 로직 구현에 강점" |
-| 개발 철학 제시 | "변경에 쉽게 대응할 수 있는 구조를 고민" |
-| 폭넓은 역할 | "ML에 국한되지 않고 필요한 역할을 폭넓게 수행" |
-
-## Reference Documents
-
-Before generating a variant, read these files for quality standards, structural patterns, and benchmark examples:
-
-**Bundled with this skill (`<skill-dir>/`):**
-- **`<skill-dir>/docs/resume-guidelines.md`** — 통합 가이드라인 (피드백 + 규칙 + 디자인)
-- **`<skill-dir>/docs/resume-restructure-analysis.md`** — master.yaml 이슈별 재구성 계획 + gh 검증 데이터
-- **`<skill-dir>/benchmark/`** — 익명화된 벤치마크 PDF + 패턴 요약
-
-**In the project root:**
-- **`cv/self-intro-draft.md`** — 승인된 자기소개 초안
-
-## File Locations
-
-```
-<skill-dir>/                   # This skill's directory
-├── SKILL.md
-├── scripts/
-│   └── groupby-api.mjs       # Groupby API (브라우저 불필요, curl 기반)
-├── docs/
-│   ├── resume-guidelines.md   # 통합 가이드라인 (필수)
-│   └── resume-restructure-analysis.md
-└── benchmark/
-    ├── README.md              # Benchmark index + 합격 패턴 요약
-    ├── reference-A/           # DevOps 경력기술서 (이슈→문제→의사결정→개선→결과 구조)
-    └── reference-B/           # 비개발 CV (레이아웃 참고)
-
-cv/                            # Project root
-├── master.yaml                # All data (DO NOT modify content for specific applications)
-├── variants/
-│   ├── general.yaml           # Default variant
-│   ├── toss.yaml              # Toss-specific variant (example)
-│   └── {company-slug}.yaml    # Generated by this skill
-├── themes/
-│   ├── default.yaml
-│   └── toss.yaml
-└── output/                    # Generated PDFs and results
-```
-
-## Example
-
-User: "https://toss.im/career/job-detail?job_id=123 이 공고에 맞게 이력서 만들어줘"
-
-1. Read `<skill-dir>/docs/resume-guidelines.md` → understand quality rules
-2. Fetch the posting → "Frontend Developer, React/TypeScript, design system experience preferred"
-3. Read master.yaml → gwnote project has Chakra UI design system, React Query/Jotai/Zustand
-4. Create `cv/variants/toss.yaml` with toss-tagged items prioritized
-5. Add custom summary emphasizing design system + performance optimization
-6. Apply content rules: Bold only in results, "~했다" style, narrative structure, no activity counts
-7. Playwright로 PDF 빌드 → print media 에뮬레이션으로 1페이지 검증 → 스크린샷으로 시각 확인
-8. Run `groupby-api.mjs both cv/output/combined.pdf "job-url"` → 100점
-9. Done!
+| File | When to read |
+|------|-------------|
+| `references/resume-guidelines.md` | variant 생성 전 필수 |
+| `references/resume-restructure-analysis.md` | master.yaml 구조 이해 필요 시 |
+| `benchmark/README.md` | 합격 프로필 패턴 참고 시 |
+| `benchmark/reference-A.md` | DevOps 경력기술서 구조 참고 시 |
+| `benchmark/groupby-profiles/` | 개별 합격 프로필 상세 확인 시 |
