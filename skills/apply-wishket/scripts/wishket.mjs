@@ -411,6 +411,57 @@ function buildPreviewWarnings(preview, boostHints) {
   return { minimums, checks, warnings };
 }
 
+function summarizeEvaluationCards(cards) {
+  const priced = cards
+    .filter((card) => card.price > 0 && card.durationDays > 0)
+    .map((card) => ({
+      ...card,
+      dayRate: Math.round(card.price / card.durationDays),
+    }));
+  const dayRates = priced.map((card) => card.dayRate).sort((a, b) => a - b);
+  const avgDayRate = dayRates.length
+    ? Math.round(dayRates.reduce((sum, value) => sum + value, 0) / dayRates.length)
+    : 0;
+  const medianDayRate = dayRates.length
+    ? dayRates[Math.floor(dayRates.length / 2)]
+    : 0;
+
+  const keywordCounts = new Map();
+  for (const card of cards) {
+    for (const keyword of card.keywords || []) {
+      keywordCounts.set(keyword, (keywordCounts.get(keyword) || 0) + 1);
+    }
+  }
+  const topKeywords = [...keywordCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([keyword, count]) => ({ keyword, count }));
+
+  const toneHints = [];
+  if (topKeywords.some((item) => item.keyword === '의사소통')) {
+    toneHints.push('소통 계획을 명시');
+  }
+  if (topKeywords.some((item) => item.keyword === '적극성')) {
+    toneHints.push('능동적 제안과 빠른 대응 강조');
+  }
+  if (topKeywords.some((item) => item.keyword === '사전 준비')) {
+    toneHints.push('미팅 전 준비 포인트와 리스크 선제 정리');
+  }
+  if (topKeywords.some((item) => item.keyword === '일정 준수')) {
+    toneHints.push('마일스톤과 주간 공유 리듬 명시');
+  }
+
+  return {
+    reviewCount: cards.length,
+    avgDayRate,
+    medianDayRate,
+    minDayRate: dayRates[0] || 0,
+    maxDayRate: dayRates[dayRates.length - 1] || 0,
+    topKeywords,
+    toneHints,
+  };
+}
+
 function buildSubmitFields(proposal, csrfToken, portfolios) {
   const fields = {
     csrfmiddlewaretoken: csrfToken,
@@ -522,6 +573,7 @@ async function cmdEvaluation(ids) {
       ...overview,
       cards,
       cardCount: cards.length,
+      summary: summarizeEvaluationCards(cards),
     });
   }
 
