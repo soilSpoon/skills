@@ -12,8 +12,8 @@
 
 ## 절차
 
-1. **프로젝트 상세 Fetch**: WebFetch로 `https://www.wishket.com/project/{PROJECT_ID}/` 접근. BOOST 금액 통계(최저/75%/평균/최고)도 추출.
-2. **클라이언트 과거 패턴 분석**: WebFetch로 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/` 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
+1. **프로젝트 상세 Fetch**: `{SKILL_DIR}/scripts/lightpanda-helper.mjs`로 `https://www.wishket.com/project/{PROJECT_ID}/` 파싱 (Lightpanda 권장). Lightpanda 사용 불가 시 WebFetch 폴백. BOOST 금액 통계(최저/75%/평균/최고)는 로그인 필요 → `lightpanda-helper.mjs boost {ID}` 또는 `fetch-boost-stats.mjs`로 수집.
+2. **클라이언트 과거 패턴 분석**: Lightpanda(쿠키 주입) 또는 WebFetch로 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/` 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
 3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계

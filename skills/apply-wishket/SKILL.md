@@ -264,7 +264,7 @@ node <skill-dir>/scripts/submit-proposals.mjs
 
 N개 에이전트가 독립 실행하면 범용성 높은 경험(HR, SIM)만 반복 선택된다. 테스트에서 확인: 3회 iteration 모두 배치 2건이 HR+SIM 동일 조합이었다. 이를 방지하기 위해 메인 세션이 사전에 경험을 배분한다.
 
-1. N개 프로젝트를 병렬 WebFetch로 요구사항 파악
+1. N개 프로젝트를 병렬 파싱으로 요구사항 파악 (Lightpanda `lightpanda-helper.mjs fetch` 권장, WebFetch 폴백)
 2. `docs/experience-pool.md`의 6개 경험 코드 로드
 3. 프로젝트별 경험 2-3개를 배정:
    - 1순위: 가장 직접적 매칭 (겹쳐도 OK)
