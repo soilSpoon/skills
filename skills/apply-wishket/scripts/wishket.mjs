@@ -191,11 +191,11 @@ function parseBoost(id, html, effectiveUrl) {
 
 function parseEvaluationOverview(id, html, effectiveUrl) {
   const text = stripTags(html);
-  const ajaxPath = matchOne(html, [/url:\s*'([^']*\/review\/[^']+\/filter)'/, /url:\s*"([^"]*\/review\/[^"]+\/filter)"/]);
-  const title = matchOne(html, [
-    /<title>([^<]+?) · 위시켓/,
+  const projectTitle = matchOne(html, [
     /<p class="back"><a[^>]+>[\s\S]*?'([^']+)' 프로젝트로 돌아가기<\/a>/,
   ]);
+  const ajaxPath = matchOne(html, [/url:\s*'([^']*\/review\/[^']+\/filter)'/, /url:\s*"([^"]*\/review\/[^"]+\/filter)"/]);
+  const pageTitle = matchOne(html, [/<title>([^<]+?) · 위시켓/]);
   const reviewCounts = [...html.matchAll(/class="display-count">\((\d+)\)<\/span>/g)].map((match) => Number(match[1]));
   const ratingCounts = reviewCounts.length >= 6 ? {
     total: reviewCounts[0],
@@ -211,39 +211,56 @@ function parseEvaluationOverview(id, html, effectiveUrl) {
   return {
     id,
     url: effectiveUrl,
-    title,
+    title: projectTitle || pageTitle,
+    pageTitle,
     ajaxPath,
     ratingCounts,
     hasReviews: ratingCounts.total > 0,
-    clientLabel: matchOne(text, [/클라이언트\s+([^\n]+)/]),
+    clientLabel: matchOne(text, [/클라이언트\s+([^\n]+)/]) || projectTitle,
   };
 }
 
 function parseEvaluationCards(html) {
   const cards = [];
-  const regex = /<li[^>]*class="[^"]*review[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
+  const regex = /<section class="completed-project-review-card"[\s\S]*?<\/section>/g;
   let match;
   while ((match = regex.exec(html)) !== null) {
-    const chunk = match[1];
+    const chunk = match[0];
     const text = stripTags(chunk);
-    const price = toNumber(matchOne(text, [/금액[^0-9]*([0-9,]+)/, /계약 금액[^0-9]*([0-9,]+)/]));
-    const durationDays = toNumber(matchOne(text, [/기간[^0-9]*(\d+)/, /(\d+)\s*일/]));
-    const score = toNumber(matchOne(chunk, [/data-score="(\d+)"/, /평점[^0-9]*([1-5])/]));
-    const partnerLevel = matchOne(text, [/파트너스?\s+(시니어|미드|주니어)/, /(시니어|미드|주니어)\s*파트너/]);
-    const keywordSource = matchOne(chunk, [/<div class="review-keyword[^"]*">([\s\S]*?)<\/div>/]);
-    const keywords = stripTags(keywordSource)
-      .split(/\s{2,}|\n|,/)
-      .map((value) => value.trim())
+    const price = toNumber(matchOne(text, [/계약금액[^0-9]*([0-9,]+)/, /금액[^0-9]*([0-9,]+)/]));
+    const durationDays = toNumber(matchOne(text, [/프로젝트 기간[^0-9]*(\d+)/, /기간[^0-9]*(\d+)/]));
+    const averageScore = Number(matchOne(chunk, [/평균 평점<strong>([0-9.]+)<\/strong>/]) || 0);
+    const partnerName = matchOne(chunk, [/<span class="card-user-id">([^<]+)<\/span>/]);
+    const categories = [...chunk.matchAll(/<span class="card-category-content">([\s\S]*?)<\/span>/g)]
+      .map((value) => stripTags(value[1]).trim())
       .filter(Boolean);
+    const contractedAt = matchOne(text, [/최초 계약일[^0-9]*(\d{4}년 \d{2}월 \d{2}일)/]);
+    const detailScores = [...chunk.matchAll(/<li class="details[^"]*"><span class="title">([\s\S]*?)<\/span>[\s\S]*?<span class="score">([0-9.]+)<\/span>/g)]
+      .map((value) => ({
+        title: stripTags(value[1]).trim(),
+        score: Number(value[2]),
+      }));
+    const reviewBlocks = [...chunk.matchAll(/<p class="card-review-intro(?: with-repair)?">([\s\S]*?)<span>([\s\S]*?)<\/span><\/p>[\s\S]*?<p class="card-user-review-content hidden"[^>]*data-state="detail">([\s\S]*?)<\/p>/g)]
+      .map((value) => ({
+        type: stripTags(value[1]).trim(),
+        date: stripTags(value[2]).trim(),
+        detail: stripTags(value[3]).trim(),
+      }));
+    const keywords = detailScores.filter((item) => item.score >= 4.5).map((item) => item.title);
 
     if (text) {
       cards.push({
-        partnerLevel,
-        score,
+        projectTitle: matchOne(chunk, [/<h4 class="card-title"><a[^>]*>([\s\S]*?)<\/a><\/h4>/]),
+        partnerName,
+        averageScore,
         price,
         durationDays,
+        contractedAt,
+        categories,
         keywords,
-        summary: text.slice(0, 400),
+        detailScores,
+        reviews: reviewBlocks,
+        summary: reviewBlocks.map((item) => item.detail).join(' ').slice(0, 400) || text.slice(0, 400),
       });
     }
   }
