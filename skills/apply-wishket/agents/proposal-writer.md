@@ -12,31 +12,32 @@
 
 ## 절차
 
-1. **프로젝트 상세 Fetch**: WebFetch로 `https://www.wishket.com/project/{PROJECT_ID}/` 접근
-2. **참조 파일 읽기**:
+1. **프로젝트 상세 Fetch**: WebFetch로 `https://www.wishket.com/project/{PROJECT_ID}/` 접근. BOOST 금액 통계(최저/75%/평균/최고)도 추출.
+2. **클라이언트 과거 패턴 분석**: WebFetch로 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/` 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
+3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계
    - `{SKILL_DIR}/docs/estimation-guide.md` — 공수 추정 방법론
    - `{MASTER_YAML_PATH}` — 경험 원천 데이터
-3. **경험 매칭**:
+4. **경험 매칭**:
    - `ASSIGNED_EXPERIENCES`가 있으면 해당 코드를 우선 사용
    - 없으면 experience-pool.md 규칙에 따라 직접 2-3개 선택
+   - **경험이 프로젝트의 실제 업무 유형과 직결되는지 확인** — 퍼블리싱에 MES 실시간 처리 같은 무관한 경험 금지
    - master.yaml에서 해당 경험의 구체적 "이슈→해결→결과" 스토리를 가져옴
-4. **공수 추정** (estimation-guide.md 따라):
+5. **공수 추정** (estimation-guide.md 따라):
    - 기능 분해 (명시적 + 암묵적 기능 모두)
    - 기능별 복잡도 (S/M/L/XL) + 근거 1줄
    - 생산성 계수 적용 (기술 매칭도 기반)
    - 총 공수 + QA 버퍼(20%) + 상식 체크
    - **기능별 테이블 형식**으로 근거 남기기
-5. **금액/기간 산정** (proposal-rules.md 7단계):
+6. **금액/기간 산정** (proposal-rules.md 7단계):
+   - **BOOST 금액 통계 기반** — 75% 이하, 일당 10~20만 범위 (신규 파트너)
+   - 클라이언트 과거 계약 일당이 있으면 그 범위에 맞춤
    - 강도 계산 (공수 ÷ 가용 작업일)
-   - 클라이언트 기대 일당 + 강도 보정
-   - 제안 금액/기간 + 강도 프리미엄
    - 이탈도 체크 (±20% 이내)
-   - 벤치마크 비교
-6. **지원서 작성**: 4단 템플릿으로 조립
-7. **포트폴리오 선택**: experience-pool.md 매핑 테이블에서 2-3개
-8. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
+7. **지원서 작성**: proposal-rules.md의 자연스러운 흐름 템플릿으로 조립. `[대괄호 섹션]` 사용 금지.
+8. **포트폴리오 선택**: experience-pool.md 매핑 테이블에서 2-3개
+9. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
 
 ## 출력 형식
 
