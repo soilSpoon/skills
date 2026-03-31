@@ -22,7 +22,8 @@ function usage() {
   node wishket.mjs list [--pages N] [--sort default|closing|new|applicants|budget]
   node wishket.mjs detail <ID> [ID...]
   node wishket.mjs boost <ID> [ID...]
-  node wishket.mjs submit <proposals.json|proposal.md> [--confirm]`);
+  node wishket.mjs evaluation <ID> [ID...]
+  node wishket.mjs submit <proposals.json|proposal.md> [more.md ...] [--confirm]`);
 }
 
 function getListSortCode(args) {
@@ -188,6 +189,67 @@ function parseBoost(id, html, effectiveUrl) {
   };
 }
 
+function parseEvaluationOverview(id, html, effectiveUrl) {
+  const text = stripTags(html);
+  const ajaxPath = matchOne(html, [/url:\s*'([^']*\/review\/[^']+\/filter)'/, /url:\s*"([^"]*\/review\/[^"]+\/filter)"/]);
+  const title = matchOne(html, [
+    /<title>([^<]+?) · 위시켓/,
+    /<p class="back"><a[^>]+>[\s\S]*?'([^']+)' 프로젝트로 돌아가기<\/a>/,
+  ]);
+  const reviewCounts = [...html.matchAll(/class="display-count">\((\d+)\)<\/span>/g)].map((match) => Number(match[1]));
+  const ratingCounts = reviewCounts.length >= 6 ? {
+    total: reviewCounts[0],
+    highest: reviewCounts[1],
+    good: reviewCounts[2],
+    normal: reviewCounts[3],
+    low: reviewCounts[4],
+    worst: reviewCounts[5],
+  } : {
+    total: 0, highest: 0, good: 0, normal: 0, low: 0, worst: 0,
+  };
+
+  return {
+    id,
+    url: effectiveUrl,
+    title,
+    ajaxPath,
+    ratingCounts,
+    hasReviews: ratingCounts.total > 0,
+    clientLabel: matchOne(text, [/클라이언트\s+([^\n]+)/]),
+  };
+}
+
+function parseEvaluationCards(html) {
+  const cards = [];
+  const regex = /<li[^>]*class="[^"]*review[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const chunk = match[1];
+    const text = stripTags(chunk);
+    const price = toNumber(matchOne(text, [/금액[^0-9]*([0-9,]+)/, /계약 금액[^0-9]*([0-9,]+)/]));
+    const durationDays = toNumber(matchOne(text, [/기간[^0-9]*(\d+)/, /(\d+)\s*일/]));
+    const score = toNumber(matchOne(chunk, [/data-score="(\d+)"/, /평점[^0-9]*([1-5])/]));
+    const partnerLevel = matchOne(text, [/파트너스?\s+(시니어|미드|주니어)/, /(시니어|미드|주니어)\s*파트너/]);
+    const keywordSource = matchOne(chunk, [/<div class="review-keyword[^"]*">([\s\S]*?)<\/div>/]);
+    const keywords = stripTags(keywordSource)
+      .split(/\s{2,}|\n|,/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (text) {
+      cards.push({
+        partnerLevel,
+        score,
+        price,
+        durationDays,
+        keywords,
+        summary: text.slice(0, 400),
+      });
+    }
+  }
+  return cards;
+}
+
 function parseCsrfToken(html) {
   return matchOne(html, [/name="csrfmiddlewaretoken" type="hidden" value="([^"]+)"/]);
 }
@@ -301,6 +363,37 @@ function loadProposals(file) {
   return Array.isArray(parsed) ? parsed : [parsed];
 }
 
+function loadProposalInputs(files) {
+  return files.flatMap((file) => loadProposals(file));
+}
+
+function buildPreviewWarnings(preview, boostHints) {
+  const minimums = {
+    proposalChars: boostHints.minProposalChars || 0,
+    portfolioCount: boostHints.minPortfolioCount || 0,
+    relatedDescriptionChars: preview.has_related_portfolio === 'True' ? 300 : 0,
+  };
+
+  const checks = {
+    proposalLengthOk: minimums.proposalChars === 0 || preview.body_length >= minimums.proposalChars,
+    portfolioCountOk: minimums.portfolioCount === 0 || preview.resolvedPortfolios.length >= minimums.portfolioCount,
+    relatedDescriptionOk: minimums.relatedDescriptionChars === 0 || preview.related_description_length >= minimums.relatedDescriptionChars,
+  };
+
+  const warnings = [];
+  if (!checks.proposalLengthOk) {
+    warnings.push(`proposal body too short: ${preview.body_length} < ${minimums.proposalChars}`);
+  }
+  if (!checks.portfolioCountOk) {
+    warnings.push(`portfolio count too low: ${preview.resolvedPortfolios.length} < ${minimums.portfolioCount}`);
+  }
+  if (!checks.relatedDescriptionOk) {
+    warnings.push(`related description too short: ${preview.related_description_length} < ${minimums.relatedDescriptionChars}`);
+  }
+
+  return { minimums, checks, warnings };
+}
+
 function buildSubmitFields(proposal, csrfToken, portfolios) {
   const fields = {
     csrfmiddlewaretoken: csrfToken,
@@ -384,8 +477,42 @@ async function cmdBoost(ids) {
   console.log(JSON.stringify(results, null, 2));
 }
 
-async function cmdSubmit(file, options = {}) {
-  const proposals = loadProposals(file);
+async function cmdEvaluation(ids) {
+  const cookieHeader = getCookieHeader();
+  const results = [];
+
+  for (const id of ids) {
+    console.error(`[evaluation] ${id}`);
+    const pageUrl = `https://www.wishket.com/project/project_evaluation/${id}/`;
+    const { html, effectiveUrl } = await fetchHtml(pageUrl, cookieHeader);
+
+    if (effectiveUrl.includes('auth.wishket.com')) {
+      results.push({ id, error: 'NOT_LOGGED_IN', url: effectiveUrl });
+      continue;
+    }
+
+    const overview = parseEvaluationOverview(id, html, effectiveUrl);
+    let cards = [];
+    if (overview.ajaxPath && overview.hasReviews) {
+      const ajaxUrl = overview.ajaxPath.startsWith('http')
+        ? `${overview.ajaxPath}?filter_str=latest_date&star_count=0&public_post=yes`
+        : `https://www.wishket.com${overview.ajaxPath}?filter_str=latest_date&star_count=0&public_post=yes`;
+      const { html: cardHtml } = await fetchHtml(ajaxUrl, cookieHeader);
+      cards = parseEvaluationCards(cardHtml);
+    }
+
+    results.push({
+      ...overview,
+      cards,
+      cardCount: cards.length,
+    });
+  }
+
+  console.log(JSON.stringify(results, null, 2));
+}
+
+async function cmdSubmit(files, options = {}) {
+  const proposals = loadProposalInputs(files);
   const cookieHeader = getCookieHeader();
 
   for (const proposal of proposals) {
@@ -402,6 +529,7 @@ async function cmdSubmit(file, options = {}) {
     const portfolioOptions = parsePortfolioOptions(html);
     const resolvedPortfolios = resolvePortfolios(proposal.portfolios, portfolioOptions);
     const fields = buildSubmitFields(proposal, csrfToken, resolvedPortfolios);
+    const boostHints = parseBoost(proposal.id, html, effectiveUrl);
 
     const preview = {
       id: proposal.id,
@@ -414,9 +542,16 @@ async function cmdSubmit(file, options = {}) {
       body_length: fields.body.length,
       mode: options.confirm ? 'confirm' : 'preview',
     };
+    const review = buildPreviewWarnings(preview, boostHints);
+    const previewWithChecks = {
+      ...preview,
+      minimums: review.minimums,
+      checks: review.checks,
+      warnings: review.warnings,
+    };
 
     if (!options.confirm) {
-      console.log(JSON.stringify(preview, null, 2));
+      console.log(JSON.stringify(previewWithChecks, null, 2));
       continue;
     }
 
@@ -425,7 +560,7 @@ async function cmdSubmit(file, options = {}) {
     const locationMatch = response.match(/\nlocation:\s*(.+)\r?/i);
 
     console.log(JSON.stringify({
-      ...preview,
+      ...previewWithChecks,
       statusLine,
       location: locationMatch?.[1]?.trim() || '',
       submitted: true,
@@ -444,7 +579,8 @@ try {
   if (cmd === 'list') await cmdList(args);
   else if (cmd === 'detail') await cmdDetail(args);
   else if (cmd === 'boost') await cmdBoost(args);
-  else if (cmd === 'submit') await cmdSubmit(args[0], { confirm: args.includes('--confirm') });
+  else if (cmd === 'evaluation') await cmdEvaluation(args);
+  else if (cmd === 'submit') await cmdSubmit(args.filter((arg) => arg !== '--confirm'), { confirm: args.includes('--confirm') });
   else {
     console.error(`Unknown command: ${cmd}`);
     process.exit(1);

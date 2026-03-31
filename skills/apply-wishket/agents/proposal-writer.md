@@ -13,7 +13,7 @@
 ## 절차
 
 1. **프로젝트 상세 Fetch**: `node {SKILL_DIR}/scripts/wishket.mjs detail {PROJECT_ID}`로 파싱. 로그인 apply 페이지 힌트(data-bot, 지원 힌트)는 `node {SKILL_DIR}/scripts/wishket.mjs boost {PROJECT_ID}`로 수집. 다건이면 먼저 `list --sort closing`으로 마감 임박 순 정렬을 기준으로 우선순위를 잡는다.
-2. **클라이언트 과거 패턴 분석**: evaluation 페이지 전용 자동 파서는 아직 없으므로, 필요 시 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/`를 직접 fetch하여 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 읽는다. 이 정보로 지원서 톤과 금액을 보정.
+2. **클라이언트 과거 패턴 분석**: `node {SKILL_DIR}/scripts/wishket.mjs evaluation {PROJECT_ID}`로 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴, 평가 키워드를 읽는다. 이 정보로 지원서 톤과 금액을 보정.
 3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계

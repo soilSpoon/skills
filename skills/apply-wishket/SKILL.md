@@ -69,12 +69,13 @@ node <skill-dir>/scripts/wishket.mjs list --sort closing    # 마감 임박 순 
 node <skill-dir>/scripts/wishket.mjs list                   # 모집 중 프로젝트 목록
 node <skill-dir>/scripts/wishket.mjs detail 154095 154137   # 프로젝트 상세
 node <skill-dir>/scripts/wishket.mjs boost 154095           # 로그인 apply 페이지 힌트 / data-bot
+node <skill-dir>/scripts/wishket.mjs evaluation 154095      # 클라이언트 평가 요약 / 리뷰 카드
 ```
 `boost`는 브라우저 프로필을 열지 않는다. `WISHKET_COOKIE_HEADER` 또는 `~/.wishket-cookie-header`에서 쿠키 헤더를 읽어 로그인 apply 페이지를 가져오고, 지원 힌트(data-bot)를 파싱한다.
 
 기본 우선순위는 `list --sort closing`이다. 마감 임박 순으로 보고, **명백히 못하는 일만 제외한 뒤** detail/boost로 내려가라.
 
-**1-2. 클라이언트 과거 채택 패턴 분석** — `https://www.wishket.com/project/project_evaluation/{ID}/`에서 확인. 현재 스크립트는 evaluation 전용 파서를 제공하지 않으므로, 필요 시 별도 HTTP fetch로 직접 확인:
+**1-2. 클라이언트 과거 채택 패턴 분석** — `node <skill-dir>/scripts/wishket.mjs evaluation {ID}`로 확인:
 - 이 클라이언트가 과거에 채택한 파트너들의 **레벨** (시니어/미드/주니어)
 - **계약 금액과 기간** (일당 환산)
 - **프로젝트 유형** (프론트엔드/백엔드/풀스택)
@@ -229,6 +230,7 @@ FIX/REWRITE 판정된 건은 수정 사항을 구체적으로 제시.
 node <skill-dir>/scripts/wishket.mjs submit proposals.json
 node <skill-dir>/scripts/wishket.mjs submit proposals.json --confirm
 node <skill-dir>/scripts/wishket.mjs submit benchmark/wishket/proposals/154095.md
+node <skill-dir>/scripts/wishket.mjs submit benchmark/wishket/proposals/153634.md benchmark/wishket/proposals/154048.md
 ```
 
 `proposals.json` 형식: `[{ "id": "154095", "amount": "5000000", "term": "30", "body": "...", "portfolios": ["제목1", "제목2"], "desc": "포트폴리오 설명" }]`
@@ -250,6 +252,7 @@ node <skill-dir>/scripts/wishket.mjs submit benchmark/wishket/proposals/154095.m
 - CSRF 토큰과 포트폴리오 목록을 HTML에서 파싱
 - 제목 또는 포트폴리오 ID 기준으로 포트폴리오를 최대 3개까지 매칭
 - preview 모드에서 실제 전송 전 payload를 JSON으로 출력
+- preview에 `minimums`, `checks`, `warnings`를 포함하여 본문 길이/포트폴리오 수/관련 설명 길이 경고를 표시
 - `--confirm` 모드에서 같은 apply URL로 POST
 
 주의:
