@@ -1,349 +1,442 @@
 #!/usr/bin/env node
 /**
- * 위시켓 자동화 통합 CLI (Lightpanda).
+ * 위시켓 자동화 통합 CLI.
  *
- * Usage:
- *   node wishket.mjs list [--pages N]              # 프로젝트 목록
- *   node wishket.mjs detail <ID> [ID...]           # 프로젝트 상세
- *   node wishket.mjs boost <ID> [ID...]            # BOOST 통계 (로그인 필요)
- *   node wishket.mjs submit <proposals.json>       # 폼 제출 (로그인 필요)
+ * 현재 버전은 Playwright 의존 없이 HTTP 기반으로 읽기/제출 작업을 처리한다.
+ * - list: 공개 프로젝트 목록
+ * - detail: 공개 프로젝트 상세
+ * - boost: 로그인 후 apply 페이지에서 data-bot / 지원 힌트 파싱
  *
- * 환경: playwright-core + lightpanda 바이너리 필요
- * 쿠키: boost/submit는 Playwright persistent context에서 자동 추출
+ * submit은 기본적으로 preview 모드로 동작하며, --confirm이 있을 때만 실제 POST를 전송한다.
  */
-import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
+import { execFile } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { promisify } from 'util';
 
-// playwright-core를 portfolio/node_modules에서 찾기 (스킬 디렉토리에는 없으므로)
-const require = createRequire(import.meta.url);
-let chromium;
-try {
-  ({ chromium } = await import('playwright-core'));
-} catch {
-  // 폴백: 알려진 경로에서 직접 로드
-  const pw = require('/Users/dh/dev/portfolio/node_modules/playwright-core');
-  chromium = pw.chromium;
-}
+const execFileAsync = promisify(execFile);
 
-// ── 공통 ──
-
-const BLOCK_DOMAINS = [
-  'sentry-cdn.com', 'clarity.ms', 'googletagmanager.com',
-  'googleoptimize.com', 'doubleclick.net', 'googleadservices.com',
-  'snap.licdn.com', 'analytics.google.com', 'wcs.naver.net',
-  'pstatic.net', 'hs-scripts.com', 'channel.io', 'hubspot.com',
-  'facebook.net', 'google.com/ccm', 'google.com/rmkt',
-];
-
-const CHROME_PROFILE = '/Users/dh/Library/Caches/ms-playwright/mcp-chrome-868f91d';
 const FILTER_URL = 'https://www.wishket.com/project/?d=A4FwvCCGDODWD6AjGBTAJgMgMZjSgbigDYD2wAtigHYgYBmdYA7iohilmmACoBOAriiA';
 
-let LP_PORT = 9260;
-let lpProc = null;
-let lpBrowser = null;
-
-async function startLP() {
-  lpProc = spawn('lightpanda', [
-    'serve', '--host', '127.0.0.1', '--port', String(LP_PORT),
-    '--log-level', 'error', '--timeout', '120', '--http-timeout', '15000',
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
-  lpProc.stderr.on('data', d => process.stderr.write(d));
-  lpProc.on('exit', (code, signal) => {
-    if (signal === 'SIGSEGV') console.error('[LP] SIGSEGV — 트래킹 스크립트 차단 확인 필요');
-  });
-  await new Promise(r => setTimeout(r, 2000));
-  lpBrowser = await chromium.connectOverCDP(`ws://127.0.0.1:${LP_PORT}`);
+function usage() {
+  console.log(`Usage:
+  node wishket.mjs list [--pages N] [--sort default|closing|new|applicants|budget]
+  node wishket.mjs detail <ID> [ID...]
+  node wishket.mjs boost <ID> [ID...]
+  node wishket.mjs submit <proposals.json|proposal.md> [--confirm]`);
 }
 
-async function stopLP() {
-  await lpBrowser?.close().catch(() => {});
-  lpProc?.kill();
+function getListSortCode(args) {
+  const raw = args[args.indexOf('--sort') + 1] || 'default';
+  const map = {
+    default: 'bs',
+    closing: 'cls',
+    new: 'new',
+    applicants: 'apc',
+    budget: 'bgt',
+  };
+  return map[raw] || map.default;
 }
 
-/** 페이지 방문 (context 1개 제한 → 매번 새로 생성) */
-async function visit(url, cookies = []) {
-  const ctx = await lpBrowser.newContext({});
-  const page = await ctx.newPage();
-  await page.route(u => BLOCK_DOMAINS.some(d => u.toString().includes(d)), r => r.abort());
-  if (cookies.length) await ctx.addCookies(cookies);
-  await page.goto(url, { timeout: 20000, waitUntil: 'domcontentloaded' });
-  return { ctx, page };
+function expandHome(path) {
+  if (!path.startsWith('~/')) return path;
+  return `${process.env.HOME}/${path.slice(2)}`;
 }
 
-/** Playwright persistent context에서 위시켓 쿠키 추출 */
-async function extractCookies() {
-  console.error('[cookies] Extracting from Chrome profile...');
-  const pw = await chromium.launchPersistentContext(CHROME_PROFILE, {
-    headless: true, channel: 'chrome', viewport: { width: 1280, height: 900 },
-  });
-  const cookies = await pw.cookies('https://www.wishket.com');
-  await pw.close();
-  const filtered = cookies
-    .filter(c => c.domain.includes('wishket'))
-    .map(c => ({ name: c.name, value: c.value, domain: c.domain, path: c.path || '/' }));
-  console.error(`[cookies] Got ${filtered.length} wishket cookies`);
-  return filtered;
+function getCookieHeader() {
+  if (process.env.WISHKET_COOKIE_HEADER) return process.env.WISHKET_COOKIE_HEADER.trim();
+  const fallback = expandHome('~/.wishket-cookie-header');
+  if (existsSync(fallback)) return readFileSync(fallback, 'utf8').trim();
+  throw new Error('WISHKET_COOKIE_HEADER not set and ~/.wishket-cookie-header not found');
 }
 
-// ── list ──
+async function fetchHtml(url, cookieHeader = '') {
+  const args = ['-LsS', '-w', '\n__CURL_EFFECTIVE_URL__=%{url_effective}\n', url];
+  if (cookieHeader) args.push('-H', `Cookie: ${cookieHeader}`);
+  const { stdout } = await execFileAsync('curl', args, { maxBuffer: 20 * 1024 * 1024 });
+  const marker = '\n__CURL_EFFECTIVE_URL__=';
+  const idx = stdout.lastIndexOf(marker);
+  if (idx === -1) return { html: stdout, effectiveUrl: url };
+  return {
+    html: stdout.slice(0, idx),
+    effectiveUrl: stdout.slice(idx + marker.length).trim(),
+  };
+}
+
+async function postForm(url, cookieHeader, referer, fields) {
+  const args = ['-i', '-sS', '-X', 'POST', url,
+    '-H', `Cookie: ${cookieHeader}`,
+    '-H', 'Origin: https://www.wishket.com',
+    '-H', `Referer: ${referer}`,
+    '-H', 'X-Requested-With: XMLHttpRequest',
+  ];
+
+  for (const [name, value] of Object.entries(fields)) {
+    args.push('--data-urlencode', `${name}=${value ?? ''}`);
+  }
+
+  const { stdout } = await execFileAsync('curl', args, { maxBuffer: 20 * 1024 * 1024 });
+  return stdout;
+}
+
+function stripTags(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|section|li|h1|h2|h3|span)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function toNumber(value) {
+  if (!value) return 0;
+  const digits = String(value).replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : 0;
+}
+
+function parseMoneyToWon(value) {
+  if (!value) return 0;
+  const raw = String(value).trim();
+  if (raw.includes('만원')) return toNumber(raw) * 10000;
+  return toNumber(raw);
+}
+
+function matchOne(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+function parseProjectCards(html) {
+  const results = [];
+  const seen = new Set();
+  const regex = /<a[^>]+href="\/project\/(\d+)\/"[^>]*>([\s\S]*?)<\/a>/g;
+  let match;
+
+  while ((match = regex.exec(html)) !== null) {
+    const id = match[1];
+    if (seen.has(id)) continue;
+
+    const anchorText = stripTags(match[2]).replace(/\s+/g, ' ').trim();
+    if (!anchorText || anchorText.length < 8) continue;
+
+    const chunk = html.slice(Math.max(0, match.index - 1200), Math.min(html.length, match.index + 2400));
+    const chunkText = stripTags(chunk);
+
+    results.push({
+      id,
+      title: anchorText,
+      budget: toNumber(matchOne(chunkText, [/([0-9,]+)\s*원/, /예상 금액[^0-9]*([0-9,]+)/])),
+      durationDays: toNumber(matchOne(chunkText, [/(\d+)\s*일/, /예상 기간[^0-9]*(\d+)/])),
+      applicants: toNumber(matchOne(chunkText, [/지원자[^0-9]*(\d+)/, /(\d+)\s*명/])),
+    });
+    seen.add(id);
+  }
+
+  return results;
+}
+
+function parseDetail(id, html, effectiveUrl) {
+  const text = stripTags(html);
+  const title = matchOne(html, [
+    /<p class="subtitle-1-medium text900">([^<]+)<\/p>/,
+    /<title>([^<]+?) · 위시켓/,
+  ]);
+
+  return {
+    id,
+    url: effectiveUrl,
+    title,
+    budget: toNumber(matchOne(text, [/예상 금액[^0-9]*([0-9,]+)/, /([0-9,]+)\s*원/])),
+    durationDays: toNumber(matchOne(text, [/예상 기간[^0-9]*(\d+)/])),
+    applicants: toNumber(matchOne(text, [/지원자[^0-9]*(\d+)/])),
+    deadline: matchOne(text, [/모집 마감[^\d]*([\d.]+)/]),
+  };
+}
+
+function parseBoost(id, html, effectiveUrl) {
+  const text = stripTags(html);
+  const title = matchOne(html, [
+    /<p class="subtitle-1-medium text900">([^<]+)<\/p>/,
+    /<title>([^<]+?) · 위시켓/,
+  ]);
+  const dataBot = matchOne(
+    html,
+    [/<div class="data-bot-data mb12">([\s\S]*?)<\/div><p class="bot-guide-text/]
+  );
+  const botText = stripTags(dataBot);
+
+  return {
+    id,
+    url: effectiveUrl,
+    title,
+    budget: toNumber(matchOne(text, [/예상 금액[^0-9]*([0-9,]+)/])),
+    durationDays: toNumber(matchOne(text, [/예상 기간[^0-9]*(\d+)/])),
+    applicants: toNumber(matchOne(text, [/지원자[^0-9]*(\d+)/])),
+    minProposalChars: toNumber(matchOne(botText, [/지원 내용이\s*([0-9,]+)자 이상/])),
+    minPortfolioCount: toNumber(matchOne(botText, [/포트폴리오 수가\s*([0-9,]+)개 이상/])),
+    dataBotSummary: botText,
+  };
+}
+
+function parseCsrfToken(html) {
+  return matchOne(html, [/name="csrfmiddlewaretoken" type="hidden" value="([^"]+)"/]);
+}
+
+function parsePortfolioOptions(html) {
+  const results = [];
+  const regex = /class="portfolio-box"[\s\S]*?data-portfolio="(\d+)"[\s\S]*?<div class="portfolio-title[^"]*">([\s\S]*?)<\/div>/g;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const id = match[1];
+    const title = stripTags(match[2]).replace(/\s+/g, ' ').trim();
+    if (title) results.push({ id, title });
+  }
+  return results;
+}
+
+function normalize(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function resolvePortfolios(requestedValues, options) {
+  const resolved = [];
+  const seen = new Set();
+  for (const requested of requestedValues || []) {
+    const raw = String(requested || '').trim();
+    if (!raw) continue;
+
+    if (/^\d+$/.test(raw)) {
+      const direct = options.find((option) => option.id === raw);
+      if (direct && !seen.has(direct.id)) {
+        seen.add(direct.id);
+        resolved.push(direct);
+      }
+      if (resolved.length === 3) break;
+      continue;
+    }
+
+    const key = normalize(requested);
+    if (!key) continue;
+    const match = options.find((option) => {
+      const title = normalize(option.title);
+      return title.includes(key) || key.includes(title) || title.includes(key.slice(0, 10));
+    });
+    if (match && !seen.has(match.id)) {
+      seen.add(match.id);
+      resolved.push(match);
+    }
+    if (resolved.length === 3) break;
+  }
+  return resolved;
+}
+
+function extractMarkdownSection(markdown, heading) {
+  const lines = markdown.split('\n');
+  const startIndex = lines.findIndex((line) => line.trim() === `## ${heading}`);
+  if (startIndex === -1) return '';
+
+  const body = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index].trim();
+    if (trimmed === '---' || /^##\s+/.test(trimmed)) break;
+    body.push(lines[index]);
+  }
+  return body.join('\n').trim();
+}
+
+function synthesizePortfolioDescription(portfolioIds, reasonMap) {
+  const reasons = portfolioIds
+    .map((id) => reasonMap.get(String(id)))
+    .filter(Boolean);
+
+  if (reasons.length === 0) return '';
+
+  return `관련 포트폴리오에서는 ${reasons.join(' 또한 ')} 경험을 확인하실 수 있습니다. 이번 프로젝트도 화면 구현보다 먼저 운영 흐름과 상태 구조를 안정적으로 정리하고, 이를 실제 사용자 경험으로 연결하는 방식으로 진행할 수 있습니다.`;
+}
+
+function parseMarkdownProposal(file) {
+  const markdown = readFileSync(file, 'utf8');
+  const id = matchOne(markdown, [/\*\*프로젝트 ID:\*\*\s*(\d+)/]);
+  const amount = String(parseMoneyToWon(matchOne(markdown, [/\*\*지원 금액:\*\*\s*([^\n]+)/])));
+  const term = String(toNumber(matchOne(markdown, [/\*\*지원 기간:\*\*\s*([^\n]+)/])));
+  const portfolios = matchOne(markdown, [/\*\*첨부 포트폴리오:\*\*\s*([^\n]+)/])
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const body = extractMarkdownSection(markdown, '지원서 본문');
+  const explicitDesc = extractMarkdownSection(markdown, '관련 포트폴리오 설명');
+  const reasonSection = matchOne(markdown, [
+    /### 포트폴리오 선택 이유\s*\n([\s\S]*?)(?=\n### |\n## |\n?$)/,
+  ]);
+  const reasonMap = new Map();
+  const reasonRegex = /-\s+\*\*(\d+)\*\*:\s*(.+)/g;
+  let reasonMatch;
+  while ((reasonMatch = reasonRegex.exec(reasonSection)) !== null) {
+    reasonMap.set(reasonMatch[1], reasonMatch[2].trim());
+  }
+
+  return {
+    id,
+    amount,
+    term,
+    body,
+    portfolios,
+    desc: explicitDesc || synthesizePortfolioDescription(portfolios, reasonMap),
+  };
+}
+
+function loadProposals(file) {
+  if (file.endsWith('.md')) return [parseMarkdownProposal(file)];
+  const parsed = JSON.parse(readFileSync(file, 'utf8'));
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
+
+function buildSubmitFields(proposal, csrfToken, portfolios) {
+  const fields = {
+    csrfmiddlewaretoken: csrfToken,
+    budget: String(proposal.amount ?? ''),
+    term: String(proposal.term ?? ''),
+    body: proposal.body ?? '',
+    ai_proposal_history: '',
+  };
+
+  if (portfolios.length > 0 || proposal.desc) {
+    fields.has_related_portfolio = 'True';
+    fields.relate_tmp = portfolios.map((p) => p.id).join(',');
+    fields.relate_portfolio_first = portfolios[0]?.id ?? '';
+    fields.relate_portfolio_second = portfolios[1]?.id ?? '';
+    fields.relate_portfolio_third = portfolios[2]?.id ?? '';
+    fields.related_description = proposal.desc ?? '';
+  } else {
+    fields.has_related_portfolio = 'False';
+    fields.relate_tmp = '';
+    fields.relate_portfolio_first = '';
+    fields.relate_portfolio_second = '';
+    fields.relate_portfolio_third = '';
+    fields.related_description = '';
+  }
+
+  return fields;
+}
 
 async function cmdList(args) {
-  const pages = parseInt(args.find((_, i, a) => a[i - 1] === '--pages') || '7');
-  await startLP();
-
+  const pages = Number(args[args.indexOf('--pages') + 1] || 1);
+  const sortCode = getListSortCode(args);
   const all = [];
   const seen = new Set();
 
-  for (let p = 1; p <= pages; p++) {
-    const url = p === 1 ? FILTER_URL : `${FILTER_URL}&page=${p}`;
-    console.error(`[list] Page ${p}/${pages}`);
-
-    try {
-      const { ctx, page } = await visit(url);
-      const rows = await page.evaluate(() => {
-        const results = [];
-        const links = document.querySelectorAll('a[href*="/project/"]');
-        for (const link of links) {
-          const href = link.getAttribute('href') || '';
-          const m = href.match(/\/project\/(\d+)\//);
-          if (!m) continue;
-          const title = link.textContent?.trim();
-          if (!title || title.length < 5) continue;
-
-          // 부모 요소에서 추가 정보 추출
-          const container = link.closest('[class*="item"], [class*="card"], li, tr') || link.parentElement?.parentElement;
-          const text = container?.textContent || '';
-          const budget = text.match(/([0-9,]+)원/);
-          const duration = text.match(/(\d+)일/);
-          const applicants = text.match(/(\d+)명/);
-
-          results.push({
-            id: m[1],
-            title: title.replace(/\s+/g, ' '),
-            budget: budget ? budget[1] + '원' : '협의',
-            duration: duration ? duration[1] + '일' : '-',
-            applicants: applicants ? applicants[1] + '명' : '비공개',
-          });
-        }
-        return results;
-      });
-
-      for (const r of rows) {
-        if (!seen.has(r.id)) { seen.add(r.id); all.push(r); }
-      }
-      console.error(`  → ${rows.length} found (total: ${all.length})`);
-      await page.close();
-      await ctx.close();
-
-      if (rows.length === 0) break;
-    } catch (e) {
-      console.error(`  → FAIL: ${e.message.split('\n')[0]}`);
-      break;
+  for (let page = 1; page <= pages; page += 1) {
+    const query = sortCode === 'bs' ? '' : `&srt=${sortCode}`;
+    const url = page === 1 ? `${FILTER_URL}${query}` : `${FILTER_URL}${query}&page=${page}`;
+    console.error(`[list] ${url}`);
+    const { html } = await fetchHtml(url);
+    const items = parseProjectCards(html);
+    for (const item of items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      all.push(item);
     }
+    if (items.length === 0) break;
   }
 
   console.log(JSON.stringify(all, null, 2));
-  await stopLP();
 }
-
-// ── detail ──
 
 async function cmdDetail(ids) {
-  await startLP();
   const results = [];
-
   for (const id of ids) {
     console.error(`[detail] ${id}`);
-    try {
-      const { ctx, page } = await visit(`https://www.wishket.com/project/${id}/`);
-      const data = await page.evaluate(() => {
-        const text = document.body?.innerText || '';
-        const title = document.querySelector('h1')?.textContent?.trim() || '';
-
-        const budget = text.match(/예상 금액[^0-9]*([0-9,]+)/)?.[1] || text.match(/([0-9,]+)원/)?.[1] || '협의';
-        const duration = text.match(/예상 기간[^0-9]*(\d+)/)?.[1] || '';
-        const applicants = text.match(/지원자[^0-9]*(\d+)/)?.[1] || '비공개';
-        const deadline = text.match(/모집 마감[^\d]*([\d.]+)/)?.[1] || '';
-
-        // 기술 스택
-        const techSection = text.match(/사용\s*기술[\s\S]*?(?=업무|프로젝트|클라이언트)/)?.[0] || '';
-
-        // 상세 설명 (h1 이후 텍스트)
-        const desc = text.substring(0, 3000);
-
-        return { title, budget, duration, applicants, deadline, techSection: techSection.trim(), bodyLength: text.length };
-      });
-      results.push({ id, ...data });
-      await page.close();
-      await ctx.close();
-    } catch (e) {
-      results.push({ id, error: e.message.split('\n')[0] });
-    }
+    const { html, effectiveUrl } = await fetchHtml(`https://www.wishket.com/project/${id}/`);
+    results.push(parseDetail(id, html, effectiveUrl));
   }
-
   console.log(JSON.stringify(results, null, 2));
-  await stopLP();
 }
 
-// ── boost ──
-
 async function cmdBoost(ids) {
-  const cookies = await extractCookies();
-  await startLP();
+  const cookieHeader = getCookieHeader();
   const results = [];
 
   for (const id of ids) {
     console.error(`[boost] ${id}`);
-    try {
-      const { ctx, page } = await visit(
-        `https://www.wishket.com/project/${id}/proposal/apply/`, cookies
-      );
+    const { html, effectiveUrl } = await fetchHtml(
+      `https://www.wishket.com/project/${id}/proposal/apply/`,
+      cookieHeader,
+    );
 
-      if (page.url().includes('auth.wishket.com')) {
-        results.push({ id, error: 'NOT_LOGGED_IN' });
-        await page.close(); await ctx.close();
-        continue;
-      }
-
-      // "실시간 확인" 버튼 클릭
-      await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('button, [class*="btn"]')]
-          .find(b => b.textContent.includes('실시간 확인'));
-        if (btn) btn.click();
-      });
-      await page.waitForTimeout(2000);
-
-      const stats = await page.evaluate(() => {
-        const text = document.body?.innerText || '';
-        const result = { min: 0, avg: 0, max: 0, applicants: 0, budget: '' };
-
-        const app = text.match(/지원자\s*(\d+)명/);
-        if (app) result.applicants = parseInt(app[1]);
-
-        const bud = text.match(/예상 금액[^0-9]*([0-9,]+)/);
-        if (bud) result.budget = bud[1];
-
-        const boxes = document.querySelectorAll('[class*="statistics"], [class*="stat-box"]');
-        for (const box of boxes) {
-          const t = box.textContent;
-          const num = parseInt(t.replace(/[^0-9]/g, '') || '0');
-          if (t.includes('최저') && num > 0) result.min = num;
-          if (t.includes('평균') && num > 0) result.avg = num;
-          if (t.includes('최고') && num > 0) result.max = num;
-        }
-        return result;
-      });
-
-      results.push({ id, ...stats });
-      await page.close();
-      await ctx.close();
-    } catch (e) {
-      results.push({ id, error: e.message.split('\n')[0] });
+    if (effectiveUrl.includes('auth.wishket.com')) {
+      results.push({ id, error: 'NOT_LOGGED_IN', url: effectiveUrl });
+      continue;
     }
+
+    results.push(parseBoost(id, html, effectiveUrl));
   }
 
   console.log(JSON.stringify(results, null, 2));
-  await stopLP();
 }
 
-// ── submit ──
+async function cmdSubmit(file, options = {}) {
+  const proposals = loadProposals(file);
+  const cookieHeader = getCookieHeader();
 
-async function cmdSubmit(file) {
-  const proposals = JSON.parse(readFileSync(file, 'utf-8'));
-  const cookies = await extractCookies();
-  await startLP();
+  for (const proposal of proposals) {
+    console.error(`[submit] ${proposal.id}`);
+    const applyUrl = `https://www.wishket.com/project/${proposal.id}/proposal/apply/`;
+    const { html, effectiveUrl } = await fetchHtml(applyUrl, cookieHeader);
 
-  for (const p of proposals) {
-    console.error(`[submit] ${p.id}`);
-    try {
-      const { ctx, page } = await visit(
-        `https://www.wishket.com/project/${p.id}/proposal/apply/`, cookies
-      );
-
-      if (page.url().includes('auth.wishket.com')) {
-        console.error(`  → NOT_LOGGED_IN`);
-        await page.close(); await ctx.close();
-        continue;
-      }
-
-      // 금액/기간/본문
-      await page.fill('input[name="budget"]', String(p.amount));
-      await page.fill('input[name="term"]', String(p.term));
-      await page.fill('textarea[name="body"]', p.body);
-
-      // 포트폴리오 라디오
-      await page.evaluate(() => {
-        document.querySelector('label[for="has_related_portfolio"]')?.click();
-      });
-      await page.waitForTimeout(500);
-
-      // 포트폴리오 모달
-      await page.evaluate(() => {
-        document.querySelector('.btn-select-related-portfolio')?.click();
-      });
-      await page.waitForTimeout(1000);
-
-      // 포트폴리오 선택
-      for (const title of (p.portfolios || [])) {
-        const prefix = title.substring(0, 10);
-        await page.evaluate((pf) => {
-          const match = [...document.querySelectorAll('.portfolio-box')]
-            .find(b => b.querySelector('.portfolio-title-box')?.innerText?.includes(pf));
-          if (match) match.click();
-        }, prefix);
-        await page.waitForTimeout(300);
-      }
-
-      // 선택 완료
-      await page.evaluate(() => {
-        [...document.querySelectorAll('button')]
-          .find(b => b.textContent.includes('선택 완료'))?.click();
-      });
-      await page.waitForTimeout(500);
-
-      // 포트폴리오 설명
-      if (p.desc) {
-        const descTa = page.locator('textarea[name="related_description"]');
-        if (await descTa.count() > 0) await descTa.fill(p.desc);
-      }
-      await page.waitForTimeout(300);
-
-      // 1차: "프로젝트 지원"
-      await page.evaluate(() => {
-        [...document.querySelectorAll('button')]
-          .find(b => b.textContent.trim() === '프로젝트 지원' && !b.disabled)?.click();
-      });
-      await page.waitForTimeout(2000);
-
-      // 2차: "제출하기"
-      await page.evaluate(() => {
-        [...document.querySelectorAll('button')]
-          .find(b => b.textContent.trim() === '제출하기')?.click();
-      });
-      await page.waitForTimeout(3000);
-
-      console.error(`  → DONE`);
-      await page.close();
-      await ctx.close();
-    } catch (e) {
-      console.error(`  → ERROR: ${e.message.split('\n')[0]}`);
+    if (effectiveUrl.includes('auth.wishket.com')) {
+      console.log(JSON.stringify({ id: proposal.id, error: 'NOT_LOGGED_IN', url: effectiveUrl }, null, 2));
+      continue;
     }
+
+    const csrfToken = parseCsrfToken(html);
+    const portfolioOptions = parsePortfolioOptions(html);
+    const resolvedPortfolios = resolvePortfolios(proposal.portfolios, portfolioOptions);
+    const fields = buildSubmitFields(proposal, csrfToken, resolvedPortfolios);
+
+    const preview = {
+      id: proposal.id,
+      url: applyUrl,
+      budget: fields.budget,
+      term: fields.term,
+      has_related_portfolio: fields.has_related_portfolio,
+      resolvedPortfolios,
+      related_description_length: fields.related_description.length,
+      body_length: fields.body.length,
+      mode: options.confirm ? 'confirm' : 'preview',
+    };
+
+    if (!options.confirm) {
+      console.log(JSON.stringify(preview, null, 2));
+      continue;
+    }
+
+    const response = await postForm(applyUrl, cookieHeader, applyUrl, fields);
+    const statusLine = response.split('\n', 1)[0].trim();
+    const locationMatch = response.match(/\nlocation:\s*(.+)\r?/i);
+
+    console.log(JSON.stringify({
+      ...preview,
+      statusLine,
+      location: locationMatch?.[1]?.trim() || '',
+      submitted: true,
+    }, null, 2));
   }
-
-  await stopLP();
 }
-
-// ── main ──
 
 const [cmd, ...args] = process.argv.slice(2);
 
 if (!cmd || cmd === 'help') {
-  console.log(`Usage:
-  node wishket.mjs list [--pages N]
-  node wishket.mjs detail <ID> [ID...]
-  node wishket.mjs boost <ID> [ID...]
-  node wishket.mjs submit <proposals.json>`);
+  usage();
   process.exit(0);
 }
 
@@ -351,10 +444,12 @@ try {
   if (cmd === 'list') await cmdList(args);
   else if (cmd === 'detail') await cmdDetail(args);
   else if (cmd === 'boost') await cmdBoost(args);
-  else if (cmd === 'submit') await cmdSubmit(args[0]);
-  else { console.error(`Unknown command: ${cmd}`); process.exit(1); }
-} catch (e) {
-  console.error(`FATAL: ${e.message}`);
-  await stopLP();
+  else if (cmd === 'submit') await cmdSubmit(args[0], { confirm: args.includes('--confirm') });
+  else {
+    console.error(`Unknown command: ${cmd}`);
+    process.exit(1);
+  }
+} catch (error) {
+  console.error(`FATAL: ${error.message}`);
   process.exit(1);
 }

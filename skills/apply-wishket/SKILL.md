@@ -44,7 +44,7 @@ Output: proposals/154006.md + proposals/153636.md (경험 다양화 + 크로스 
 | `agents/verifier.md` | 수치/경험 fact-check 에이전트 | Wave 2 |
 | `agents/estimator.md` | 공수 독립 검증 에이전트 | Wave 2 |
 | `scripts/verify-proposal.sh` | 구조 검사 12항목 자동화 스크립트 | Phase 6 |
-| `scripts/wishket.mjs` | Lightpanda 통합 CLI — list/detail/boost/submit 서브커맨드 | Phase 1, 8 |
+| `scripts/wishket.mjs` | HTTP-first Wishket CLI — list/detail/boost/submit(미리보기+확인 전송) | Phase 1, 8 |
 
 프로젝트 루트: `cv/master.yaml` (경험 원천 데이터)
 
@@ -63,15 +63,18 @@ Output: proposals/154006.md + proposals/153636.md (경험 다양화 + 크로스 
 - 예산, 기간, 모집 마감일, 지원자 수
 - **클라이언트 우선순위**: [1순위] 산출물 완성도 / 일정 준수 / 금액 등
 
-**파싱 도구: `scripts/wishket.mjs`** (Lightpanda 통합 CLI):
+**파싱 도구: `scripts/wishket.mjs`** (Playwright 없는 HTTP-first CLI):
 ```bash
+node <skill-dir>/scripts/wishket.mjs list --sort closing    # 마감 임박 순 목록
 node <skill-dir>/scripts/wishket.mjs list                   # 모집 중 프로젝트 목록
 node <skill-dir>/scripts/wishket.mjs detail 154095 154137   # 프로젝트 상세
-node <skill-dir>/scripts/wishket.mjs boost 154095           # BOOST 통계 (쿠키 자동 주입)
+node <skill-dir>/scripts/wishket.mjs boost 154095           # 로그인 apply 페이지 힌트 / data-bot
 ```
-BOOST 데이터를 Phase 3 금액 산정에 반영: **최저 이상 & 75% 이하 & 일당 10~20만 범위**.
+`boost`는 브라우저 프로필을 열지 않는다. `WISHKET_COOKIE_HEADER` 또는 `~/.wishket-cookie-header`에서 쿠키 헤더를 읽어 로그인 apply 페이지를 가져오고, 지원 힌트(data-bot)를 파싱한다.
 
-**1-2. 클라이언트 과거 채택 패턴 분석** — `https://www.wishket.com/project/project_evaluation/{ID}/`에서 확인 (Lightpanda + 쿠키 주입 또는 Playwright):
+기본 우선순위는 `list --sort closing`이다. 마감 임박 순으로 보고, **명백히 못하는 일만 제외한 뒤** detail/boost로 내려가라.
+
+**1-2. 클라이언트 과거 채택 패턴 분석** — `https://www.wishket.com/project/project_evaluation/{ID}/`에서 확인. 현재 스크립트는 evaluation 전용 파서를 제공하지 않으므로, 필요 시 별도 HTTP fetch로 직접 확인:
 - 이 클라이언트가 과거에 채택한 파트너들의 **레벨** (시니어/미드/주니어)
 - **계약 금액과 기간** (일당 환산)
 - **프로젝트 유형** (프론트엔드/백엔드/풀스택)
@@ -220,24 +223,38 @@ FIX/REWRITE 판정된 건은 수정 사항을 구체적으로 제시.
 
 ### Phase 8: 웹 폼 제출
 
-`scripts/wishket.mjs submit`로 제출한다:
+`scripts/wishket.mjs submit`은 Playwright 없이 **직접 HTTP POST** 로 제출 payload를 만든다. 기본은 preview 모드이고, `--confirm`이 있을 때만 실제 전송한다:
+
 ```bash
 node <skill-dir>/scripts/wishket.mjs submit proposals.json
+node <skill-dir>/scripts/wishket.mjs submit proposals.json --confirm
+node <skill-dir>/scripts/wishket.mjs submit benchmark/wishket/proposals/154095.md
 ```
 
 `proposals.json` 형식: `[{ "id": "154095", "amount": "5000000", "term": "30", "body": "...", "portfolios": ["제목1", "제목2"], "desc": "포트폴리오 설명" }]`
 
-**기능:**
-- 지원 폼 진입 시 BOOST 금액 통계를 자동 파싱 (최저/평균/최고)
-- 제안 금액이 BOOST 최저 미만이면 자동 상향 (일당 10~20만 범위 내)
-- `proposals/{ID}.md`에서 "## 지원서 본문" 텍스트를 자동 추출
-- 포트폴리오를 title로 정확히 매칭하여 선택
-- 2단계 제출 확인 ("프로젝트 지원" → "제출하기") 자동 처리
+단건은 proposal markdown도 직접 입력할 수 있다. 이 경우 스크립트가 다음 메타데이터를 읽는다:
+- `**프로젝트 ID:**`
+- `**지원 금액:**`
+- `**지원 기간:**`
+- `**첨부 포트폴리오:**`
+- `## 지원서 본문`
+- 선택: `## 관련 포트폴리오 설명`
 
-**알려진 한계:**
-- 포트폴리오 이미지 업로드: jQuery `change` 핸들러 미트리거 → 이미지는 브라우저에서 직접 드래그 앤 드롭
-- Lightpanda: context 1개만 가능 → 순차 실행 필수
-- `locator.click()` 미지원 → `page.evaluate(() => el.click())` JS 클릭 사용
+쿠키 공급:
+- `WISHKET_COOKIE_HEADER="csrftoken=...; wsessionid=..."`
+- 또는 `~/.wishket-cookie-header`
+
+동작 방식:
+- apply 페이지를 먼저 fetch
+- CSRF 토큰과 포트폴리오 목록을 HTML에서 파싱
+- 제목 또는 포트폴리오 ID 기준으로 포트폴리오를 최대 3개까지 매칭
+- preview 모드에서 실제 전송 전 payload를 JSON으로 출력
+- `--confirm` 모드에서 같은 apply URL로 POST
+
+주의:
+- 기본값은 **전송하지 않는 preview**
+- 실제 submit 성공 케이스가 있으므로 현재 경로를 기본 제출 경로로 사용해도 된다. 다만 실수 방지를 위해 **항상 단건 preview → 확인 후 `--confirm`** 순서를 유지하라.
 
 ---
 
@@ -249,7 +266,7 @@ node <skill-dir>/scripts/wishket.mjs submit proposals.json
 
 N개 에이전트가 독립 실행하면 범용성 높은 경험(HR, SIM)만 반복 선택된다. 테스트에서 확인: 3회 iteration 모두 배치 2건이 HR+SIM 동일 조합이었다. 이를 방지하기 위해 메인 세션이 사전에 경험을 배분한다.
 
-1. N개 프로젝트를 Lightpanda `lightpanda-helper.mjs fetch`로 병렬 파싱하여 요구사항 파악
+1. N개 프로젝트를 `node <skill-dir>/scripts/wishket.mjs detail ...`로 병렬 파싱하여 요구사항 파악
 2. `docs/experience-pool.md`의 6개 경험 코드 로드
 3. 프로젝트별 경험 2-3개를 배정:
    - 1순위: 가장 직접적 매칭 (겹쳐도 OK)
@@ -338,5 +355,5 @@ apply-wishket/
 │   └── estimator.md        # 공수 독립 검증
 └── scripts/
     ├── verify-proposal.sh  # 구조 검사 12항목 자동화
-    └── wishket.mjs         # Lightpanda 통합 CLI (list/detail/boost/submit)
+    └── wishket.mjs         # HTTP-first CLI (list/detail/boost)
 ```

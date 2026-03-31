@@ -12,8 +12,8 @@
 
 ## 절차
 
-1. **프로젝트 상세 Fetch**: `node {SKILL_DIR}/scripts/wishket.mjs detail {PROJECT_ID}`로 파싱. BOOST 금액 통계(최저/75%/평균/최고)는 `node {SKILL_DIR}/scripts/wishket.mjs boost {PROJECT_ID}`로 수집.
-2. **클라이언트 과거 패턴 분석**: `node {SKILL_DIR}/scripts/wishket.mjs detail`로 evaluation 페이지 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
+1. **프로젝트 상세 Fetch**: `node {SKILL_DIR}/scripts/wishket.mjs detail {PROJECT_ID}`로 파싱. 로그인 apply 페이지 힌트(data-bot, 지원 힌트)는 `node {SKILL_DIR}/scripts/wishket.mjs boost {PROJECT_ID}`로 수집. 다건이면 먼저 `list --sort closing`으로 마감 임박 순 정렬을 기준으로 우선순위를 잡는다.
+2. **클라이언트 과거 패턴 분석**: evaluation 페이지 전용 자동 파서는 아직 없으므로, 필요 시 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/`를 직접 fetch하여 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 읽는다. 이 정보로 지원서 톤과 금액을 보정.
 3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계
@@ -31,13 +31,14 @@
    - 총 공수 + QA 버퍼(20%) + 상식 체크
    - **기능별 테이블 형식**으로 근거 남기기
 6. **금액/기간 산정** (proposal-rules.md 7단계):
-   - **BOOST 금액 통계 기반** — 75% 이하, 일당 10~20만 범위 (신규 파트너)
+   - 예산 / 지원자 수 / apply 페이지 힌트(data-bot) 기반
    - 클라이언트 과거 계약 일당이 있으면 그 범위에 맞춤
    - 강도 계산 (공수 ÷ 가용 작업일)
    - 이탈도 체크 (±20% 이내)
 7. **지원서 작성**: proposal-rules.md의 자연스러운 흐름 템플릿으로 조립. `[대괄호 섹션]` 사용 금지.
 8. **포트폴리오 선택**: experience-pool.md 매핑 테이블에서 2-3개
-9. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
+9. **관련 포트폴리오 설명 작성**: 선택한 포트폴리오가 이번 프로젝트와 어떻게 연결되는지 1개 문단으로 정리. 이 문단은 `wishket.mjs submit`의 `desc` 또는 markdown의 `## 관련 포트폴리오 설명`으로 그대로 들어간다.
+10. **자기 검증**: 체크리스트 12항목 자가 확인 후 저장
 
 ## 출력 형식
 
@@ -55,6 +56,12 @@
 ## 지원서 본문
 
 {위시켓에 복붙할 텍스트}
+
+---
+
+## 관련 포트폴리오 설명
+
+{선택한 포트폴리오와 이번 프로젝트의 연결점, 진행 방식, 핵심 요소를 1개 문단으로 설명}
 
 ---
 

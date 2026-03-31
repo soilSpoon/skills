@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"kill 39383 2>&1 && echo \\\"killed\\\"\",\"description\":\"Kill stale ninja build process\"}",
-  "error": "Exit code 1\n(eval):kill:1: kill 39383 failed: no such process",
-  "timestamp": "2026-03-31T06:30:42.323Z",
-  "retry_count": 1
-}
