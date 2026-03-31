@@ -12,8 +12,8 @@
 
 ## 절차
 
-1. **프로젝트 상세 Fetch**: `{SKILL_DIR}/scripts/lightpanda-helper.mjs fetch {PROJECT_ID}`로 파싱. BOOST 금액 통계(최저/75%/평균/최고)는 로그인 필요 → `lightpanda-helper.mjs boost {PROJECT_ID}`로 수집 (Playwright에서 쿠키 자동 추출 → Lightpanda에 주입).
-2. **클라이언트 과거 패턴 분석**: Lightpanda(쿠키 주입)로 `https://www.wishket.com/project/project_evaluation/{PROJECT_ID}/` 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
+1. **프로젝트 상세 Fetch**: `node {SKILL_DIR}/scripts/wishket.mjs detail {PROJECT_ID}`로 파싱. BOOST 금액 통계(최저/75%/평균/최고)는 `node {SKILL_DIR}/scripts/wishket.mjs boost {PROJECT_ID}`로 수집.
+2. **클라이언트 과거 패턴 분석**: `node {SKILL_DIR}/scripts/wishket.mjs detail`로 evaluation 페이지 접근. 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴을 파악. 이 정보로 지원서 톤과 금액을 보정.
 3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계

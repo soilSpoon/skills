@@ -44,9 +44,7 @@ Output: proposals/154006.md + proposals/153636.md (경험 다양화 + 크로스 
 | `agents/verifier.md` | 수치/경험 fact-check 에이전트 | Wave 2 |
 | `agents/estimator.md` | 공수 독립 검증 에이전트 | Wave 2 |
 | `scripts/verify-proposal.sh` | 구조 검사 12항목 자동화 스크립트 | Phase 6 |
-| `scripts/lightpanda-helper.mjs` | Lightpanda 기반 파싱/BOOST/제출 통합 헬퍼 (권장) | Phase 1, 8 |
-| `scripts/fetch-boost-stats.mjs` | Playwright 기반 BOOST 금액 통계 파싱 (폴백) | Phase 1 |
-| `scripts/submit-proposals.mjs` | Playwright 기반 위시켓 폼 입력+제출 (폴백) | Phase 8 |
+| `scripts/wishket.mjs` | Lightpanda 통합 CLI — list/detail/boost/submit 서브커맨드 | Phase 1, 8 |
 
 프로젝트 루트: `cv/master.yaml` (경험 원천 데이터)
 
@@ -65,13 +63,13 @@ Output: proposals/154006.md + proposals/153636.md (경험 다양화 + 크로스 
 - 예산, 기간, 모집 마감일, 지원자 수
 - **클라이언트 우선순위**: [1순위] 산출물 완성도 / 일정 준수 / 금액 등
 
-**파싱 도구: Lightpanda** — 가볍고 빠르며 JS 렌더링된 콘텐츠까지 가져옴. 트래킹 스크립트 차단 필수. 사용법은 `scripts/lightpanda-helper.mjs` 참조.
-
-> **BOOST 금액 통계**는 로그인 필요. Lightpanda에 쿠키 주입하거나 `scripts/fetch-boost-stats.mjs`를 실행:
-> ```bash
-> node <skill-dir>/scripts/fetch-boost-stats.mjs 154079 153957 154097
-> ```
-> JSON으로 각 프로젝트의 min/p75/avg/p25/max/applicants를 반환한다. 이 데이터를 Phase 3 금액 산정에 반영: **최저 이상 & 75% 이하 & 일당 10~20만 범위**.
+**파싱 도구: `scripts/wishket.mjs`** (Lightpanda 통합 CLI):
+```bash
+node <skill-dir>/scripts/wishket.mjs list                   # 모집 중 프로젝트 목록
+node <skill-dir>/scripts/wishket.mjs detail 154095 154137   # 프로젝트 상세
+node <skill-dir>/scripts/wishket.mjs boost 154095           # BOOST 통계 (쿠키 자동 주입)
+```
+BOOST 데이터를 Phase 3 금액 산정에 반영: **최저 이상 & 75% 이하 & 일당 10~20만 범위**.
 
 **1-2. 클라이언트 과거 채택 패턴 분석** — `https://www.wishket.com/project/project_evaluation/{ID}/`에서 확인 (Lightpanda + 쿠키 주입 또는 Playwright):
 - 이 클라이언트가 과거에 채택한 파트너들의 **레벨** (시니어/미드/주니어)
@@ -222,25 +220,14 @@ FIX/REWRITE 판정된 건은 수정 사항을 구체적으로 제시.
 
 ### Phase 8: 웹 폼 제출
 
-**방법 A: Lightpanda (권장)** — 가볍고 빠르며 Chrome 프로필 잠금 문제 없음.
-
-Lightpanda에서 위시켓 폼 제출 시 필수 사항:
-- 트래킹 스크립트 차단 (`page.route`로 sentry, clarity, GTM 등 block) — 미차단 시 SIGSEGV 크래시
-- `waitUntil: 'domcontentloaded'` 사용
-- context 1개 제한 → 페이지마다 close 후 새로 생성
-- `locator.click()` 대신 `page.evaluate(() => el.click())` JS 클릭 사용
-- 쿠키 주입: Playwright persistent context에서 쿠키 추출 → `ctx.addCookies()`로 주입
-
-사용법은 `scripts/lightpanda-helper.mjs`의 `submitProposal()` 참조.
-
-**방법 B: Playwright** — Lightpanda 실패 시 또는 디버깅용.
-
-`scripts/submit-proposals.mjs`의 `PROPOSALS` 배열을 수정 후 실행:
+`scripts/wishket.mjs submit`로 제출한다:
 ```bash
-node <skill-dir>/scripts/submit-proposals.mjs
+node <skill-dir>/scripts/wishket.mjs submit proposals.json
 ```
 
-**공통 기능:**
+`proposals.json` 형식: `[{ "id": "154095", "amount": "5000000", "term": "30", "body": "...", "portfolios": ["제목1", "제목2"], "desc": "포트폴리오 설명" }]`
+
+**기능:**
 - 지원 폼 진입 시 BOOST 금액 통계를 자동 파싱 (최저/평균/최고)
 - 제안 금액이 BOOST 최저 미만이면 자동 상향 (일당 10~20만 범위 내)
 - `proposals/{ID}.md`에서 "## 지원서 본문" 텍스트를 자동 추출
@@ -248,9 +235,9 @@ node <skill-dir>/scripts/submit-proposals.mjs
 - 2단계 제출 확인 ("프로젝트 지원" → "제출하기") 자동 처리
 
 **알려진 한계:**
-- 포트폴리오 이미지 업로드: `setFiles`가 위시켓 jQuery `change` 핸들러를 트리거하지 못함 → 이미지는 브라우저에서 직접 드래그 앤 드롭
+- 포트폴리오 이미지 업로드: jQuery `change` 핸들러 미트리거 → 이미지는 브라우저에서 직접 드래그 앤 드롭
 - Lightpanda: context 1개만 가능 → 순차 실행 필수
-- Playwright: Chrome 프로필 잠금 → 실행 전 `pkill -f "Google Chrome"` 및 SingletonLock 제거 필요
+- `locator.click()` 미지원 → `page.evaluate(() => el.click())` JS 클릭 사용
 
 ---
 
@@ -350,8 +337,6 @@ apply-wishket/
 │   ├── verifier.md         # 수치/경험 fact-check
 │   └── estimator.md        # 공수 독립 검증
 └── scripts/
-    ├── verify-proposal.sh      # 구조 검사 12항목 자동화
-    ├── lightpanda-helper.mjs   # Lightpanda 기반 파싱/제출 헬퍼 (권장)
-    ├── fetch-boost-stats.mjs   # Phase 1: BOOST 금액 통계 Playwright 파싱
-    └── submit-proposals.mjs    # Phase 8: Playwright 폼 입력+제출 (폴백)
+    ├── verify-proposal.sh  # 구조 검사 12항목 자동화
+    └── wishket.mjs         # Lightpanda 통합 CLI (list/detail/boost/submit)
 ```
