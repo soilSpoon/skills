@@ -23,6 +23,7 @@ function usage() {
   node wishket.mjs detail <ID> [ID...]
   node wishket.mjs boost <ID> [ID...]
   node wishket.mjs evaluation <ID> [ID...]
+  node wishket.mjs analyze <ID> [ID...]
   node wishket.mjs submit <proposals.json|proposal.md> [more.md ...] [--confirm]`);
 }
 
@@ -43,10 +44,11 @@ function expandHome(path) {
   return `${process.env.HOME}/${path.slice(2)}`;
 }
 
-function getCookieHeader() {
+function getCookieHeader(options = {}) {
   if (process.env.WISHKET_COOKIE_HEADER) return process.env.WISHKET_COOKIE_HEADER.trim();
   const fallback = expandHome('~/.wishket-cookie-header');
   if (existsSync(fallback)) return readFileSync(fallback, 'utf8').trim();
+  if (options.optional) return '';
   throw new Error('WISHKET_COOKIE_HEADER not set and ~/.wishket-cookie-header not found');
 }
 
@@ -109,6 +111,11 @@ function parseMoneyToWon(value) {
   return toNumber(raw);
 }
 
+function parseApplicantsCount(text) {
+  const match = text.match(/지원자(?:\s*수)?[^0-9]{0,20}(\d{1,3})(?![\d.])/);
+  return match ? Number(match[1]) : 0;
+}
+
 function matchOne(text, patterns) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -159,7 +166,7 @@ function parseDetail(id, html, effectiveUrl) {
     title,
     budget: toNumber(matchOne(text, [/예상 금액[^0-9]*([0-9,]+)/, /([0-9,]+)\s*원/])),
     durationDays: toNumber(matchOne(text, [/예상 기간[^0-9]*(\d+)/])),
-    applicants: toNumber(matchOne(text, [/지원자[^0-9]*(\d+)/])),
+    applicants: parseApplicantsCount(text),
     deadline: matchOne(text, [/모집 마감[^\d]*([\d.]+)/]),
   };
 }
@@ -182,7 +189,7 @@ function parseBoost(id, html, effectiveUrl) {
     title,
     budget: toNumber(matchOne(text, [/예상 금액[^0-9]*([0-9,]+)/])),
     durationDays: toNumber(matchOne(text, [/예상 기간[^0-9]*(\d+)/])),
-    applicants: toNumber(matchOne(text, [/지원자[^0-9]*(\d+)/])),
+    applicants: parseApplicantsCount(text),
     minProposalChars: toNumber(matchOne(botText, [/지원 내용이\s*([0-9,]+)자 이상/])),
     minPortfolioCount: toNumber(matchOne(botText, [/포트폴리오 수가\s*([0-9,]+)개 이상/])),
     dataBotSummary: botText,
@@ -462,6 +469,36 @@ function summarizeEvaluationCards(cards) {
   };
 }
 
+function buildAnalyzeSummary(detail, boost, evaluation) {
+  const evaluationSummary = evaluation.summary || {};
+  const recommendedDailyRate = evaluationSummary.medianDayRate || 0;
+  const recommendedBudget = recommendedDailyRate && detail.durationDays
+    ? Math.round(recommendedDailyRate * detail.durationDays)
+    : 0;
+
+  return {
+    feasibilitySignals: {
+      hasBoostHints: Boolean(boost.minProposalChars || boost.minPortfolioCount),
+      hasClientReviews: Boolean(evaluation.hasReviews),
+      applicants: detail.applicants || boost.applicants || 0,
+    },
+    pricing: {
+      projectBudget: detail.budget || boost.budget || 0,
+      durationDays: detail.durationDays || boost.durationDays || 0,
+      historicalMedianDayRate: evaluationSummary.medianDayRate || 0,
+      historicalAvgDayRate: evaluationSummary.avgDayRate || 0,
+      recommendedDailyRate,
+      recommendedBudget,
+    },
+    writing: {
+      minProposalChars: boost.minProposalChars || 0,
+      minPortfolioCount: boost.minPortfolioCount || 0,
+      topKeywords: evaluationSummary.topKeywords || [],
+      toneHints: evaluationSummary.toneHints || [],
+    },
+  };
+}
+
 function buildSubmitFields(proposal, csrfToken, portfolios) {
   const fields = {
     csrfmiddlewaretoken: csrfToken,
@@ -580,6 +617,55 @@ async function cmdEvaluation(ids) {
   console.log(JSON.stringify(results, null, 2));
 }
 
+async function cmdAnalyze(ids) {
+  const cookieHeader = getCookieHeader({ optional: true });
+  const results = [];
+
+  for (const id of ids) {
+    console.error(`[analyze] ${id}`);
+
+    const detailFetch = await fetchHtml(`https://www.wishket.com/project/${id}/`);
+    const detail = parseDetail(id, detailFetch.html, detailFetch.effectiveUrl);
+
+    const applyFetch = await fetchHtml(`https://www.wishket.com/project/${id}/proposal/apply/`, cookieHeader);
+    const boost = !cookieHeader || applyFetch.effectiveUrl.includes('auth.wishket.com')
+      ? { id, error: 'NOT_LOGGED_IN', url: applyFetch.effectiveUrl }
+      : parseBoost(id, applyFetch.html, applyFetch.effectiveUrl);
+
+    const evalFetch = await fetchHtml(`https://www.wishket.com/project/project_evaluation/${id}/`, cookieHeader);
+    let evaluation;
+    if (!cookieHeader || evalFetch.effectiveUrl.includes('auth.wishket.com')) {
+      evaluation = { id, error: 'NOT_LOGGED_IN', url: evalFetch.effectiveUrl };
+    } else {
+      const overview = parseEvaluationOverview(id, evalFetch.html, evalFetch.effectiveUrl);
+      let cards = [];
+      if (overview.ajaxPath && overview.hasReviews) {
+        const ajaxUrl = overview.ajaxPath.startsWith('http')
+          ? `${overview.ajaxPath}?filter_str=latest_date&star_count=0&public_post=yes`
+          : `https://www.wishket.com${overview.ajaxPath}?filter_str=latest_date&star_count=0&public_post=yes`;
+        const ajaxFetch = await fetchHtml(ajaxUrl, cookieHeader);
+        cards = parseEvaluationCards(ajaxFetch.html);
+      }
+      evaluation = {
+        ...overview,
+        cards,
+        cardCount: cards.length,
+        summary: summarizeEvaluationCards(cards),
+      };
+    }
+
+    results.push({
+      id,
+      detail,
+      boost,
+      evaluation,
+      analyze: buildAnalyzeSummary(detail, boost, evaluation),
+    });
+  }
+
+  console.log(JSON.stringify(results, null, 2));
+}
+
 async function cmdSubmit(files, options = {}) {
   const proposals = loadProposalInputs(files);
   const cookieHeader = getCookieHeader();
@@ -649,6 +735,7 @@ try {
   else if (cmd === 'detail') await cmdDetail(args);
   else if (cmd === 'boost') await cmdBoost(args);
   else if (cmd === 'evaluation') await cmdEvaluation(args);
+  else if (cmd === 'analyze') await cmdAnalyze(args);
   else if (cmd === 'submit') await cmdSubmit(args.filter((arg) => arg !== '--confirm'), { confirm: args.includes('--confirm') });
   else {
     console.error(`Unknown command: ${cmd}`);

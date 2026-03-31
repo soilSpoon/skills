@@ -12,8 +12,8 @@
 
 ## 절차
 
-1. **프로젝트 상세 Fetch**: `node {SKILL_DIR}/scripts/wishket.mjs detail {PROJECT_ID}`로 파싱. 로그인 apply 페이지 힌트(data-bot, 지원 힌트)는 `node {SKILL_DIR}/scripts/wishket.mjs boost {PROJECT_ID}`로 수집. 다건이면 먼저 `list --sort closing`으로 마감 임박 순 정렬을 기준으로 우선순위를 잡는다.
-2. **클라이언트 과거 패턴 분석**: `node {SKILL_DIR}/scripts/wishket.mjs evaluation {PROJECT_ID}`로 과거 채택 파트너의 레벨, 계약 금액, 기간 패턴, 평가 키워드를 읽는다. 특히 `summary.medianDayRate`, `summary.topKeywords`, `summary.toneHints`를 확인해 제안 일당과 본문 톤을 보정한다.
+1. **프로젝트 종합 분석**: 기본값은 `node {SKILL_DIR}/scripts/wishket.mjs analyze {PROJECT_ID}`다. 이 결과에서 `detail`, `boost`, `evaluation`, `analyze.pricing`, `analyze.writing`을 함께 읽는다. 다건이면 먼저 `list --sort closing`으로 마감 임박 순 정렬을 기준으로 우선순위를 잡는다.
+2. **클라이언트 과거 패턴 분석**: 필요 시 `node {SKILL_DIR}/scripts/wishket.mjs evaluation {PROJECT_ID}`를 직접 보되, 기본적으로는 `analyze` 결과의 `evaluation.summary.medianDayRate`, `evaluation.summary.topKeywords`, `evaluation.summary.toneHints`를 제안 일당과 본문 톤 보정에 사용한다.
 3. **참조 파일 읽기**:
    - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
    - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계
@@ -32,7 +32,7 @@
    - **기능별 테이블 형식**으로 근거 남기기
 6. **금액/기간 산정** (proposal-rules.md 7단계):
    - 예산 / 지원자 수 / apply 페이지 힌트(data-bot) 기반
-   - 클라이언트 과거 계약 일당이 있으면 `evaluation.summary.medianDayRate`를 기준선으로 사용
+   - 클라이언트 과거 계약 일당이 있으면 `analyze.pricing.historicalMedianDayRate`를 기준선으로 사용
    - 강도 계산 (공수 ÷ 가용 작업일)
    - 이탈도 체크 (±20% 이내)
 7. **지원서 작성**: proposal-rules.md의 자연스러운 흐름 템플릿으로 조립. `[대괄호 섹션]` 사용 금지.
