@@ -15,7 +15,18 @@ Read `<skill-dir>/references/resume-guidelines.md` before starting. It contains 
 
 ### 2. Research Company + Job Posting
 
-**Job posting**: Fetch URL → extract required/preferred skills, responsibilities, team context, seniority signals.
+**Job posting** — API-first로 정형화된 데이터를 먼저 확보한다:
+
+**원티드 공고** (wanted.co.kr/wd/{id}):
+```bash
+node <skill-dir>/scripts/job-parser.mjs wanted <ID>
+# 또는 URL 자동 감지:
+node <skill-dir>/scripts/job-parser.mjs url "https://www.wanted.co.kr/wd/<ID>"
+```
+→ JSON으로 position, requirements, mainTasks, preferredPoints, benefits, company, skills, companyTags, annualFrom/To 반환. WebFetch 불필요.
+
+**기타 플랫폼** (잡플래닛, 사람인, 회사 자체 채용 페이지 등):
+→ WebFetch로 HTML 파싱. job-parser 미지원 플랫폼은 기존 방식 유지.
 
 **Company deep research** (go beyond the posting):
 - Search "{company} 기술 블로그", "{company} 개발 문화" → engineering values, tech stack, migration plans
@@ -108,6 +119,13 @@ Full rules in `<skill-dir>/references/resume-guidelines.md`. Key points:
 - **활동 카운트 금지**: PR 개수, 포크 수 무의미. 왜 했고 뭘 개선했고 어떤 효과인지.
 - **어미**: 명사형 통일 ("~제거", "~구축"). 동사형/혼재 금지.
 - **master.yaml 수정 금지**: variant가 커스텀 수단. 경험/스킬 날조 금지.
+
+## Scripts
+
+| Script | Usage |
+|--------|-------|
+| `scripts/job-parser.mjs` | 채용공고 API 파서. `wanted <ID>`, `url <URL>`, `search wanted <keyword>` |
+| `scripts/groupby-api.mjs` | Groupby 평가 API. `both <pdf> <url>` |
 
 ## References
 
