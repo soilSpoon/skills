@@ -8,7 +8,7 @@
  *   npx zx scripts/groupby-api.mjs both cv/output/combined.pdf "https://www.wanted.co.kr/wd/342655"
  */
 
-import { createReadStream, readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { gzipSync } from 'zlib';
 

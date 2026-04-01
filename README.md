@@ -56,6 +56,25 @@ npx skills add soilSpoon/skills@human-like-browser
 **Bundled scripts:**
 - `scripts/human-behavior.js` — Initialization block reference (paste into Playwright `browser_run_code`)
 
+### apply-wishket
+
+Generate tailored proposals for Wishket freelance projects.
+
+```bash
+npx skills add soilSpoon/skills@apply-wishket
+```
+
+**What it does:**
+- Analyzes project requirements from Wishket URL or project ID
+- Matches relevant experience from master.yaml
+- Estimates cost and timeline with multi-step validation
+- Generates proposal with issue→solution pattern and staged process
+- Fact-checks output via parallel verification agents
+- Supports single or batch (parallel) project processing
+
+**Bundled scripts:**
+- `scripts/verify-proposal.sh` — 12-point structural validation for generated proposals
+
 ## Installation
 
 ```bash
@@ -63,6 +82,7 @@ npx skills add soilSpoon/skills@human-like-browser
 npx skills add soilSpoon/skills@tailor-resume
 npx skills add soilSpoon/skills@fact-check
 npx skills add soilSpoon/skills@human-like-browser
+npx skills add soilSpoon/skills@apply-wishket
 ```
 
 ## License

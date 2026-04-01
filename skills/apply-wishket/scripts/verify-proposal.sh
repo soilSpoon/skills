@@ -9,6 +9,16 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
+# 설정 파일 로드 (스크립트와 같은 디렉토리)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONFIG="$SCRIPT_DIR/verify-config.sh"
+if [ ! -f "$CONFIG" ]; then
+  echo "오류: 설정 파일 없음: $CONFIG"
+  echo "verify-config.sh를 scripts/ 디렉토리에 생성하세요."
+  exit 1
+fi
+source "$CONFIG"
+
 PASS=0
 FAIL=0
 
@@ -49,11 +59,11 @@ CHARS=$(echo "$BODY" | wc -m | tr -d ' ')
 [ "$CHARS" -ge 830 ] && check "830자 이상" "PASS" || check "830자 이상" "FAIL" "${CHARS}자"
 
 # 6. 포트폴리오 2개+
-PF_COUNT=$(grep -c '277406\|287046\|291990\|291992\|287048' "$FILE" 2>/dev/null)
+PF_COUNT=$(grep -c "$PORTFOLIO_IDS" "$FILE" 2>/dev/null)
 [ "$PF_COUNT" -ge 2 ] && check "포트폴리오 2개+" "PASS" || check "포트폴리오 2개+" "FAIL" "${PF_COUNT}개"
 
 # 7. 기술 디테일 금지어
-TECH_VIOLATIONS=$(echo "$BODY" | grep -c -i 'PermissionGate\|usePermission\|SDK v5\|hospital_id\|RBAC\|Chart\.js' 2>/dev/null)
+TECH_VIOLATIONS=$(echo "$BODY" | grep -c -i "$TECH_BANNED" 2>/dev/null)
 [ "$TECH_VIOLATIONS" -eq 0 ] && check "기술 금지어" "PASS" || check "기술 금지어" "FAIL" "${TECH_VIOLATIONS}건"
 
 # 8. 미팅 논의 포함
@@ -61,7 +71,7 @@ MEETING=$(echo "$BODY" | grep -c '미팅 시 논의\|논의 희망' 2>/dev/null)
 [ "$MEETING" -ge 1 ] && check "미팅 논의" "PASS" || check "미팅 논의" "FAIL"
 
 # 9. 익명화 금지어
-ANON_VIOLATIONS=$(echo "$BODY" | grep -c -i '출근노트\|에브리드론\|GSS\|슈퍼워크\|gwnote\|everydrone\|포스코' 2>/dev/null)
+ANON_VIOLATIONS=$(echo "$BODY" | grep -c -i "$ANON_BANNED" 2>/dev/null)
 [ "$ANON_VIOLATIONS" -eq 0 ] && check "익명화" "PASS" || check "익명화" "FAIL" "${ANON_VIOLATIONS}건"
 
 # 10. 범위형 기간 금지
@@ -69,7 +79,7 @@ RANGE=$(echo "$BODY" | grep -c '[0-9]~[0-9].*주\|[0-9]~[0-9].*일' 2>/dev/null)
 [ "$RANGE" -eq 0 ] && check "확정형 기간" "PASS" || check "확정형 기간" "FAIL" "${RANGE}건"
 
 # 11. 경험 소스 편중 (전체 파일에서)
-EXP_CODES=$(grep '경험 [12]:' "$FILE" | grep -o 'HR\|SIM\|MES\|TOK\|OSS\|MENU' 2>/dev/null | sort | uniq -d)
+EXP_CODES=$(grep '경험 [12]:' "$FILE" | grep -o "$EXP_CODES_PATTERN" 2>/dev/null | sort | uniq -d)
 [ -z "$EXP_CODES" ] && check "경험 편중 없음" "PASS" || check "경험 편중 없음" "FAIL" "중복: $EXP_CODES"
 
 # 12. 금액 근거
