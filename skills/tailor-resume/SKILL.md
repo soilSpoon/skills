@@ -63,21 +63,36 @@ sections:
 - `max`: resume 모드에서만 적용. career 모드는 모든 매칭 프로젝트 포함.
 - `summary_text` / `highlight_bullets_text`: variant에 인라인. master.yaml 수정 불필요.
 - oss 섹션에 filter 필수 — 없으면 `general_md` 태그 항목의 `**bold**`가 raw 노출.
+- `filter` 유효 태그: master.yaml의 각 프로젝트/oss 항목에 지정된 태그. 일반적으로 `general` (범용), `all` (전체 포함), 또는 회사별 slug (예: `kakaobank`, `ridi`). master.yaml에서 `grep 'tags:' cv/master.yaml`로 확인.
 
 ### 5. Verify Layout
 
-Playwright로 PDF 생성 (dev server localhost:5173 필요):
+dev server가 필요하다. 실행 중이 아니면 `pnpm dev &`로 시작. 포트 충돌 시 `pnpm dev --port 5174`.
+
+Playwright로 PDF 생성:
 - Resume: `resume-{slug}` → A4, printBackground: true → 1페이지 필수
 - Career: `career-{slug}` → A4, printBackground: false → 빈 여백 최소화
 - 스크린샷으로 시각 확인: 텍스트 깨짐, bold 렌더링, 페이지 분리 점검
 
+Combined PDF 생성 (resume + career 합본):
+```bash
+npx zx -e "
+import {execSync} from 'child_process';
+execSync('pdfunite cv/output/resume-{slug}.pdf cv/output/career-{slug}.pdf cv/output/combined-{slug}.pdf');
+"
+```
+
+`pdfunite` 미설치 시: `brew install poppler` 또는 개별 PDF로 Groupby 평가.
+
 ### 6. Evaluate with Groupby
 
 ```bash
-npx zx <skill-dir>/scripts/groupby-api.mjs both cv/output/combined.pdf "{posting-url}"
+npx zx <skill-dir>/scripts/groupby-api.mjs both cv/output/combined-{slug}.pdf "{posting-url}"
 ```
 
 Modes: `improve` (팩폭), `job-match` (합격률), `both`. 90+ 점수 목표.
+
+Groupby API 사용 불가 시 (타임아웃, 서비스 다운): `references/resume-guidelines.md`의 체크리스트로 수동 평가. 점수화 없이 진행.
 
 ### 7. Iterate
 
@@ -100,6 +115,6 @@ Full rules in `<skill-dir>/references/resume-guidelines.md`. Key points:
 |------|-------------|
 | `references/resume-guidelines.md` | variant 생성 전 필수 |
 | `references/resume-restructure-analysis.md` | master.yaml 구조 이해 필요 시 |
-| `benchmark/README.md` | 합격 프로필 패턴 참고 시 |
-| `benchmark/reference-A.md` | DevOps 경력기술서 구조 참고 시 |
-| `benchmark/groupby-profiles/` | 개별 합격 프로필 상세 확인 시 |
+| `references/benchmark/README.md` | 합격 프로필 패턴 참고 시 |
+| `references/benchmark/reference-A.md` | DevOps 경력기술서 구조 참고 시 |
+| `references/benchmark/groupby-profiles/` | 개별 합격 프로필 상세 확인 시 |

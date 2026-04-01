@@ -1,4 +1,0 @@
-interface:
-  display_name: "Apply Wishket"
-  short_description: "Analyze Wishket projects and submit tailored proposals"
-  default_prompt: "Use $apply-wishket to shortlist Wishket projects, generate tailored proposals, preview the payload, and submit safely."

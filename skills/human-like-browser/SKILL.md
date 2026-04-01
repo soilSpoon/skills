@@ -1,37 +1,17 @@
 ---
 name: human-like-browser
-description: "Human-like browser automation that bypasses bot detection. Wraps Playwright MCP tools to simulate realistic human behavior: Bezier-curve mouse movements with micro-tremor, log-normal typing delays with digraph timing and typos (~600 chars/min), smooth inertia scrolling, CDP artifact cleanup, and comprehensive anti-fingerprinting stealth (hardware, WebGL, plugins, connection). Passes FCaptcha keystroke biometrics. Use this skill whenever the user mentions bot detection, anti-scraping bypass, human-like browsing, stealth automation, Cloudflare bypass, DataDome, PerimeterX, Akamai, scraping protected sites, or needs to interact with websites that detect and block bots. Also trigger when the user says 'act like a human', 'natural browsing', 'avoid detection', 'scrape without getting blocked', 'fill form like a person', or any Playwright/browser task where detection evasion matters. Korean language typing support included."
+description: "Human-like browser automation that bypasses bot detection. Wraps Playwright MCP tools to simulate realistic human behavior: Bezier-curve mouse movements with micro-tremor, log-normal typing delays with digraph timing and typos (~600 chars/min), smooth inertia scrolling, CDP artifact cleanup, and comprehensive anti-fingerprinting stealth (hardware, WebGL, plugins, connection). Passes FCaptcha keystroke biometrics. Use this skill whenever the user mentions bot detection, anti-scraping bypass, human-like browsing, stealth automation, Cloudflare bypass, DataDome, PerimeterX, Akamai, scraping protected sites, or needs to interact with websites that detect and block bots. Also trigger when the user says 'act like a human', 'natural browsing', 'avoid detection', 'scrape without getting blocked', 'fill form like a person', or any Playwright/browser task where detection evasion matters. Korean QWERTY layout supported (no IME simulation)."
 ---
 
 # Human-Like Browser Automation v2
 
 Make Playwright automation indistinguishable from real human browsing. Bypasses bot detection systems (Cloudflare, DataDome, PerimeterX, Akamai, FCaptcha) by simulating realistic behavioral biometrics and browser fingerprints.
 
-## What's New in v2
-- **Log-normal typing distribution** — matches real keystroke biometrics (FCaptcha checks this)
-- **Digraph timing** — common letter pairs (th, er, in) typed at realistic relative speeds
-- **Same-hand autocorrelation** — keys typed by same hand are slower (biometric signal)
-- **Mouse micro-tremor** — subtle hand shake during hover/idle (FCaptcha analyzes this)
-- **Idle fidget movements** — unconscious mouse drift between actions
-- **CDP artifact cleanup** — removes `cdc_` variables and `__playwright` markers
-- **Hardware fingerprint spoofing** — `hardwareConcurrency`, `deviceMemory`, `platform`, `maxTouchPoints`
-- **WebGL2 patching** — both WebGL and WebGL2 contexts covered
-- **`outerWidth/outerHeight`** — matches inner dimensions (headless mismatch is detectable)
-- **Element-scoped scrolling** — scroll within specific containers
-- **Auto-stealth on navigation** — patches re-applied automatically via `page.on('load')`
-- **`think()` function** — natural pauses with optional fidget/tremor
-- **`navigate()` function** — goto + stealth + post-load human behavior in one call
-
-## Environment Constraints
-
-`browser_run_code` runs in a sandboxed context:
-- **No `require()`** — all code must be inlined
-- **No `setTimeout()`** — use `page.waitForTimeout()`
-- **`page` object persists** — `page.__human` survives across calls
-
 ## Quick Start
 
 ### Step 1: Initialize (once per session)
+
+> **Constraints**: `browser_run_code` runs in a sandbox — no `require()`, no `setTimeout()` (use `page.waitForTimeout()`). The `page` object and `page.__human` persist across calls.
 
 Read `scripts/human-behavior.js` and paste the entire initialization block into `mcp__plugin_playwright_playwright__browser_run_code`. This defines all functions on `page.__human` and applies stealth patches.
 
@@ -71,13 +51,6 @@ Log-normal keystroke timing with digraph speed modifiers and same-hand autocorre
 | Slow | 160 | 0.35 | 0.01 |
 | Erratic | 120 | 0.50 | 0.05 |
 
-FCaptcha biometric signals addressed:
-- **Dwell variance**: log-normal distribution provides natural variance
-- **Log-normal fit**: directly modeled (Gaussian fails this check)
-- **Autocorrelation**: same-hand key pairs have higher intervals
-- **Digraph patterns**: common pairs have realistic relative timing
-- **Entropy**: variance of delay distribution matches human range
-
 ### `h.scroll(opts?)`
 - `opts.direction`: 'down' | 'up'
 - `opts.distance`: pixels (default random 300-800)
@@ -102,30 +75,7 @@ Natural pause between actions. 30% chance of fidget, 20% chance of tremor during
 Subtle hand shake — tiny movements (±0.3px) at ~50ms intervals. Applied automatically during hover.
 
 ### `h.stealth()`
-Re-applies all anti-detection patches. Auto-called on page load events.
-
-**Patches applied:**
-| Category | Property | Spoofed Value |
-|----------|----------|---------------|
-| Automation | `navigator.webdriver` | false |
-| Chrome | `chrome.runtime`, `chrome.app` | present with mock methods |
-| Hardware | `hardwareConcurrency` | 8 |
-| Hardware | `deviceMemory` | 8 |
-| Hardware | `platform` | MacIntel |
-| Hardware | `maxTouchPoints` | 0 |
-| Network | `connection.rtt` | 50 |
-| Network | `connection.downlink` | 10 |
-| Network | `connection.effectiveType` | 4g |
-| Browser | `plugins` | 3 standard Chrome plugins |
-| Browser | `languages` | ko-KR, ko, en-US, en |
-| Graphics | WebGL/WebGL2 vendor | Google Inc. (Apple) |
-| Graphics | WebGL/WebGL2 renderer | ANGLE Apple M1 |
-| Window | `outerWidth/outerHeight` | matches inner + chrome UI |
-| Screen | width/height fallback | 1920x1080 |
-| CDP | `cdc_*` variables | deleted |
-| CDP | `__playwright*` markers | deleted |
-| Security | `Function.toString()` | returns `[native code]` for overrides |
-| Iframe | child `navigator.webdriver` | false |
+Re-applies all anti-detection patches. Auto-called on page load events. See `references/stealth-patches.md` for the full list of 28 patches (automation, hardware, WebGL, CDP, etc.).
 
 ### Utility Functions
 - `h.sleep(ms)` — `page.waitForTimeout()` wrapper
@@ -174,5 +124,6 @@ async (page) => {
 - **Always use `think()` between actions** — it adds fidget/tremor naturally
 - **Combine with residential proxies** for IP reputation
 - **Vary parameters across sessions** — slightly different baseDelay/sigma each time
-- **For Korean text**, same API works — typo map covers QWERTY layout used for Korean IME
+- **For Korean text**, typo simulation works on the QWERTY layer. Actual Hangul IME composition is not simulated.
+- **Selector safety**: If an element may not be loaded yet, use `await page.waitForSelector(sel, {timeout: 5000})` before `h.click(sel)`. The skill does not auto-retry on null selectors.
 - **Element scrolling**: use `opts.selector` for scrollable containers like sidebars or chat windows

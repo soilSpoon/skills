@@ -7,7 +7,7 @@
 - `PROJECT_ID`: 위시켓 프로젝트 ID
 - `ASSIGNED_EXPERIENCES`: 사전 배정된 경험 코드 (예: "HR, MES") — Wave 0에서 메인 세션이 결정. 단건이면 없을 수 있음 → 직접 매칭.
 - `MASTER_YAML_PATH`: cv/master.yaml 경로
-- `SKILL_DIR`: 스킬 디렉토리 경로 (docs/, agents/ 포함)
+- `SKILL_DIR`: 스킬 디렉토리 경로 (references/, agents/ 포함)
 - `OUTPUT_PATH`: 결과 파일 저장 경로
 
 ## 절차
@@ -15,9 +15,9 @@
 1. **프로젝트 종합 분석**: 기본값은 `node {SKILL_DIR}/scripts/wishket.mjs analyze {PROJECT_ID}`다. 이 결과에서 `detail`, `boost`, `evaluation`, `analyze.pricing`, `analyze.writing`을 함께 읽는다. 다건이면 먼저 `list --sort closing`으로 마감 임박 순 정렬을 기준으로 우선순위를 잡는다.
 2. **클라이언트 과거 패턴 분석**: 필요 시 `node {SKILL_DIR}/scripts/wishket.mjs evaluation {PROJECT_ID}`를 직접 보되, 기본적으로는 `analyze` 결과의 `evaluation.summary.medianDayRate`, `evaluation.summary.topKeywords`, `evaluation.summary.toneHints`를 제안 일당과 본문 톤 보정에 사용한다.
 3. **참조 파일 읽기**:
-   - `{SKILL_DIR}/docs/experience-pool.md` — 경험 매칭 테이블
-   - `{SKILL_DIR}/docs/proposal-rules.md` — 템플릿 + 금액 산정 7단계
-   - `{SKILL_DIR}/docs/estimation-guide.md` — 공수 추정 방법론
+   - `{SKILL_DIR}/references/experience-pool.md` — 경험 매칭 테이블
+   - `{SKILL_DIR}/references/proposal-rules.md` — 템플릿 + 금액 산정 7단계
+   - `{SKILL_DIR}/references/estimation-guide.md` — 공수 추정 방법론
    - `{MASTER_YAML_PATH}` — 경험 원천 데이터
 4. **경험 매칭**:
    - `ASSIGNED_EXPERIENCES`가 있으면 해당 코드를 우선 사용
@@ -102,7 +102,7 @@
 - 강도 프리미엄: {N%}
 - 제안: {금액}/{기간} → 제안 일당 {M}만원/일
 - 이탈도: 금액 {X}% / 기간 {Y}% → {안전/주의/위험}
-- 벤치마크: 신규 파트너 범위(15~33만) {이내/초과}
+- 벤치마크: 신규 파트너 기본 범위(10~20만, 클라이언트 예산 및 boost 조사 결과로 보정) {이내/초과}
 - 최종 결정 근거: ...
 
 ### 포트폴리오 선택

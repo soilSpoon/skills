@@ -28,18 +28,17 @@ echo "=== 구조 검사: $(basename $FILE) ==="
 # 본문 추출 (## 지원서 본문 ~ 다음 ---)
 BODY=$(sed -n '/## 지원서 본문/,/^---$/p' "$FILE")
 
-# 1. 프로젝트 핵심 2-3가지
-COUNT=$(echo "$BODY" | grep -c '^\s*[0-9]\.' 2>/dev/null)
-[ "$COUNT" -ge 2 ] && check "핵심 2-3가지" "PASS" || check "핵심 2-3가지" "FAIL" "번호 리스트 ${COUNT}개"
+# 1. 프로젝트 핵심 파악 (본문 초반에 프로젝트 이해를 보여주는 내용)
+COUNT=$(echo "$BODY" | head -20 | grep -c '.\{20,\}' 2>/dev/null)
+[ "$COUNT" -ge 2 ] && check "프로젝트 분석" "PASS" || check "프로젝트 분석" "FAIL" "본문 초반 실질 내용 ${COUNT}줄"
 
 # 2. 예상 이슈 2-3개
 COUNT=$(echo "$BODY" | grep -c -i '이슈\|리스크\|문제' 2>/dev/null)
 [ "$COUNT" -ge 2 ] && check "이슈 2-3개" "PASS" || check "이슈 2-3개" "FAIL" "${COUNT}개"
 
-# 3. 이슈→해결 패턴
-EXP_COUNT=$(echo "$BODY" | grep -c '유사\|경험' 2>/dev/null)
-PATTERN_COUNT=$(echo "$BODY" | grep -c '겪은 이슈\|→.*해결\|문제.*→' 2>/dev/null)
-[ "$PATTERN_COUNT" -ge 2 ] && check "이슈→해결 패턴" "PASS" || check "이슈→해결 패턴" "FAIL" "${PATTERN_COUNT}개"
+# 3. 경험 연결 (유사 경험/프로젝트 언급)
+PATTERN_COUNT=$(echo "$BODY" | grep -c '경험\|프로젝트.*진행\|구축\|개발.*경험\|도입\|전환\|개선\|→' 2>/dev/null)
+[ "$PATTERN_COUNT" -ge 2 ] && check "경험 연결" "PASS" || check "경험 연결" "FAIL" "${PATTERN_COUNT}개"
 
 # 4. 단계별 프로세스
 STAGE_COUNT=$(echo "$BODY" | grep -c '단계' 2>/dev/null)

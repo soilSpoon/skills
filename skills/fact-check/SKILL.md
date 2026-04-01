@@ -16,9 +16,9 @@ The user provides content in one of three ways:
 3. **URL** - fetch the page content with WebFetch
 
 Detect the input type automatically:
-- Starts with `http://` or `https://` -> URL, fetch with WebFetch
-- Contains a file extension (`.md`, `.html`, `.txt`, etc.) or starts with `/` or `~` -> file path, read with Read tool
-- Otherwise -> treat as direct text content
+- Starts with `http://` or `https://` → URL, fetch with WebFetch
+- Starts with `/` or `~/` or matches a file path pattern (e.g., `path/to/file.md`) → file path, read with Read tool
+- Otherwise → treat as direct text content
 
 If the input is ambiguous, ask the user to clarify.
 
@@ -29,6 +29,8 @@ If the input is ambiguous, ask the user to clarify.
 4. If no content can be recovered, tell the user and suggest they paste the text directly.
 
 ## Workflow
+
+**Fast path**: If the input contains 3 or fewer claims after extraction, skip agent dispatch (Step 2) and verify all claims directly in the main session using WebSearch. This avoids the overhead of 6 parallel agents for simple content.
 
 ### Step 1: Extract Claims
 
@@ -77,6 +79,16 @@ For each agent, read the corresponding prompt file and include it in the agent's
 Read each agent's prompt file from the skill directory before dispatching. The skill directory path is: the directory containing this SKILL.md file.
 
 **Important**: Use `subagent_type: "general-purpose"` for each agent. Launch all 6 in a single message to maximize parallelism.
+
+**Input scoping**: To reduce token cost, scope each agent's input to what it needs:
+- **Link Check**: Only the URLs found in the text, not the full content
+- **Number Check**: Only claims classified as statistics, dates, or proper nouns
+- **Source Verify**: Full text + source URLs
+- **Others**: Full text + all claims
+
+For short content (<1000 words), send full text to all agents.
+
+**Agent failure fallback**: If any agent fails (timeout, token limit), perform that agent's verification directly in the main session. Never skip a verification category because an agent failed.
 
 ### Step 3: Cross-Reference Results
 

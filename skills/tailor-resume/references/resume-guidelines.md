@@ -147,8 +147,8 @@
 
 | 자료 | 경로 | 용도 |
 |------|------|------|
-| 벤치마크 A (DevOps 경력기술서) | `cv/benchmark/reference-A/` | 이슈→문제→의사결정→개선→결과 구조 참고 |
-| 벤치마크 B (비개발 CV) | `cv/benchmark/reference-B/` | 레이아웃/디자인 참고 |
-| 벤치마크 패턴 요약 | `cv/benchmark/README.md` | 합격 프로필 공통 패턴 |
+| 벤치마크 A (DevOps 경력기술서) | `<skill-dir>/references/benchmark/reference-A/` | 이슈→문제→의사결정→개선→결과 구조 참고 |
+| 벤치마크 B (비개발 CV) | `<skill-dir>/references/benchmark/reference-B/` | 레이아웃/디자인 참고 |
+| 벤치마크 패턴 요약 | `<skill-dir>/references/benchmark/README.md` | 합격 프로필 공통 패턴 |
 | 재구성 분석 | `docs/resume-restructure-analysis.md` | master.yaml 이슈별 재구성 계획 + gh 검증 데이터 |
 | 자기소개 초안 | `cv/self-intro-draft.md` | 승인된 자기소개 문구 |

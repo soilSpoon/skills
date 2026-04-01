@@ -521,10 +521,13 @@ async (page) => {
   };
   await stealth();
 
-  // Auto-stealth on future navigations
-  page.on('load', async () => {
-    try { await stealth(); } catch(e) {}
-  });
+  // Auto-stealth on future navigations (guard against duplicate listeners)
+  if (!page.__humanStealthBound) {
+    page.on('load', async () => {
+      try { await stealth(); } catch(e) {}
+    });
+    page.__humanStealthBound = true;
+  }
 
   return 'Human behavior v2 initialized. New: logNormal typing, digraph, tremor, fidget, CDP stealth, hardware fingerprint';
 }
