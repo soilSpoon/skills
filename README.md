@@ -75,6 +75,31 @@ npx skills add soilSpoon/skills@apply-wishket
 **Bundled scripts:**
 - `scripts/verify-proposal.sh` — 12-point structural validation for generated proposals
 
+### toss-frontend-fundamentals
+
+Toss의 [Frontend Fundamentals](https://frontend-fundamentals.com) 코드 품질 4대 기준(가독성/예측가능성/응집도/결합도) + 접근성(A11y)을 반영하는 프론트엔드 코드 리뷰 & 작성 가이드.
+
+```bash
+npx skills add soilSpoon/skills@toss-frontend-fundamentals
+```
+
+**What it does:**
+- React/TypeScript 코드 리뷰·작성 시 원칙 citation + before/after refactoring + 체크리스트 제공
+- 트리거 맵 38+ rows — 안티패턴 감지 후 해당 reference 파일만 progressive-load
+- Toss OSS 레포(es-toolkit, es-hangul, suspensive, use-funnel) PR 분석 기반 아키텍처 패턴 포함
+- GitHub discussions 주요 스레드(boolean 네이밍, if-return, 배열 타입, MV-VI 등) 반영
+- 라이브러리 저자용 패턴(subpath exports, attw/publint/sherif, Changesets, OIDC provenance)은 opt-in
+
+**References (progressive disclosure):**
+- `references/readability.md` — 맥락 축소, 이름으로 추상화, 조건 단순화
+- `references/predictability.md` — 이름 겹침, 숨은 로직, 템플릿 리터럴 타입
+- `references/cohesion.md` — 디렉토리, 폼, RSC colocation, 환경 분기 중앙화
+- `references/coupling.md` — 책임 분리, 어댑터 패턴, `/compat` 마이그레이션
+- `references/a11y-basics.md`, `a11y-components.md`, `a11y-practical.md` — WAI-ARIA, Tab/Modal/Radio, 안티패턴
+- `references/recipes.md` — Modal, Form, Query Key Factory, overlay-kit 등 20 recipes
+- `references/discussions.md` — 커뮤니티 토론 8건 요약
+- `references/library-patterns.md` — 라이브러리 저자 전용(opt-in)
+
 ## Installation
 
 ```bash
@@ -83,6 +108,7 @@ npx skills add soilSpoon/skills@tailor-resume
 npx skills add soilSpoon/skills@fact-check
 npx skills add soilSpoon/skills@human-like-browser
 npx skills add soilSpoon/skills@apply-wishket
+npx skills add soilSpoon/skills@toss-frontend-fundamentals
 ```
 
 ## License
