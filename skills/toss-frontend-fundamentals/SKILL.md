@@ -22,6 +22,99 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 
 원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기). 스킬은 답을 강제하지 않고 트레이드오프를 드러내며, 맥락에 따라 선택을 돕는다.
 
+## 토스가 실제로 평가하는 것 (채용 기술과제·라이브 코딩)
+
+토스 프론트엔드 채용 페이지(toss.im/career/article/26291) 공식 설명:
+
+> "토스는 **주어진 시간 안에 제품을 완성할 수 있는지**, 작성된 **코드가 확장 가능한지**, **React와 같은 라이브러리 동작을 이해하고 있는지**를 위주로 살펴보아요. 이론적인 지식보다는 **실용적인 개발 역량**이 중요하다고 생각하기 때문이에요. 그래서 JavaScript의 Hoisting/Closure와 같은 지식적인 질문들보다는, 매일매일 프론트엔드 개발에서 나오는 실용적인 내용들을 주제로 **코드 리뷰를 하는 듯한 경험**을 하시게 될 거예요."
+
+이 문구를 코드 판단 기준으로 번역하면 다음 4축이 4대 코드 품질 기준과 **함께** 평가된다.
+
+| 평가축 | 질문 | 안티패턴 (감점) |
+|---|---|---|
+| **완성도** | 주어진 시간 내 기능이 전부 돌아가는가? | 핵심 기능 누락, TODO/주석 버그, 스스로 fix 코멘트가 PR에 누적 |
+| **확장성** | 요구가 살짝 바뀌어도 안전하게 수정할 수 있는가? | 페이지에 원자/상태/라우팅/API가 전부 직접 박힘, 훅이 추상화 이름만 있고 결합은 그대로 |
+| **라이브러리 동작 이해** | React·상태 라이브러리·라우터가 실제로 어떻게 도는지 알고 쓰는가? | useEffect로 라우팅 guard + 상태 초기화 경쟁, dep 누락, Strict Mode 이중 실행 취약, cleanup 안 함, `setState` 후 같은 턴에 값 읽음 |
+| **실용성** | 과제 범위 안에서 가치 있는 선택을 했는가? | **자가 도입 복잡성** — 요청 없는 View Transitions/애니메이션/커스텀 상태 라이브러리 도입 뒤 버그 발생, 그걸 또 커스텀 Promise 계약으로 땜질 |
+
+**핵심 해석 — "코드 리뷰를 하는 듯한 경험"**: 평가자는 *"이 코드가 내가 매일 리뷰한다면 어떤 코멘트를 달까?"* 로 본다. 따라서 스킬의 리뷰 출력은 **실제 리뷰 코멘트 톤**이어야 하고, 코드 작성 시에도 **"이 줄에 리뷰 코멘트가 달릴 것 같은가?"** 를 셀프체크한다.
+
+### 작성 모드 Red Flag — 과제·라이브코딩 중 스스로에게 질문
+
+- **"이 기능, 과제에서 요구했나?"** — No면 추가 복잡성이 갚아야 할 가치를 증명하라. View Transitions 같은 self-driven 기능은 버그 없이 완벽하지 않으면 **오히려 감점**.
+- **"useEffect 안에서 navigate/setState를 한다면, 전환·언마운트 중 다시 트리거되지 않나?"** — React 동작 이해 평가 포인트.
+- **"시그니처만 보고 동기/비동기·순서 의존성이 보이는가?"** — 안 보이면 이름 바꾸거나 옵션으로 드러낸다 (`afterTransition`, `onSettled` 같은 명시적 콜백).
+- **"남은 시간으로 고치기 vs 일단 제출 vs 기능 축소 중 뭐가 가장 완성도 있는가?"** — 완성 > 자가 복잡성.
+
+## 토스 문화 8원칙을 리뷰로 번역
+
+토스 팀 문화 공식 페이지(toss.im/career/culture)의 8원칙은 채용 평가 기준이자 **코드 리뷰 가이드라인**이다. 각 원칙을 코드/PR 관점으로 번역.
+
+| 원칙 | 원문 핵심 | 코드 리뷰 번역 |
+|---|---|---|
+| **DRI** (Direct Responsible Individual) | "맡은 일에 대한 최종의사결정권을 바탕으로 모든 것을 스스로 결정하고 주도적으로 진행하며, 결과에 대한 책임을 집니다" | 이 변경의 **DRI가 코드/PR에서 1명으로 식별**되는가. 여러 모듈에 걸친 변경은 DRI 명시 필수. |
+| **Freedom & Responsibility** | "팀원을 믿지 못해 만든 규칙과 프로세스를 최소화" | "금지" 규칙보다 **"우회할 이유를 줄이는 설계"**로 (ESLint disable을 막기보다, ESLint를 따르고 싶게 만들기). |
+| **Radical Transparency** | "의사결정에 필요한 최대한의 정보를 팀 전체에 공개" | **"왜 이 추상화/결합인가"를 PR 본문·주요 커밋 메시지·코드 주석에 드러내라.** 트레이드오프를 숨기지 않는다. |
+| **Courage to Fail Fast** | "더 빨리 실패를 선언하고 … 용기 있게 나아가는 것에 언제나 박수" | **거대 PR 금지, 작게 빠르게 머지**. 실패는 롤백·포스트모템으로 학습. 실험적 구조는 feature flag 뒤에. |
+| **Mission over Individual** | "팀의 목표에 가장 큰 영향을 줄 수 있는 일이 최우선 순위" | "내가 더 깔끔하게 짜고 싶은" 스타일 리팩토링보다 **사용자/임팩트가 큰 변경**을 먼저. |
+| **Radical Candor** | "동료가 성장하길 바라는 마음을 바탕으로 개선점을 솔직하게" | 리뷰 톤: **솔직 + 대안 제시 + 이유**. "이렇게 하면 안 됨" 만 적지 말고, "왜 / 대신 이렇게" 를 붙인다. |
+| **Question Every Assumption** | "'당연한 것'은 없습니다 … 가정을 바꾸면 어떨지 생각" | 관용적 패턴(매직 넘버, 기본 prop, 관용 hook 분리)에도 **"정말 이게 최선인가?"** 재질문. |
+| **Move with Urgency / Focus on Impact / Extra-mile** | "과감히 생략 … 신속한 속도로 시도", "적당한 수준에서 마무리 짓지 않습니다" | 리뷰 우선순위는 **가독성·예측가능성·접근성 결함 먼저**, 양념 개선은 뒤. "대충 돌아가는" 상태로 PR 보내지 않는다. |
+
+## 프론트엔드 플랫폼 엔지니어링 철학 (토스 FE 헤드·Web Framework 팀 인용)
+
+공고에 링크된 두 채용 narrative — [Frontend Platform 이야기](https://toss.im/career/article/Frontend), [Web Framework 팀 도전기](https://toss.im/career/article/web_framework_2511) — 에서 **코드·리뷰 철학**으로 직결되는 문구만 뽑았다.
+
+### 1. "문제의 근원을 찾는 사람들"
+
+> "어떤 사람들은 눈앞의 문제를 고치고, 어떤 사람들은 문제의 근원을 찾아요. 토스 Web Framework 팀은 문제의 근원을 찾는 사람들이 모여 있는 팀이에요."
+
+> "'왜 아직도 그걸 하고 있나요?'라는 질문을 들은 적이 단 한 번도 없었어요. 표면적인 문제를 빠르게 덮는 것보다, 시간이 더 걸리더라도 근본 원인을 해결하는 것을 팀이 중요한 원칙으로 삼고 있기 때문이에요."
+
+**리뷰 번역** — 버그 리포트/회귀에 대한 첫 코멘트는 "패치할 곳"이 아니라 **"왜 반복되나"** 여야 한다. 같은 버그 유형이 두 번째면 개별 수정보다 **가드레일(타입·테스트·Lint·Codemod)**로 막아야 한다.
+
+### 2. "시스템이 실수를 막는다" > "개인이 실수하지 않길 바란다"
+
+> "개발자 개인이 실수하지 않기를 바라기보다, 도구와 시스템을 통해 더 나은 개발 환경과 프로덕트를 만든다는 철학에 공감하시는 분들이라면 높은 만족도를 느끼실 거예요."
+
+**리뷰 번역** — 리뷰의 1차 방어선은 **사람 눈이 아니라 ESLint · TypeScript · `eslint-plugin-jsx-a11y` · Prettier · codemod**. 같은 지적을 두 번 하면 자동화 실패다. 사람 리뷰는 시스템이 못 잡는 설계·가독성·트레이드오프에 집중.
+
+### 3. "기술 스택 숙련도"보다 "문제 정의·발견 역량"
+
+> "토스에서 플랫폼 엔지니어는 기술 스택을 얼마나 많이 알고 있느냐 보다는 문제를 근본적으로 해결하기 위한 시스템적 사고와 접근 태도를 더 중요하게 생각해요."
+
+> "단순히 문제를 잘 푸는 것뿐 아니라, 무엇이 문제인지 스스로 찾아내고 설명할 수 있는 역량이 플랫폼 엔지니어의 본질적인 역할이라고 생각해요."
+
+**리뷰 번역** — 평가 질문: *"이 사람이 내가 못 본 문제를 찾아냈는가?"*. 과제에서도 "요구사항 충족" 외에 **"과제가 안 시킨 문제 발견 + 그 해결안 제안(주석/README에)"** 이 있으면 가점.
+
+### 4. "테스트가 없으면 버그는 돌아온다 / 모니터링이 없으면 성능은 느려진다"
+
+> "버그를 고칠 때, 테스트를 작성하지 않는 이상, 반드시 버그는 돌아오게 되어 있어요."
+
+> "최적화할 때, 성능을 꾸준히 모니터링하지 않는 이상, 반드시 속도는 느려지게 되어 있어요."
+
+**리뷰 번역** — 버그 fix PR에 **회귀 테스트가 없으면 `[MUST]` 차단**. 성능 개선 PR에 **측정 지표·before/after 수치가 없으면 `[MUST]` 차단**.
+
+### 5. "E2E 테스트 셀렉터는 접근성 친화적이어야 한다"
+
+> "테스트 코드를 작성하는 방식이 접근성 친화적이지 않으며, 실제 사용자의 동작과는 상이해요. XPath나 Test ID를 지정하는 방식을 이용하여 테스트하기 때문에, 애플리케이션 코드와 테스트 코드 사이에 강결합이 발생하죠."
+
+**리뷰 번역** — E2E·컴포넌트 테스트는 **`getByRole` / `getByLabelText` / `getByText` 우선**. `data-testid`와 XPath는 **최후의 수단**. 접근 가능한 이름(role + accessible name)이 테스트 셀렉터라면 a11y 투자와 테스트 투자가 같은 예산으로 간다 (TMC 25 "누구나 작성하는 E2E 테스트, 접근성에서 찾은 답" 세션과 동일 원칙).
+
+### 6. "Breaking change엔 Codemod + 명확한 릴리스 노트 + 업그레이드 원라이너"
+
+> "Breaking Change에 대해서는 꼼꼼히 Codemod를 작성하여 업그레이드 명령어 한 줄로 최신 프레임워크의 기능과 성능을 누릴 수 있도록 하려고 해요."
+
+**리뷰 번역** — 공개 API를 바꾸는 PR은 (1) **마이그레이션 가이드**, (2) 가능하면 **codemod 스크립트**, (3) **릴리스 노트 항목**을 함께. 라이브러리 저자 패턴([library-patterns.md](references/library-patterns.md))에 공식 근거.
+
+### 7. "우회할 이유를 줄이는 설계" (메타 원칙)
+
+[`rethinking-design-system`](https://toss.tech/article/rethinking-design-system) 에서:
+
+> "중요한 것은 우회로를 없애는 통제가 아니라, 우회할 이유를 줄이는 설계였어요."
+
+**리뷰 번역 (스킬 최상위 메타원칙)** — `/* eslint-disable */`, `// @ts-ignore`, `as any`, private API 우회, 디자인 시스템 fork가 보이면 **"왜 우회하나"** 를 물어라. 우회는 **대부분 API 설계 실패의 증상**이지 사용자 잘못이 아니다. Flat/Compound 하이브리드([design-tokens.md](references/design-tokens.md) 참조)가 그 대표 해법.
+
 ## 빠른 트리거 맵 (코드 → 원칙 → 파일)
 
 리뷰 중 아래 패턴이 보이면 해당 reference를 로드한다.
@@ -76,6 +169,18 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 | 커스텀 `AbortError`/`TimeoutError`/`ValidationError` 만들 때 | 플랫폼 표준으로 승격 (DOMException/RangeError 등) | [predictability.md #13](references/predictability.md) |
 | 다단계 폼·위저드 — 단계마다 required 필드가 다름 | 빌더 패턴 + 단계별 가드 누적 | [recipes.md #19](references/recipes.md) |
 | RSC prefetch 쿼리가 오래 걸려 페이지 전체 지연 | hydration timeout + CSR 폴백 | [recipes.md #20](references/recipes.md) |
+| **과제에서 요청하지 않은** 애니메이션/View Transitions/커스텀 라우팅 계층 도입 | 자가 도입 복잡성 (완성도·실용성 감점) | §토스 평가 — 위 섹션 |
+| `useEffect`가 `navigate` + 상태 초기화 + race 방지 flag까지 다 포함 | React 동작 이해 — effect는 **동기화**용, 명령형 로직은 이벤트 핸들러/콜백으로 | §토스 평가 — React 동작 이해 |
+| 함수가 조용히 `Promise`를 반환하는데 호출부 절반은 `await`, 절반은 버림 | 시그니처로 비동기 드러내기 (`afterTransition` 콜백 / 이름에 `Async`) | [predictability.md #3](references/predictability.md) + §토스 평가 |
+| 컴포넌트 prop이 15개+ / boolean prop 폭증 | Flat → Compound 분해 (props가 끝없이 늘어나면 위험 신호) | [design-tokens.md #flat-vs-compound](references/design-tokens.md) + §플랫폼 철학 #7 |
+| 색상·z-index·spacing이 숫자 이름(`blue-100`, `z-9999`) | Target/Role/Variant/Level 의미 기반 토큰 | [design-tokens.md #4축-네이밍](references/design-tokens.md) |
+| E2E/컴포넌트 테스트 셀렉터가 `data-testid` · XPath 투성이 | `getByRole`/`getByLabelText` 우선 — 테스트와 a11y 동시 강화 | §플랫폼 철학 #5 |
+| 버그 fix PR에 회귀 테스트 없음 / 성능 PR에 측정 수치 없음 | `[MUST]` 차단 (버그·성능은 반드시 돌아온다) | §플랫폼 철학 #4 |
+| 같은 버그 유형이 2회 이상 보고됨 | 개별 패치 대신 **가드레일**(타입·Lint 룰·codemod·테스트) | §플랫폼 철학 #1,#2 |
+| `// @ts-ignore` / `/* eslint-disable */` / `as any` / 디자인 시스템 fork | "우회할 이유를 줄이는 설계" — API 실패의 증상으로 취급 | §플랫폼 철학 #7 |
+| `typeof window` / Universal·Isomorphic 분기가 여러 곳 산재 | 실행 환경을 좁혀 응집도 회복 (toss.tech RN 2024) | [cohesion.md #9](references/cohesion.md) + §플랫폼 철학 |
+| 공개 API breaking change PR에 마이그레이션 가이드/codemod 없음 | 릴리스 노트 + codemod + 업그레이드 원라이너 세트 | [library-patterns.md](references/library-patterns.md) + §플랫폼 철학 #6 |
+| 모바일/RN 앱 번들이 모놀리식 (서비스 A 변경이 B에 영향) | Shared 번들 + Service 번들 분리, 결정적 빌드 도구 선택 | §플랫폼 철학 (toss.tech RN 2024) |
 
 ## 워크플로
 
@@ -129,6 +234,25 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 - `[SHOULD]` `aria-expanded` 같은 상태와 시각 상태(`hidden`)가 동기화
 - `[SHOULD]` 색만으로 의미 전달하지 않음 (색 + 아이콘 + 텍스트)
 
+**채용 과제·라이브코딩 관점** (토스 공식 기준)
+- `[MUST]` 과제 요구사항의 모든 기능이 실제로 돌아간다 (완성도)
+- `[MUST]` 과제에서 요청하지 않은 복잡성(커스텀 애니메이션/라우팅 래퍼/자체 상태 라이브러리)을 **스스로** 도입한 뒤 버그가 남아 있지 않다
+- `[MUST]` `useEffect`가 "렌더 후 동기화"가 아닌 "이벤트 핸들러"로 쓰이지 않는다 (navigate/setState 내부 호출 + 경쟁 상태 없음)
+- `[MUST]` 커스텀 훅이 **자기 책임의 원자는 자기가 set** 한다 — 페이지가 훅 사용 후 `useSetAtom`을 또 꺼내 쓰면 추상화 실패
+- `[SHOULD]` 함수 시그니처가 동기/비동기·실행 순서·부작용을 드러낸다 (숨은 `Promise`, 숨은 DOM 조작 금지)
+- `[SHOULD]` 도메인 중심 디렉토리로 **"같이 변하는 파일이 같이 묶여" 있다** — `components/`·`hooks/`·`utils/` 만의 분류는 감점
+- `[SHOULD]` PR·커밋이 "스스로 만든 버그를 스스로 고치는" 루프로 보이지 않는다 (자가 도입 복잡성의 신호)
+
+**플랫폼 엔지니어링 관점** (토스 Web Framework·Frontend Platform 팀 기준)
+- `[MUST]` 같은 버그 유형이 2회 이상이면 **개별 패치 대신 가드레일**(타입·Lint·codemod·테스트)로 승격
+- `[MUST]` 버그 fix PR에 **회귀 테스트**가 있거나, 없는 이유가 명시됨 ("버그는 반드시 돌아온다")
+- `[MUST]` 성능 개선 PR에 **before/after 측정 수치**가 있거나, 없는 이유가 명시됨 ("모니터링 없으면 속도는 반드시 느려진다")
+- `[SHOULD]` "왜 이 추상화/결합인가"가 **PR 본문·주요 커밋·코드 주석에 드러남** (Radical Transparency)
+- `[SHOULD]` **"왜 우회하나"** 질문: `// @ts-ignore`·`/* eslint-disable */`·`as any`·private API 우회는 **API 설계 실패의 증상**으로 조사
+- `[SHOULD]` 공개 API breaking change는 **마이그레이션 가이드 + codemod + 업그레이드 원라이너**
+- `[SHOULD]` E2E·컴포넌트 테스트 셀렉터가 `getByRole`/`getByLabelText` 우선 (접근성 + 테스트 동시 강화)
+- `[NIT]` "내가 더 깔끔하게 짜고 싶은" 스타일 리팩토링보다 **임팩트 큰 변경이 먼저** (Mission over Individual)
+
 ## 출력 형식 (리뷰 지적 1건 당)
 
 ```
@@ -161,8 +285,87 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 - **컨텍스트를 우선한다.** 작은 스크립트에 도메인 폴더링, 2명이 쓰는 파일에 중복 허용을 밀어붙이면 과잉 적용이다.
 - **접근성은 타협 대상이 아니다.** `[MUST]` 항목은 "시간 없어서 나중에" 가 아닌 **기본값**. semantic HTML·`aria-label`·키보드 지원은 기능 구현과 동시에 한다.
 - **자동화가 가능한 건 자동화.** `eslint-plugin-jsx-a11y`, Testing Library `getByRole`, Prettier + ESLint 룰로 사람 리뷰 시간 절약.
+- **채용 과제에서는 "완성도 > 자가 복잡성"**. 토스는 공식적으로 "주어진 시간 안에 완성, 코드 확장성, 라이브러리 동작 이해, 실용성"을 평가한다고 밝힘(toss.im/career/article/26291). 요청하지 않은 멋있는 기능(View Transitions, 복잡한 전환 애니메이션, 자체 네비게이션 훅 등)을 도입하려면 **버그 없이 끝낼 시간이 남았을 때만** 한다.
+- **"코드 리뷰를 하는 듯한 경험"이 평가 방식**이라는 점을 작성 단계에서 내재화한다. 한 줄 한 줄 "여기 리뷰 코멘트가 달릴 것 같은가?"로 셀프체크.
 
 ## 원문 URL 인덱스
+
+**토스 채용·팀 (공식 채용 허브)**
+- 프론트엔드 합류 5가지 이유 (평가 기준 공식 인용): https://toss.im/career/article/26291
+- Frontend Platform 이야기 (140명 조직, SSR/CI/CD/RN/Toolbox/E2E): https://toss.im/career/article/Frontend
+- Web Framework 팀 도전기 (문제 근원 탐구·시스템이 실수 방지 철학): https://toss.im/career/article/web_framework_2511
+- 합류 여정 (6단계 채용 프로세스): https://toss.im/career/joining-guide
+- 팀 문화 (DRI·8원칙): https://toss.im/career/culture
+- FAQ (인터뷰/과제/기술): https://toss.im/career/faq?category=0
+- 토스뱅크 FE DX 개선: https://toss.im/career/article/tossbank-developer-experience
+- FE 챕터 리드 인터뷰 (리드 역할·성장): https://toss.im/career/article/toss-frontend-leadership-and-growth
+- 토스증권 FE 챕터: https://toss.im/career/article/secu_frontend-chapter
+- 토스증권 PC Design Platform: https://toss.im/career/article/secu_pc_design_platform
+- 토스 FE UX Engineer 직무: https://toss.im/career/article/ux-engineer-interview
+- Frontend UX Engineer (2026.01): https://toss.im/career/article/44425
+- NEXT Frontend 직무 소개: https://toss.im/career/article/next-developer-2023-frontend
+- NEXT 개발 문화: https://toss.im/career/article/next-developer-2023-culture
+- NEXT 2022 코딩테스트 기출/풀이: https://toss.im/career/article/next-developer-2023-sample-questions
+- NEXT 합격 수기 (결과보다 왜): https://toss.im/career/article/next-25-frontend
+
+**토스 기술 블로그 (toss.tech) — 프론트엔드 핵심**
+- FE 챕터 소개 (조직·기술스택·문화): https://toss.tech/article/toss-frontend-chapter
+- 리포지토리 기반 지원 (평가 기준 공개): https://toss.tech/article/frontend-apply-without-resume
+- 선언적인 코드 작성하기: https://toss.tech/article/frontend-declarative-code
+- 자료구조로 복잡한 FE 컴포넌트: https://toss.tech/article/frontend-tree-structure
+- ts-pattern은 더 멋진 if문이 아니다: https://toss.tech/article/ts-pattern-usage
+- Template Literal Types: https://toss.tech/article/template-literal-types
+- TS 타입 호환성 (구조적 서브타이핑): https://toss.tech/article/typescript-type-compatibility
+- 100년 가는 FE 코드, SDK: https://toss.tech/article/42223
+- 가치있는 테스트 전략: https://toss.tech/article/test-strategy-server
+- React Native 2024 (Shared/Service 번들·Micro FE): https://toss.tech/article/react-native-2024
+- RN 도입, CocoaPods 없이: https://toss.tech/article/react-native-without-cocoapods
+- 디자인 시스템 다시 생각하기 (Flat/Compound): https://toss.tech/article/rethinking-design-system
+- TDS 컬러 시스템 업데이트 (Target/Role/Variant/Level): https://toss.tech/article/tds-color-system-update
+- 이런 것도 컴포넌트로? (DS 컴포넌트화 기준): https://toss.tech/article/tds-component-making
+- DS 가이드 스케일업: https://toss.tech/article/toss-design-system-guide
+- 200+ 서비스 모노레포 CI: https://toss.tech/article/monorepo-pipeline
+- SSR 서버 최적화: https://toss.tech/article/ssr-server
+- 유연한 배포 Pipeline (SLASH 23 DevOps): https://toss.tech/article/slash23-devops
+- 패키지 매니저의 과거·미래: https://toss.tech/article/lightning-talks-package-manager
+- es-toolkit 10M 주간 다운로드: https://toss.tech/article/es-toolkit
+- 쓰기 쉬운 Toss Front SDK: https://toss.tech/article/toss-front-sdk
+- A11y Fundamentals (토스 공식 접근성 문서): https://toss.tech/article/A11y_Fundamentals
+- 접근성 업무일지 #3 (챗봇 흐름): https://toss.tech/article/38743
+- 인터랙션, 꼭 넣어야 해요?: https://toss.tech/article/interaction
+- Software 3.0 시대: https://toss.tech/article/software-3-0-era
+- 하마터면 못생겨질 뻔 (토스 프론트 2): https://toss.tech/article/toss_front
+- Harness로 조직 생산성 저점 올리기: https://toss.tech/article/harness-for-team-productivity
+
+**toss.tech 모닥불(Fireside Chat) FE 시리즈**
+- EP.1 가독성 좋은 코드란?: https://toss.tech/article/28334
+- EP.2 함수형 프로그래밍 FE에 도움 될까?: https://toss.tech/article/firesidechat_frontend_2
+- EP.3 FE 테스트 자동화 꼭 해야 할까?: https://toss.tech/article/firesidechat_frontend_3
+- EP.4 OSS 기여와 토스 합격: https://toss.tech/article/firesidechat_frontend_4
+- EP.5 개발만 잘해도 될까: https://toss.tech/article/firesidechat_frontend_5
+- EP.8 면접관이 진짜 원하는 것: https://toss.tech/article/firesidechat_frontend_8
+- EP.9 서비스 최적화 노하우: https://toss.tech/article/firesidechat_frontend_9
+- EP.10 FE 코드/디렉토리 관리 Q&A: https://toss.tech/article/firesidechat_frontend_10
+- EP.11 디자인 편집기 데우스 구현기: https://toss.tech/article/firesidechat_frontend_11
+- EP.12 코드 리뷰 컬쳐 (고맥락자 리뷰·코드스멜 WG): https://toss.tech/article/firesidechat_frontend_12
+
+**컨퍼런스 세션 (TMC 25 / SLASH)**
+- TMC 25 장애 대응 자동화: https://toss.im/tmc-25/sessions/engineering/frontend-32
+- SLASH 24 오프라인 결제 혁신: https://toss.im/slash-24/sessions/4
+- SLASH 24 RN 디버깅: https://toss.im/slash-24/sessions/7
+- SLASH 24 Yarn Plugin 자동 로깅: https://toss.im/slash-24/sessions/10
+- SLASH 24 SharedWorker 멀티탭 WS: https://toss.im/slash-24/sessions/13
+
+**오픈소스 (토스 공개 라이브러리)**
+- es-toolkit: https://es-toolkit.dev
+- es-hangul: https://es-hangul.slash.page
+- suspensive: https://suspensive.org
+- @toss/use-funnel: https://use-funnel.slash.page
+- granite (RN Framework): https://www.granite.run
+- 전체 리포지토리: https://github.com/toss
+
+**토스 채용 평가 기준 (공식 간단 요약)**
+- 프론트엔드 기술과제·라이브 코딩 안내: https://toss.im/career/article/26291
 
 **코드 품질**
 - 개요: https://frontend-fundamentals.com/code-quality/code/
