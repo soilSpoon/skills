@@ -252,6 +252,8 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 
 전체 목록은 [references/url-index.md](references/url-index.md). 카테고리별 2-3개만 자주 쓰는 북마크로 남긴다.
 
+> ⚠️ **선제 fetch 금지** — 이 링크들은 참조용이다. 스킬 활성화 시점에 **선제적으로 WebFetch 하지 않는다.** 리뷰·작성 중 특정 원칙의 원문 근거가 **필요해진 순간에만** 해당 항목 1개를 fetch. 대부분의 리뷰는 SKILL.md 본문 + `references/*.md` 만으로 충분하다.
+
 **토스 평가 기준 · 팀** — [26291 합류 5가지 이유](https://toss.im/career/article/26291) · [Frontend Platform 이야기](https://toss.im/career/article/Frontend) · [Web Framework 팀 도전기](https://toss.im/career/article/web_framework_2511) · [팀 문화 8원칙](https://toss.im/career/culture)
 
 **토스 기술 블로그 핵심** — [리포지토리 기반 지원 평가 기준](https://toss.tech/article/frontend-apply-without-resume) · [rethinking-design-system (Flat/Compound)](https://toss.tech/article/rethinking-design-system) · [TDS 컬러 시스템 (4축 토큰)](https://toss.tech/article/tds-color-system-update) · [React Native 2024 (MFE·결정적 빌드)](https://toss.tech/article/react-native-2024) · [100년 가는 SDK](https://toss.tech/article/42223) · [A11y Fundamentals](https://toss.tech/article/A11y_Fundamentals)
