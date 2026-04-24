@@ -1,5 +1,17 @@
 # Design Tokens & API Layering (토스 TDS 기반)
 
+## 목차
+
+1. 왜 이 파일이 존재하나
+2. 4축 토큰 네이밍 (Target / Role / Variant / Level)
+3. Single Source of Truth — 토큰은 codegen으로 분산시켜라
+4. 인지 균일 색공간 (OKLCH) — 접근성 × 일관성
+5. Flat API vs Compound API — 하이브리드 전략
+6. 우회할 이유를 줄이는 설계 (메타 원칙)
+7. 마이그레이션 전략 — 3단계
+
+---
+
 ## 왜 이 파일이 존재하나
 
 스킬 본문 §플랫폼 철학 #7 "**우회할 이유를 줄이는 설계**" 와 "매직 넘버" 가이드가 만나는 지점을 구체 레시피로 내린다. 출처는 토스 기술 블로그 [`rethinking-design-system`](https://toss.tech/article/rethinking-design-system) 과 [`tds-color-system-update`](https://toss.tech/article/tds-color-system-update).

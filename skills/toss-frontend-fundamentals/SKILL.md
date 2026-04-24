@@ -1,6 +1,6 @@
 ---
 name: toss-frontend-fundamentals
-description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·예측 가능성·응집도·결합도)과 접근성(A11y) 원칙으로 React·TypeScript·프론트엔드 코드를 작성·리뷰·리팩토링한다. 사용 시점 - (1) "리뷰해줘", "개선해줘", "PR 봐줘", "code review" 같은 프론트엔드 리뷰 요청, (2) React 컴포넌트·훅·프론트엔드 유틸을 새로 쓰거나 리팩토링할 때, (3) "토스 코딩 컨벤션", "frontend-fundamentals", "변경하기 쉬운 코드", "가독성/예측가능성/응집도/결합도" 관련 질문, (4) props drilling, 매직 넘버, 중첩 삼항, 복잡한 조건문, 커스텀 훅 분리/통합, 전역 상태 도입, 폼 설계, 조건부 렌더링, 디렉토리 구조 같은 패턴을 검토할 때, (5) "접근성", "a11y", "aria", "스크린 리더", "키보드 네비게이션", "semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 같은 UI 컴포넌트의 a11y 점검 요청. Use when reviewing or writing React/TypeScript frontend code that should follow Toss coding principles for maintainability and accessibility.
+description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·예측 가능성·응집도·결합도)과 접근성(A11y) 원칙, 그리고 토스 채용 공식 평가축(완성도·확장성·라이브러리 동작 이해·실용성)·팀 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript·프론트엔드 코드를 작성·리뷰·리팩토링한다. 사용 시점 - (1) "리뷰해줘", "개선해줘", "PR 봐줘", "code review" 같은 프론트엔드 리뷰 요청, (2) React 컴포넌트·훅·프론트엔드 유틸을 새로 쓰거나 리팩토링할 때, (3) "토스 코딩 컨벤션", "frontend-fundamentals", "변경하기 쉬운 코드", "가독성/예측가능성/응집도/결합도" 관련 질문, (4) props drilling, 매직 넘버, 중첩 삼항, 복잡한 조건문, 커스텀 훅 분리/통합, 전역 상태 도입, 폼 설계, 조건부 렌더링, 디렉토리 구조 같은 패턴을 검토할 때, (5) "접근성", "a11y", "aria", "스크린 리더", "키보드 네비게이션", "semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 같은 UI 컴포넌트의 a11y 점검 요청, (6) "토스 사전과제", "기술과제", "라이브 코딩", "토스 평가", "토스 지원", "코드 리뷰를 하는 듯한 경험" 같은 채용 준비·제출 컨텍스트, (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change 같은 플랫폼 패턴 판단. Use when reviewing or writing React/TypeScript frontend code that should follow Toss coding principles for maintainability, accessibility, and Toss-style hiring evaluation (code completion, extensibility, library understanding, pragmatism).
 ---
 
 # Toss Frontend Fundamentals
@@ -61,59 +61,19 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 | **Question Every Assumption** | "'당연한 것'은 없습니다 … 가정을 바꾸면 어떨지 생각" | 관용적 패턴(매직 넘버, 기본 prop, 관용 hook 분리)에도 **"정말 이게 최선인가?"** 재질문. |
 | **Move with Urgency / Focus on Impact / Extra-mile** | "과감히 생략 … 신속한 속도로 시도", "적당한 수준에서 마무리 짓지 않습니다" | 리뷰 우선순위는 **가독성·예측가능성·접근성 결함 먼저**, 양념 개선은 뒤. "대충 돌아가는" 상태로 PR 보내지 않는다. |
 
-## 프론트엔드 플랫폼 엔지니어링 철학 (토스 FE 헤드·Web Framework 팀 인용)
+## 프론트엔드 플랫폼 엔지니어링 철학 (요약)
 
-공고에 링크된 두 채용 narrative — [Frontend Platform 이야기](https://toss.im/career/article/Frontend), [Web Framework 팀 도전기](https://toss.im/career/article/web_framework_2511) — 에서 **코드·리뷰 철학**으로 직결되는 문구만 뽑았다.
+[Frontend Platform 이야기](https://toss.im/career/article/Frontend), [Web Framework 팀 도전기](https://toss.im/career/article/web_framework_2511), [rethinking-design-system](https://toss.tech/article/rethinking-design-system) 원문에서 추출한 7개 원칙. 상세 인용·리뷰 프로토콜은 [platform-philosophy.md](references/platform-philosophy.md).
 
-### 1. "문제의 근원을 찾는 사람들"
-
-> "어떤 사람들은 눈앞의 문제를 고치고, 어떤 사람들은 문제의 근원을 찾아요. 토스 Web Framework 팀은 문제의 근원을 찾는 사람들이 모여 있는 팀이에요."
-
-> "'왜 아직도 그걸 하고 있나요?'라는 질문을 들은 적이 단 한 번도 없었어요. 표면적인 문제를 빠르게 덮는 것보다, 시간이 더 걸리더라도 근본 원인을 해결하는 것을 팀이 중요한 원칙으로 삼고 있기 때문이에요."
-
-**리뷰 번역** — 버그 리포트/회귀에 대한 첫 코멘트는 "패치할 곳"이 아니라 **"왜 반복되나"** 여야 한다. 같은 버그 유형이 두 번째면 개별 수정보다 **가드레일(타입·테스트·Lint·Codemod)**로 막아야 한다.
-
-### 2. "시스템이 실수를 막는다" > "개인이 실수하지 않길 바란다"
-
-> "개발자 개인이 실수하지 않기를 바라기보다, 도구와 시스템을 통해 더 나은 개발 환경과 프로덕트를 만든다는 철학에 공감하시는 분들이라면 높은 만족도를 느끼실 거예요."
-
-**리뷰 번역** — 리뷰의 1차 방어선은 **사람 눈이 아니라 ESLint · TypeScript · `eslint-plugin-jsx-a11y` · Prettier · codemod**. 같은 지적을 두 번 하면 자동화 실패다. 사람 리뷰는 시스템이 못 잡는 설계·가독성·트레이드오프에 집중.
-
-### 3. "기술 스택 숙련도"보다 "문제 정의·발견 역량"
-
-> "토스에서 플랫폼 엔지니어는 기술 스택을 얼마나 많이 알고 있느냐 보다는 문제를 근본적으로 해결하기 위한 시스템적 사고와 접근 태도를 더 중요하게 생각해요."
-
-> "단순히 문제를 잘 푸는 것뿐 아니라, 무엇이 문제인지 스스로 찾아내고 설명할 수 있는 역량이 플랫폼 엔지니어의 본질적인 역할이라고 생각해요."
-
-**리뷰 번역** — 평가 질문: *"이 사람이 내가 못 본 문제를 찾아냈는가?"*. 과제에서도 "요구사항 충족" 외에 **"과제가 안 시킨 문제 발견 + 그 해결안 제안(주석/README에)"** 이 있으면 가점.
-
-### 4. "테스트가 없으면 버그는 돌아온다 / 모니터링이 없으면 성능은 느려진다"
-
-> "버그를 고칠 때, 테스트를 작성하지 않는 이상, 반드시 버그는 돌아오게 되어 있어요."
-
-> "최적화할 때, 성능을 꾸준히 모니터링하지 않는 이상, 반드시 속도는 느려지게 되어 있어요."
-
-**리뷰 번역** — 버그 fix PR에 **회귀 테스트가 없으면 `[MUST]` 차단**. 성능 개선 PR에 **측정 지표·before/after 수치가 없으면 `[MUST]` 차단**.
-
-### 5. "E2E 테스트 셀렉터는 접근성 친화적이어야 한다"
-
-> "테스트 코드를 작성하는 방식이 접근성 친화적이지 않으며, 실제 사용자의 동작과는 상이해요. XPath나 Test ID를 지정하는 방식을 이용하여 테스트하기 때문에, 애플리케이션 코드와 테스트 코드 사이에 강결합이 발생하죠."
-
-**리뷰 번역** — E2E·컴포넌트 테스트는 **`getByRole` / `getByLabelText` / `getByText` 우선**. `data-testid`와 XPath는 **최후의 수단**. 접근 가능한 이름(role + accessible name)이 테스트 셀렉터라면 a11y 투자와 테스트 투자가 같은 예산으로 간다 (TMC 25 "누구나 작성하는 E2E 테스트, 접근성에서 찾은 답" 세션과 동일 원칙).
-
-### 6. "Breaking change엔 Codemod + 명확한 릴리스 노트 + 업그레이드 원라이너"
-
-> "Breaking Change에 대해서는 꼼꼼히 Codemod를 작성하여 업그레이드 명령어 한 줄로 최신 프레임워크의 기능과 성능을 누릴 수 있도록 하려고 해요."
-
-**리뷰 번역** — 공개 API를 바꾸는 PR은 (1) **마이그레이션 가이드**, (2) 가능하면 **codemod 스크립트**, (3) **릴리스 노트 항목**을 함께. 라이브러리 저자 패턴([library-patterns.md](references/library-patterns.md))에 공식 근거.
-
-### 7. "우회할 이유를 줄이는 설계" (메타 원칙)
-
-[`rethinking-design-system`](https://toss.tech/article/rethinking-design-system) 에서:
-
-> "중요한 것은 우회로를 없애는 통제가 아니라, 우회할 이유를 줄이는 설계였어요."
-
-**리뷰 번역 (스킬 최상위 메타원칙)** — `/* eslint-disable */`, `// @ts-ignore`, `as any`, private API 우회, 디자인 시스템 fork가 보이면 **"왜 우회하나"** 를 물어라. 우회는 **대부분 API 설계 실패의 증상**이지 사용자 잘못이 아니다. Flat/Compound 하이브리드([design-tokens.md](references/design-tokens.md) 참조)가 그 대표 해법.
+| # | 원칙 | 리뷰 번역 (한 줄) |
+|---|---|---|
+| 1 | 문제의 근원 vs 표면 덮기 | 같은 버그 2회차면 개별 fix 대신 **가드레일** |
+| 2 | 시스템이 실수 방지 > 개인이 실수 안 하길 바람 | 같은 지적 두 번 하면 **자동화 실패**. 1차 방어선은 ESLint·TS·jsx-a11y |
+| 3 | 문제 정의·발견 역량 > 기술 스택 | 과제에서 "안 시킨 문제 발견 + 해결안 제안"이 가점 |
+| 4 | 테스트·모니터링 없으면 회귀는 반드시 | 버그 fix PR에 **회귀 테스트 없으면 `[MUST]` 차단**, 성능 PR엔 수치 필수 |
+| 5 | E2E 셀렉터는 a11y 친화적 | `getByRole`/`getByLabelText` 우선, `data-testid`·XPath는 최후 |
+| 6 | Breaking change 세트 | 마이그레이션 가이드 + codemod + 릴리스 노트 동시 제공 |
+| 7 | **우회할 이유를 줄이는 설계** (메타) | `@ts-ignore`·`as any`·fork는 **API 설계 실패의 증상** |
 
 ## 빠른 트리거 맵 (코드 → 원칙 → 파일)
 
@@ -290,109 +250,18 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 
 ## 원문 URL 인덱스
 
-**토스 채용·팀 (공식 채용 허브)**
-- 프론트엔드 합류 5가지 이유 (평가 기준 공식 인용): https://toss.im/career/article/26291
-- Frontend Platform 이야기 (140명 조직, SSR/CI/CD/RN/Toolbox/E2E): https://toss.im/career/article/Frontend
-- Web Framework 팀 도전기 (문제 근원 탐구·시스템이 실수 방지 철학): https://toss.im/career/article/web_framework_2511
-- 합류 여정 (6단계 채용 프로세스): https://toss.im/career/joining-guide
-- 팀 문화 (DRI·8원칙): https://toss.im/career/culture
-- FAQ (인터뷰/과제/기술): https://toss.im/career/faq?category=0
-- 토스뱅크 FE DX 개선: https://toss.im/career/article/tossbank-developer-experience
-- FE 챕터 리드 인터뷰 (리드 역할·성장): https://toss.im/career/article/toss-frontend-leadership-and-growth
-- 토스증권 FE 챕터: https://toss.im/career/article/secu_frontend-chapter
-- 토스증권 PC Design Platform: https://toss.im/career/article/secu_pc_design_platform
-- 토스 FE UX Engineer 직무: https://toss.im/career/article/ux-engineer-interview
-- Frontend UX Engineer (2026.01): https://toss.im/career/article/44425
-- NEXT Frontend 직무 소개: https://toss.im/career/article/next-developer-2023-frontend
-- NEXT 개발 문화: https://toss.im/career/article/next-developer-2023-culture
-- NEXT 2022 코딩테스트 기출/풀이: https://toss.im/career/article/next-developer-2023-sample-questions
-- NEXT 합격 수기 (결과보다 왜): https://toss.im/career/article/next-25-frontend
+전체 목록은 [references/url-index.md](references/url-index.md). 카테고리별 2-3개만 자주 쓰는 북마크로 남긴다.
 
-**토스 기술 블로그 (toss.tech) — 프론트엔드 핵심**
-- FE 챕터 소개 (조직·기술스택·문화): https://toss.tech/article/toss-frontend-chapter
-- 리포지토리 기반 지원 (평가 기준 공개): https://toss.tech/article/frontend-apply-without-resume
-- 선언적인 코드 작성하기: https://toss.tech/article/frontend-declarative-code
-- 자료구조로 복잡한 FE 컴포넌트: https://toss.tech/article/frontend-tree-structure
-- ts-pattern은 더 멋진 if문이 아니다: https://toss.tech/article/ts-pattern-usage
-- Template Literal Types: https://toss.tech/article/template-literal-types
-- TS 타입 호환성 (구조적 서브타이핑): https://toss.tech/article/typescript-type-compatibility
-- 100년 가는 FE 코드, SDK: https://toss.tech/article/42223
-- 가치있는 테스트 전략: https://toss.tech/article/test-strategy-server
-- React Native 2024 (Shared/Service 번들·Micro FE): https://toss.tech/article/react-native-2024
-- RN 도입, CocoaPods 없이: https://toss.tech/article/react-native-without-cocoapods
-- 디자인 시스템 다시 생각하기 (Flat/Compound): https://toss.tech/article/rethinking-design-system
-- TDS 컬러 시스템 업데이트 (Target/Role/Variant/Level): https://toss.tech/article/tds-color-system-update
-- 이런 것도 컴포넌트로? (DS 컴포넌트화 기준): https://toss.tech/article/tds-component-making
-- DS 가이드 스케일업: https://toss.tech/article/toss-design-system-guide
-- 200+ 서비스 모노레포 CI: https://toss.tech/article/monorepo-pipeline
-- SSR 서버 최적화: https://toss.tech/article/ssr-server
-- 유연한 배포 Pipeline (SLASH 23 DevOps): https://toss.tech/article/slash23-devops
-- 패키지 매니저의 과거·미래: https://toss.tech/article/lightning-talks-package-manager
-- es-toolkit 10M 주간 다운로드: https://toss.tech/article/es-toolkit
-- 쓰기 쉬운 Toss Front SDK: https://toss.tech/article/toss-front-sdk
-- A11y Fundamentals (토스 공식 접근성 문서): https://toss.tech/article/A11y_Fundamentals
-- 접근성 업무일지 #3 (챗봇 흐름): https://toss.tech/article/38743
-- 인터랙션, 꼭 넣어야 해요?: https://toss.tech/article/interaction
-- Software 3.0 시대: https://toss.tech/article/software-3-0-era
-- 하마터면 못생겨질 뻔 (토스 프론트 2): https://toss.tech/article/toss_front
-- Harness로 조직 생산성 저점 올리기: https://toss.tech/article/harness-for-team-productivity
+**토스 평가 기준 · 팀** — [26291 합류 5가지 이유](https://toss.im/career/article/26291) · [Frontend Platform 이야기](https://toss.im/career/article/Frontend) · [Web Framework 팀 도전기](https://toss.im/career/article/web_framework_2511) · [팀 문화 8원칙](https://toss.im/career/culture)
 
-**toss.tech 모닥불(Fireside Chat) FE 시리즈**
-- EP.1 가독성 좋은 코드란?: https://toss.tech/article/28334
-- EP.2 함수형 프로그래밍 FE에 도움 될까?: https://toss.tech/article/firesidechat_frontend_2
-- EP.3 FE 테스트 자동화 꼭 해야 할까?: https://toss.tech/article/firesidechat_frontend_3
-- EP.4 OSS 기여와 토스 합격: https://toss.tech/article/firesidechat_frontend_4
-- EP.5 개발만 잘해도 될까: https://toss.tech/article/firesidechat_frontend_5
-- EP.8 면접관이 진짜 원하는 것: https://toss.tech/article/firesidechat_frontend_8
-- EP.9 서비스 최적화 노하우: https://toss.tech/article/firesidechat_frontend_9
-- EP.10 FE 코드/디렉토리 관리 Q&A: https://toss.tech/article/firesidechat_frontend_10
-- EP.11 디자인 편집기 데우스 구현기: https://toss.tech/article/firesidechat_frontend_11
-- EP.12 코드 리뷰 컬쳐 (고맥락자 리뷰·코드스멜 WG): https://toss.tech/article/firesidechat_frontend_12
+**토스 기술 블로그 핵심** — [리포지토리 기반 지원 평가 기준](https://toss.tech/article/frontend-apply-without-resume) · [rethinking-design-system (Flat/Compound)](https://toss.tech/article/rethinking-design-system) · [TDS 컬러 시스템 (4축 토큰)](https://toss.tech/article/tds-color-system-update) · [React Native 2024 (MFE·결정적 빌드)](https://toss.tech/article/react-native-2024) · [100년 가는 SDK](https://toss.tech/article/42223) · [A11y Fundamentals](https://toss.tech/article/A11y_Fundamentals)
 
-**컨퍼런스 세션 (TMC 25 / SLASH)**
-- TMC 25 장애 대응 자동화: https://toss.im/tmc-25/sessions/engineering/frontend-32
-- SLASH 24 오프라인 결제 혁신: https://toss.im/slash-24/sessions/4
-- SLASH 24 RN 디버깅: https://toss.im/slash-24/sessions/7
-- SLASH 24 Yarn Plugin 자동 로깅: https://toss.im/slash-24/sessions/10
-- SLASH 24 SharedWorker 멀티탭 WS: https://toss.im/slash-24/sessions/13
+**Fireside Chat** — [EP.1 가독성](https://toss.tech/article/28334) · [EP.8 면접관이 진짜 원하는 것](https://toss.tech/article/firesidechat_frontend_8) · [EP.12 리뷰 컬쳐](https://toss.tech/article/firesidechat_frontend_12)
 
-**오픈소스 (토스 공개 라이브러리)**
-- es-toolkit: https://es-toolkit.dev
-- es-hangul: https://es-hangul.slash.page
-- suspensive: https://suspensive.org
-- @toss/use-funnel: https://use-funnel.slash.page
-- granite (RN Framework): https://www.granite.run
-- 전체 리포지토리: https://github.com/toss
+**Frontend Fundamentals 공식** — [코드 품질 개요](https://frontend-fundamentals.com/code-quality/code/) · [접근성 개요](https://frontend-fundamentals.com/a11y/overview.html) · [playground](https://frontend-fundamentals.com/a11y/playground.html)
 
-**토스 채용 평가 기준 (공식 간단 요약)**
-- 프론트엔드 기술과제·라이브 코딩 안내: https://toss.im/career/article/26291
+**오픈소스** — [es-toolkit](https://es-toolkit.dev) · [suspensive](https://suspensive.org) · [@toss/use-funnel](https://use-funnel.slash.page) · [granite](https://www.granite.run) · [전체 리포지토리](https://github.com/toss)
 
-**코드 품질**
-- 개요: https://frontend-fundamentals.com/code-quality/code/
-- 좋은 토론: https://frontend-fundamentals.com/code-quality/code/community/good-discussions.html
-- 인기 토론 전체: https://github.com/toss/frontend-fundamentals/discussions?discussions_q=is:open+sort:top
+## 애셋
 
-**가독성 예제** — [submit-button](https://frontend-fundamentals.com/code-quality/code/examples/submit-button.html) · [login-start-page](https://frontend-fundamentals.com/code-quality/code/examples/login-start-page.html) · [condition-name](https://frontend-fundamentals.com/code-quality/code/examples/condition-name.html) · [magic-number-readability](https://frontend-fundamentals.com/code-quality/code/examples/magic-number-readability.html) · [ternary-operator](https://frontend-fundamentals.com/code-quality/code/examples/ternary-operator.html) · [use-page-state-readability](https://frontend-fundamentals.com/code-quality/code/examples/use-page-state-readability.html) · [user-policy](https://frontend-fundamentals.com/code-quality/code/examples/user-policy.html) · [comparison-order](https://frontend-fundamentals.com/code-quality/code/examples/comparison-order.html)
-
-**예측 가능성 예제** — [http](https://frontend-fundamentals.com/code-quality/code/examples/http.html) · [use-user](https://frontend-fundamentals.com/code-quality/code/examples/use-user.html) · [hidden-logic](https://frontend-fundamentals.com/code-quality/code/examples/hidden-logic.html)
-
-**응집도 예제** — [code-directory](https://frontend-fundamentals.com/code-quality/code/examples/code-directory.html) · [magic-number-cohesion](https://frontend-fundamentals.com/code-quality/code/examples/magic-number-cohesion.html) · [form-fields](https://frontend-fundamentals.com/code-quality/code/examples/form-fields.html)
-
-**결합도 예제** — [use-page-state-coupling](https://frontend-fundamentals.com/code-quality/code/examples/use-page-state-coupling.html) · [use-bottom-sheet](https://frontend-fundamentals.com/code-quality/code/examples/use-bottom-sheet.html) · [item-edit-modal](https://frontend-fundamentals.com/code-quality/code/examples/item-edit-modal.html)
-
-**접근성**
-- 개요: https://frontend-fundamentals.com/a11y/overview.html
-- 왜: https://frontend-fundamentals.com/a11y/why.html
-- 원칙: https://frontend-fundamentals.com/a11y/principles.html
-- 기초(Role/Label/State): https://frontend-fundamentals.com/a11y/basic-guide/overview.html
-- UI 컴포넌트: [tab](https://frontend-fundamentals.com/a11y/ui-foundation/tab.html) · [accordion](https://frontend-fundamentals.com/a11y/ui-foundation/accordion.html) · [modal](https://frontend-fundamentals.com/a11y/ui-foundation/modal.html) · [radio](https://frontend-fundamentals.com/a11y/ui-foundation/radio.html) · [checkbox](https://frontend-fundamentals.com/a11y/ui-foundation/checkbox.html) · [switch](https://frontend-fundamentals.com/a11y/ui-foundation/switch.html)
-- 실전 가이드:
-  - 구조: [button-inside-button](https://frontend-fundamentals.com/a11y/structure/button-inside-button.html) · [table-row-link](https://frontend-fundamentals.com/a11y/structure/table-row-link.html)
-  - 의미: [required-label](https://frontend-fundamentals.com/a11y/semantic/required-label.html) · [duplicate-interactive-element](https://frontend-fundamentals.com/a11y/semantic/duplicate-interactive-element.html)
-  - 동작: [fake-button](https://frontend-fundamentals.com/a11y/predictability/fake-button.html) · [form](https://frontend-fundamentals.com/a11y/predictability/form.html)
-  - 시각 보완: [image-alt](https://frontend-fundamentals.com/a11y/alt-text/image-alt.html)
-- ESLint: [rules](https://frontend-fundamentals.com/a11y/eslint/rules.html) · [design-system](https://frontend-fundamentals.com/a11y/eslint/design-system.html)
-- 체험 playground: https://frontend-fundamentals.com/a11y/playground.html
-
-**주요 커뮤니티 토론 (원문)** — 전체 [discussions.md](references/discussions.md) 참조
-- [#4 조건부 렌더링](https://github.com/toss/frontend-fundamentals/discussions/4) · [#5 전역 상태 기준](https://github.com/toss/frontend-fundamentals/discussions/5) · [#6 enum vs as const](https://github.com/toss/frontend-fundamentals/discussions/6) · [#7 queryKey 관리](https://github.com/toss/frontend-fundamentals/discussions/7) · [#21 불리언 암묵 변환](https://github.com/toss/frontend-fundamentals/discussions/21) · [#35 Hook vs Component](https://github.com/toss/frontend-fundamentals/discussions/35) · [#41 if return 포맷](https://github.com/toss/frontend-fundamentals/discussions/41) · [#42 다이얼로그 관리](https://github.com/toss/frontend-fundamentals/discussions/42) · [#45 Indexed Access](https://github.com/toss/frontend-fundamentals/discussions/45) · [#66 RSC data fetching](https://github.com/toss/frontend-fundamentals/discussions/66) · [#67 Form 3-type](https://github.com/toss/frontend-fundamentals/discussions/67) · [#85 Zod 스키마 compose](https://github.com/toss/frontend-fundamentals/discussions/85) · [#88 Boolean 네이밍](https://github.com/toss/frontend-fundamentals/discussions/88) · [#96 export 스타일](https://github.com/toss/frontend-fundamentals/discussions/96) · [#114 배열 타입](https://github.com/toss/frontend-fundamentals/discussions/114) · [#128 인라인 함수](https://github.com/toss/frontend-fundamentals/discussions/128) · [#150 서버 enum](https://github.com/toss/frontend-fundamentals/discussions/150) · [#162 z-index](https://github.com/toss/frontend-fundamentals/discussions/162) · [#175 데이터 주입](https://github.com/toss/frontend-fundamentals/discussions/175) · [#177 value/onChange](https://github.com/toss/frontend-fundamentals/discussions/177) · [#189 != null](https://github.com/toss/frontend-fundamentals/discussions/189) · [#196 도메인 디렉토리](https://github.com/toss/frontend-fundamentals/discussions/196) · [#199 discriminatedUnion](https://github.com/toss/frontend-fundamentals/discussions/199) · [#202 queryOptions](https://github.com/toss/frontend-fundamentals/discussions/202) · [#221 상수 위치](https://github.com/toss/frontend-fundamentals/discussions/221) · [#488 fetcher 네이밍](https://github.com/toss/frontend-fundamentals/discussions/488) · [#689 useEffect 최소화](https://github.com/toss/frontend-fundamentals/discussions/689) · [#755 MV-VI](https://github.com/toss/frontend-fundamentals/discussions/755) · [#832 function vs arrow](https://github.com/toss/frontend-fundamentals/discussions/832)
+- [`assets/pr-template.md`](assets/pr-template.md) — 채용 과제·라이브코딩 제출 시 PR/README 템플릿 (TL;DR · 요구사항 체크 · 설계 결정 Why · 의도한 단순화 · 확장 지점 · 러닝 포인트 · a11y 자가점검). "코드 리뷰 하는 듯한 경험" 평가에 맞춰 **자기 변론서** 역할.
