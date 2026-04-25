@@ -13,6 +13,7 @@
 5. [CI 품질 게이트 — attw · publint · sherif · knip · compressed-size](#5-ci-품질-게이트)
 6. [릴리스 — Changesets](#6-릴리스--changesets)
 7. [점진 마이그레이션 — `/compat` 서브패스](#7-점진-마이그레이션-compat)
+8. [SDK 특수성 — 호출 환경 통제 불가 전제](#8-sdk-특수성)
 
 ---
 
@@ -243,6 +244,49 @@ import { chunk } from 'es-toolkit/compat';  // lodash 호환
 // 점진 전환
 import { chunk } from 'es-toolkit';  // 엄격, 엣지 케이스 throw
 ```
+
+---
+
+## 8. SDK 특수성
+
+일반 라이브러리(es-toolkit, suspensive)와 **SDK(payments-legacy-3 출처)** 는 다음에서 갈라진다 — SDK 작업 시 추가로 챙겨라.
+
+### 전제 — 호출 환경을 통제할 수 없다
+
+> "SDK 개발은 일반 프론트엔드 개발과 많이 달랐습니다. 가맹점 코드 속에 깊숙이 박혀, 가맹점 코드와 동일한 수명을 가졌고."
+
+- **로그 한 줄 추가가 장애가 될 수 있다.** 가맹점이 짧은 간격에 같은 메서드를 여러 번 호출하면 새로 추가한 네트워크 의존성이 페이지를 다운시킨다 → "사이드 이펙트 없는 추가" 가정 금지.
+- **타입 검증을 런타임에 한다.** 사용자가 `customerKey`에 number 를 넣어도 `startsWith` 가 터지지 않게 — TS interface → Zod schema 자동 변환으로 경계에서 validate.
+- **로그·메서드 추가는 PR 단위로 영향 분석.** 같은 메서드의 호출 패턴(빈도/병렬성) 을 모르면 일단 보류.
+
+### 추적 가능성 — Global Trace ID
+
+평범한 로깅으로는 "결제 요청은 했는데 성공 못 함" 같은 케이스를 추출 못 한다.
+
+- **단일 Trace ID로 시스템 입구-출구 매핑** — 첫 요청 로그와 마지막 결제완료 로그를 ID 로 join.
+- 모니터링 CLI 가 "성공 카운트 41 → 0" 같은 신호를 배포 직후 즉시 노출.
+- 일반 라이브러리에서도 디버깅 사이클 짧게 만들고 싶으면 동일 패턴 적용 가능 (단, SDK 는 거의 필수).
+
+### "계약" 으로서의 인터페이스
+
+- TypeScript interface + JSDoc 을 **단일 진실의 출처**로 두고:
+  - 컴파일러로 MDX 문서 자동 생성 (CI 에서 갱신)
+  - 동일 interface 를 Zod schema 로 변환해 런타임 validate
+- "계약 변경 = 문서·검증 동시 변경" 보장.
+
+### 3계층 + 의존성 역전
+
+> "변경의 원인이 되는 곳을 따라서 경계를 그어라."
+
+- **Public Interface Layer** — 가맹점과의 약속 (검증 + 도메인 변환)
+- **Domain Layer** — 비즈니스 로직 (외부 의존성은 인터페이스로만 요청)
+- **External Service Layer** — 서버/Web API
+
+경계마다 인터페이스 기반 DI. 가맹점 특수 케이스는 도메인 블록만 교체 (`StandardWidgetRequestPaymentUsecase` → `JinyoungMallWidgetRequestPaymentUsecase`) 로 흡수.
+
+### 출처
+
+[toss.tech/article/payments-legacy-3](https://toss.tech/article/payments-legacy-3) — 토스페이먼츠 V2 SDK 설계.
 
 ---
 

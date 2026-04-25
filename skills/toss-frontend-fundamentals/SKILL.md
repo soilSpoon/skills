@@ -1,6 +1,6 @@
 ---
 name: toss-frontend-fundamentals
-description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·예측 가능성·응집도·결합도)과 접근성(A11y) 원칙, 그리고 토스 채용 공식 평가축(완성도·확장성·라이브러리 동작 이해·실용성)·팀 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript·프론트엔드 코드를 작성·리뷰·리팩토링한다. 사용 시점 - (1) "리뷰해줘", "개선해줘", "PR 봐줘", "code review" 같은 프론트엔드 리뷰 요청, (2) React 컴포넌트·훅·프론트엔드 유틸을 새로 쓰거나 리팩토링할 때, (3) "토스 코딩 컨벤션", "frontend-fundamentals", "변경하기 쉬운 코드", "가독성/예측가능성/응집도/결합도" 관련 질문, (4) props drilling, 매직 넘버, 중첩 삼항, 복잡한 조건문, 커스텀 훅 분리/통합, 전역 상태 도입, 폼 설계, 조건부 렌더링, 디렉토리 구조 같은 패턴을 검토할 때, (5) "접근성", "a11y", "aria", "스크린 리더", "키보드 네비게이션", "semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 같은 UI 컴포넌트의 a11y 점검 요청, (6) "토스 사전과제", "기술과제", "라이브 코딩", "토스 평가", "토스 지원", "코드 리뷰를 하는 듯한 경험" 같은 채용 준비·제출 컨텍스트, (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change 같은 플랫폼 패턴 판단. Use when reviewing or writing React/TypeScript frontend code that should follow Toss coding principles for maintainability, accessibility, and Toss-style hiring evaluation (code completion, extensibility, library understanding, pragmatism).
+description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·응집도·결합도) + 접근성 + 채용 평가축(완성도·확장성·라이브러리 동작 이해·실용성) + 토스 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript 프론트엔드 코드를 작성·리뷰·리팩토링한다. 트리거 - (1) "리뷰해줘"·"개선해줘"·"PR 봐줘"·"code review", (2) React 컴포넌트·훅·유틸 작성·리팩토링, (3) "토스 코딩 컨벤션"·"frontend-fundamentals"·"변경하기 쉬운 코드"·4대 축 명칭, (4) props drilling, 매직 넘버, 중첩 삼항, 커스텀 훅 분리/통합, 전역 상태, 폼 설계, 조건부 렌더링, 디렉토리 구조, (5) "접근성"·"a11y"·"aria"·"스크린 리더"·"semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 a11y 점검, (6) "토스 사전과제"·"기술과제"·"라이브 코딩"·"토스 평가"·"토스 지원"·"코드 리뷰 하는 듯한 경험", (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change. Use when reviewing/writing React/TypeScript frontend code that should follow Toss coding principles or Toss-style hiring evaluation.
 ---
 
 # Toss Frontend Fundamentals
@@ -21,6 +21,8 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 | **접근성** | 스크린 리더·키보드·색각 이상 사용자도 쓸 수 있는가? |
 
 원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기). 스킬은 답을 강제하지 않고 트레이드오프를 드러내며, 맥락에 따라 선택을 돕는다.
+
+> ⚠️ **로드 규율** — `references/*.md`와 외부 URL은 **on-demand**로만 로드한다. 스킬 활성화 시점에 preload 하지 않는다. 트리거 맵에서 해당 패턴이 매칭됐을 때, 또는 리뷰·작성 중 특정 축의 근거가 필요해진 순간에 1-2개씩만 연다. SKILL.md 본문 + 트리거 맵으로 충분한 리뷰가 대부분이다.
 
 ## 토스가 실제로 평가하는 것 (채용 기술과제·라이브 코딩)
 
@@ -161,6 +163,8 @@ description: Toss Frontend Fundamentals의 4대 코드 품질 기준(가독성·
 ## 통합 체크리스트
 
 리뷰 시 최소 이 항목을 스캔한다. `✗` 가 나오면 해당 reference로 들어간다. 라벨은 최소 엄격도.
+
+> 일부 항목은 여러 블록에 cross-cutting (예: `useEffect` 동작 이해는 "예측 가능성"·"채용"·"플랫폼" 모두에 해당). 한 번 위반이면 어느 블록에서든 같은 결정 — **중복 지적은 피하고 가장 무거운 라벨로 한 번만**.
 
 **가독성**
 - `[MUST]` 매직 넘버/문자열이 상수화되어 있는가

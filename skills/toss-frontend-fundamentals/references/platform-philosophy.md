@@ -85,6 +85,16 @@
 - 성능 개선 PR에 **before/after 수치가 없으면 `[MUST]` 차단**.
 - 모니터링 없는 최적화는 **일회성 퍼포먼스 마케팅**이지 실제 개선이 아니다.
 
+### 구체 계측 패턴 — Global Trace ID
+
+토스페이먼츠 V2 SDK([payments-legacy-3](https://toss.tech/article/payments-legacy-3))에서 검증된 패턴: **단일 ID로 시스템 입구-출구를 매핑**해 "요청은 있었는데 성공 안 됨"을 추출 가능하게.
+
+- 클라이언트 첫 요청 로그와 서버 응답 완료 로그를 같은 Trace ID 로 join
+- 배포 후 모니터링 CLI 가 "성공 카운트 41 → 0" 같은 신호를 즉시 노출
+- 분기·실패 추적 가능성을 **새 기능과 동시**에 설계 (사후 도입은 비용이 크다)
+
+코드/SDK 리뷰 시 결제·결제완료·결제실패 같은 **상태 전이가 있는 흐름**에는 Trace ID 부재를 `[SHOULD]` 지적. SDK 작업이라면 [library-patterns.md §8](library-patterns.md) 참조.
+
 ---
 
 ## 6. 원칙 #5 — E2E 셀렉터는 접근성 친화적이어야
