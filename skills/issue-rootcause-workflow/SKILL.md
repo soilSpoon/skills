@@ -1,0 +1,113 @@
+---
+name: issue-rootcause-workflow
+description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원인까지 도달하기 위한 6원칙 워크플로 — invariant 명문화, workaround vs root fix 의식, A/B 검증(가설 도달 검증 포함), 모순 신뢰, 최근 변경 + 두 path 대조. 트리거 - (1) "이거 왜 안 되지", "버그 추적", "회귀 분석", "근본 원인 찾기", "rootcause", (2) "이 fix 검증해줘", "이 패치가 진짜 고치는지", "A/B 테스트", (3) compiler/runtime/lib/infra 패치 PR 리뷰, (4) "테스트는 통과하는데 실제론 안 됨" 같은 false positive 의심, (5) "옵션 추가했는데 효과 없음" 같은 가설-도달 의심, (6) workaround만 쌓이고 같은 버그가 반복되는 상황, (7) 인시던트 포스트모템·ADR 작성. 컴파일러/런타임/인프라 한정이 아니라 자료구조 invariant·외부 시스템 호출·다단 toolchain·이중 경로 마이그레이션 어디든 적용.
+---
+
+# Issue Rootcause Workflow
+
+## 핵심 철학
+
+**증상을 막지 말고 invariant를 회복해라.** 같은 버그가 두 번째 돌아왔다면 첫 번째 fix가 root cause가 아니었다는 뜻이다. workaround와 root fix는 둘 다 합법적 선택이지만 *어느 쪽을 골랐는지 의식*하고 *그 이유를 남겨야* 다음 사람이 다시 root fix 차례를 가져갈 수 있다.
+
+| # | 원칙 | 한 줄 |
+|---|---|---|
+| 1 | Invariant 명문화 | 무엇이 참이어야 하는가 → 왜 안 참인가 |
+| 2 | Workaround vs Root fix | 둘 다 valid, 어느 걸 고르고 있는지 명시 |
+| 3 | A/B with smallest reliable repro | micro(결정적) + macro(현실적), 한 변수만 swap |
+| 4 | 가설이 도달했는지 검증 | "옵션 추가" ≠ "옵션이 관련 단계에 적용됨" |
+| 5 | 모순을 신뢰 | 결과가 사전지식과 충돌 → 실험을 먼저 의심 |
+| 6 | 최근 변경 + 두 path 대조 | git log + working/broken, before/after |
+
+자세한 정의·발동 신호·체크리스트·트레이드오프는 [principles.md](references/principles.md).
+
+## 워크플로 (5단계)
+
+```
+1. INVARIANT       무엇이 참이어야 하는가? 어디서 깨졌는가?      → 원칙 #1
+2. CHOICE          workaround vs root fix, 어느 걸 고르는가? 왜? → 원칙 #2
+3. EXPERIMENT      smallest reliable repro 만들고 한 변수만 swap → 원칙 #3
+4. VERIFY-ARRIVAL  가설(flag·config·patch)이 진짜 적용됐는지     → 원칙 #4
+5. CROSS-CHECK     모순 있나? 최근 변경? 두 path 차이?           → 원칙 #5·#6
+                   ↑ 모순 발견 시 1단계로 돌아감
+```
+
+각 단계에서 빠지지 않도록 체크리스트는 [principles.md](references/principles.md) 끝에 통합.
+
+## 트리거 맵
+
+리뷰·디버깅 중 아래 신호가 보이면 해당 원칙으로 들어간다.
+
+| 신호 | 원칙 | 파일 |
+|---|---|---|
+| `if (!x.empty())` 가드, `try/catch` 무시, 매직 retry — "왜 그런 상태가 되는가"는 안 묻는 fix | #1·#2 | [principles.md #1·#2](references/principles.md) |
+| 같은 버그가 다른 자리에서 재발 (fix 두 번째 본 패턴) | #1 (invariant 미회복) | [principles.md #1](references/principles.md) |
+| "테스트는 도는데 실제로는 안 고쳐짐" / 운영에선 효과 없음 | #4 (도달 검증 누락) | [principles.md #4](references/principles.md) |
+| "이거 fail해야 하는데 pass했다" / 결과가 사전지식과 충돌 | #5 (모순 → 실험 의심) | [principles.md #5](references/principles.md) |
+| "어제까지 됐는데 오늘부터 안 됨" | #6 (최근 변경) | [principles.md #6](references/principles.md) |
+| legacy/v1 vs new/v2 마이그레이션 중 한쪽만 깨짐 | #6 (path 대조) | [principles.md #6](references/principles.md) |
+| PR 리뷰에서 "이 fix가 진짜 고치는지 검증해줘" 요청 | #3 (A/B) | [principles.md #3](references/principles.md) |
+| 첫 실패에서 멈춰서 부분만 봄 | #3 (전수조사 — `ninja -k 0`, `pytest --maxfail=0`) | [principles.md #3](references/principles.md) |
+| compiler/toolchain 패치 검증 (LLVM/V8/CPython 등 ABI 민감) | #3·#4 | [case-llvm-vtk.md](references/case-llvm-vtk.md) |
+| 인시던트 포스트모템 / ADR 작성 | (출력 형식) | [output-templates.md](references/output-templates.md) |
+
+## 출력 형식 (조사 결과 보고)
+
+조사 끝에는 항상 4섹션으로 정리:
+
+```
+**Invariant** — 무엇이 참이어야 했는가 (1줄)
+**Violation** — 어디서 어떻게 깨졌는가 (file:line, 또는 단계명)
+**Choice**    — workaround | root fix | both 중 무엇을 적용했고 왜
+**Evidence**  — A/B 결과 표, 도달 검증 명령, 모순 해소 과정
+```
+
+이 4섹션을 PR 코멘트·ADR·인시던트 포스트모템·코드 주석 형식으로 변환하는 템플릿: [output-templates.md](references/output-templates.md).
+
+## 통합 체크리스트
+
+조사를 끝맺기 전에 점검. 라벨은 최소 엄격도.
+
+**Invariant (#1)**
+- `[MUST]` 망가진 자료구조/계약/상태가 무엇인지 1문장으로 적었는가
+- `[SHOULD]` 정상 입력에서 그게 어떻게 보존되는지 적었는가 (push N → pop N 같은 균형)
+- `[SHOULD]` 문제 입력에서 어디서 깨지는지 짚었는가 (ordering / counting / ownership / visibility)
+
+**선택의 의식 (#2)**
+- `[MUST]` 지금 fix가 "원인 제거"인지 "증상 차단"인지 PR/주석에 명시했는가
+- `[MUST]` workaround면 "왜 root fix를 안 골랐는가" 사유 + 후속 이슈 링크가 있는가
+
+**A/B 실험 (#3)**
+- `[MUST]` 결정적인 minimal repro (.ll, 단위 테스트, 작은 스크립트)
+- `[SHOULD]` 현실적인 macro repro (real workload)
+- `[MUST]` 한 번에 한 변수만 변경 (binary swap, flag toggle)
+- `[SHOULD]` 첫 실패에서 멈추지 말고 전수 수집 (`ninja -k 0`, `pytest --maxfail=0`)
+
+**도달 검증 (#4)**
+- `[MUST]` 추가한 flag/config/patch가 *실제로 적용된 단계*에서 확인됐는가 (`emcc -v`, `--print-config`, profiler tag, log signature, binary md5 차이)
+
+**모순 처리 (#5)**
+- `[MUST]` 결과가 사전지식과 다르면 결과를 수용하기 전에 실험 셋업을 먼저 의심했는가
+
+**Cross-check (#6)**
+- `[SHOULD]` 같은 함수/모듈의 다른 path는 통과하나? 차이는 무엇인가
+- `[SHOULD]` 최근 6개월 git log에서 의심 영역 변경 commit을 봤는가 (`git log -p --since`)
+- `[NIT]` 모르겠으면 메인테이너에게 reduced repro와 함께 한 줄 질문
+
+## 케이스 스터디 — 이번 워크플로의 기원
+
+LLVM PR #194184 검증 (VTK 9.6.1 standardized-EH crash). 6원칙 각각이 어느 turning point에서 발동했는지 시간순 매핑 + 두 PR 비교(workaround vs root fix) + 외부 컨트리뷰터가 root cause에 도달하기 위한 가이드: [case-llvm-vtk.md](references/case-llvm-vtk.md).
+
+특히 **#5 (모순 신뢰)** 가 결정적이었던 사례 — "baseline이 통과해야 할 때 통과하지 않았는데, 그걸 그대로 받아들이지 않고 *실험 먼저 의심*한 사용자의 한 줄 질문이 false positive 검증을 캐치"한 부분 참조.
+
+## 주의 사항
+
+- **워크플로는 교리가 아니다.** 단순 typo 같은 trivial bug에 5단계를 강요하면 과잉. **5분 이상** 걸리거나 **같은 버그가 두 번째** 보일 때부터 적용한다.
+- **"바빠서 root fix 못 함"은 합법.** 단, workaround라는 사실을 *코드 주석 + 후속 이슈*로 남겨야 다음 사람이 invariant를 회복할 수 있다 (#2의 핵심).
+- **도달 검증 없는 A/B는 false positive 공장.** 실험 셋업이 가설을 진짜로 테스트하고 있는지가 결과보다 먼저다 (#4·#5).
+- **"메인테이너 한 줄 질문"이 PR 한 개를 절약한다.** invariant를 짚어 reduced repro와 함께 물으면 root cause 방향을 받을 수 있다. 시간을 *측정*하면 reduced repro 만드는 비용 < PR 만들고 거절당하고 다시 만드는 비용.
+- **자동화가 가능한 건 자동화.** invariant 위반 검사는 assertion·schema·type·test로, 도달 검증은 dry-run·log signature·smoke test로. 사람 눈은 시스템이 못 잡는 *판단*에 쓴다.
+
+## 관련 스킬
+
+- 토스 프론트엔드 fundamentals — 4축 코드 품질 + 접근성 (이 스킬과 도메인 다름; 합쳐 쓰면 프런트엔드 회귀 분석에 효과적)
+- skill-creator — 이 스킬도 그 가이드로 만들어짐 (progressive disclosure, references one-level deep)
