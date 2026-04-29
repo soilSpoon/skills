@@ -77,6 +77,45 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | 6 | Breaking change 세트 | 마이그레이션 가이드 + codemod + 릴리스 노트 동시 제공 |
 | 7 | **우회할 이유를 줄이는 설계** (메타) | `@ts-ignore`·`as any`·fork는 **API 설계 실패의 증상** |
 
+## Lane 분할 (관점 1개당 컨텍스트 1개)
+
+한 컨텍스트가 4대 축 + 접근성 + 시스템 + 레시피를 *전부* 평가하면 관점 오염이 생긴다. 가독성 보러 들어왔다가 a11y 코드 보고 거기로 휩쓸리고, recipes 20종에 묻혀 결합도 시그널을 놓치는 식. 이 스킬은 리뷰를 5개 **lane**으로 나누고, 각 lane은 자기 관점의 references만 보고 자기 안티패턴만 본다.
+
+작은 diff(<50줄)·단일 함수 리뷰는 단일 패스(워크플로 A)로 충분하다. **PR·큰 diff·채용 과제 전체 리뷰**에선 lane들을 **병렬로** 디스패치한다(워크플로 C).
+
+### 5 lane 정의
+
+| Lane | 관점 | 활성화 | 매핑 references |
+|---|---|---|---|
+| **L1 readability+predictability** | 인지 부하·이름·시그니처·스코프 가시성 | 항상 | [readability.md](references/readability.md), [predictability.md](references/predictability.md) |
+| **L2 cohesion+coupling** | 모듈 경계·중복 vs 추상·디렉토리·결합 | 항상 | [cohesion.md](references/cohesion.md), [coupling.md](references/coupling.md) |
+| **L3 a11y** | WCAG·ARIA·키보드·semantic HTML | UI/JSX 코드 감지 시 | [a11y-basics.md](references/a11y-basics.md), [a11y-components.md](references/a11y-components.md), [a11y-practical.md](references/a11y-practical.md) |
+| **L4 react-runtime+systems** | hook 동작·렌더링·라이브러리 저자 패턴·디자인 토큰 | React/라이브러리/디자인 시스템 코드 감지 시 | [library-patterns.md](references/library-patterns.md), [design-tokens.md](references/design-tokens.md) |
+| **L5 recipes** | 즉시 적용 가능한 코드 변환 패턴 | 작성 모드 또는 리뷰 중 fix 제안 시 | [recipes.md](references/recipes.md) |
+
+### Cross-cutting (META) — 모든 lane이 필요 시 인용
+
+- [discussions.md](references/discussions.md) — 트레이드오프 토론·대안 설계
+- [platform-philosophy.md](references/platform-philosophy.md) — 플랫폼 7원칙 상세
+- [url-index.md](references/url-index.md) — 원문 URL 인덱스
+- 본 SKILL.md의 §토스 평가 / §문화 8원칙 / §플랫폼 7원칙 요약 표
+
+### Lane 간 통신 금지
+
+각 lane은 **같은 diff/코드를 받되, 자기 관점만** 답변한다. L1이 L4 결과를 보면 안 되고, L3이 L2에 의존하면 안 된다. 관점 독립성이 깨지면 fan-out의 의미가 사라진다 — "병렬 N 에이전트" 패턴의 본질은 **각 에이전트가 다른 에이전트 출력을 모르고** 자기 축만 본다는 것.
+
+### 안티패턴 → lane 빠른 매핑
+
+아래 "빠른 트리거 맵"은 lane-aware로 읽는다. 한 트리거가 여러 references를 호출하면 그 트리거는 cross-cutting — **가장 무거운 lane에 1차 보고**하고 나머지는 dedup 단계에서 머지.
+
+| 안티패턴 군 | 1차 lane |
+|---|---|
+| 매직 넘버, 부등호, 중첩 삼항, 인라인 핸들러, 이름 충돌, Boolean 네이밍, 숨은 부작용 | L1 |
+| props drilling, useEffect 다중, 디렉토리 분류, 환경 분기 산재, 과도한 DRY, 어댑터 누락 | L2 |
+| `<div onClick>`, 아이콘 버튼 무라벨, alt 누락, 커스텀 Modal/Tab/Switch, label 미연결 | L3 |
+| `useEffect` race, navigate inside effect, library 빌드/CI, 디자인 토큰 산재, Flat→Compound | L4 |
+| Form/Modal/Toggle "어떻게 만들지?", overlay-kit, query key factory, RSC hydration | L5 |
+
 ## 빠른 트리거 맵 (코드 → 원칙 → 파일)
 
 리뷰 중 아래 패턴이 보이면 해당 reference를 로드한다.
@@ -159,6 +198,51 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 1. **5가지 질문** — 가독성/예측/응집도/결합도/접근성 각각 점검.
 2. **관련 reference 참조** — 패턴이 애매하면 해당 파일 로드.
 3. **판단 근거 메모** — 트레이드오프가 있는 선택(중복 허용, 공통화 회피 등)은 리뷰 시 설명 가능하도록.
+
+### C. 병렬 리뷰 모드 (PR · 큰 diff · 채용 과제 전체)
+
+**활성화 트리거** — PR 리뷰 / `git diff` 50줄+ / "전반적으로 봐줘" / 채용 과제 제출 직전 셀프 리뷰. 단일 함수·50줄 미만 리뷰는 워크플로 A가 더 효율적이다.
+
+**1. 활성 lane 결정**
+
+변경 파일을 스캔해 lane을 켠다.
+
+| 감지 | 켜는 lane |
+|---|---|
+| 항상 | L1, L2, L5 |
+| `*.tsx`/`*.jsx` 또는 JSX 마크업 | + L3 |
+| React hook (`use*`) · `package.json` publish 설정 · 디자인 토큰 정의 | + L4 |
+
+**2. Task 도구로 lane 병렬 dispatch (가용 시 권장)**
+
+각 활성 lane을 별도 Task로 동시에 띄운다.
+
+```
+각 lane Task =
+  system: "당신은 toss-FF의 {lane} 관점만 본다. 다른 관점은 무시한다."
+  context: §Lane 분할의 매핑표가 정해준 references/*.md 만
+  input: 동일 diff 또는 변경 파일 전체
+  output (JSON): {
+    findings: [{ file, line, severity:"MUST|SHOULD|NIT",
+                 lane, principle, before, after, citation_url? }]
+  }
+```
+
+**3. Aggregator (코디네이터 직렬 수행)**
+
+- 같은 `file:line`의 findings dedup — 가장 강한 severity + 가장 짧은 citation 1개만 남긴다
+- severity → file → line 순 정렬
+- 본문은 §출력 형식의 단일 finding 포맷으로 통일
+- lane 간 disagreement(같은 코드를 두 lane이 정반대로 평가)는 별도 섹션으로 표기 — 자동 머지하지 않는다
+
+**4. Task 미가용 환경 fallback**
+
+직렬 다회 호출. 1회당 references는 1 lane만 컨텍스트에 두고 같은 diff에 대해 N번 묻는다. 토큰은 N배지만 관점 오염은 막힌다. diff가 작으면 워크플로 A로 떨어뜨리는 게 합리적.
+
+**5. 확장 lane (선택, 항상 활성화 X)**
+
+- `~/.claude/review-extensions/*.md` 같은 사용자 커스텀 규칙이 있으면 추가 lane으로 자동 등록
+- `codex:rescue` 가용 시 동일 diff를 Codex에 같은 schema로 요청 — 모델 간 disagree 항목만 별도 표시
 
 ## 통합 체크리스트
 
