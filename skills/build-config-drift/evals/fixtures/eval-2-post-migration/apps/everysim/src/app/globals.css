@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@plugin 'tailwindcss-animate';
+
+@theme {
+  --color-brand: oklch(0.6 0.2 30);
+  --color-slate-100: oklch(0.9677 0.0074 260);
+}
+
+@custom-variant dark (&:is(.dark *));

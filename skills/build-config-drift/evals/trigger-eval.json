@@ -1,0 +1,82 @@
+[
+  {
+    "query": "next dev 띄우면 globals.css 에서 'Can't resolve shadcn/tailwind.css' 에러 떠. 근데 npm run lint 통과, npm test 379/379 pass, next build 도 성공이야. apps/everysim 은 monorepo 의 한 워크스페이스 (npm workspaces) 이고 Next 16.2.3 + Tailwind v4 + Turbopack 인데 머지 직후 처음 dev 띄우다 발견함.",
+    "should_trigger": true
+  },
+  {
+    "query": "방금 `npx @tailwindcss/upgrade` 돌려서 v3.4 → v4.2 마이그레이션 끝냈는데, 도구가 자동으로 안 지운 옛날 형식 파일이나 deps 잔재 점검하고 PR 만들기 전에 알려줘.",
+    "should_trigger": true
+  },
+  {
+    "query": "이 PR 가 libs/foo/package.json 에서 devDeps 14개 떼어내는 청소야. libs/foo/src 안에서 import grep 다 돌려서 사용 안 한다 확인했고 lint/test/install 다 통과해. 머지해도 안전한지 봐줘.",
+    "should_trigger": true
+  },
+  {
+    "query": "어제부터 next dev 가 안 떠. 다른 팀원은 잘 된다고 하고, npm ci 다시 돌려도 똑같아. next build 는 잘 되는데 dev 만 깨짐. 머지 직후부터 이상해.",
+    "should_trigger": true
+  },
+  {
+    "query": "apps/web/ 디렉토리에 postcss.config.cjs 랑 postcss.config.mjs 둘 다 있는데 하나는 tailwindcss + autoprefixer 쓰고 다른 하나는 @tailwindcss/postcss 만 등록돼있어. 어느 게 진짜 활성인지 어떻게 알지?",
+    "should_trigger": true
+  },
+  {
+    "query": "node_modules 에 shadcn 이 있는데 우리 monorepo 어느 package.json 에도 \"shadcn\" 등록이 없어. 그동안 globals.css 의 @import 'shadcn/tailwind.css' 가 풀렸는데 갑자기 안 풀려. hoisting 문제인가?",
+    "should_trigger": true
+  },
+  {
+    "query": "PR 설명에 '수동 브라우저 스모크 테스트는 사용자 펜딩' 메모만 있고 그대로 머지된 PR 인데 2주 후 누가 dev 띄우려다 빨간색이 떴어. 비슷한 부채가 다른 곳에도 있을까봐 점검하고 싶어.",
+    "should_trigger": true
+  },
+  {
+    "query": "jscodeshift 로 React 17 → 19 codemod 돌렸어. lint/test 다 통과는 하는데 자동 도구가 add 만 하고 옛 형식 안 지우는 패턴 알아서, 잔재 검사 한번 하고 싶어.",
+    "should_trigger": true
+  },
+  {
+    "query": "babel.config.js 가 사라진 .babelrc.json 을 extends 하려고 시도하고 있어. 어째선지 빌드는 통과하지만 dev 에서만 가끔 transform 이 이상한 거 같아.",
+    "should_trigger": true
+  },
+  {
+    "query": "monorepo 에서 한 워크스페이스의 package.json 의 dep 를 정리할 때 안전하게 떼어내는 방법 알려줘. 다른 워크스페이스 가 silently 의존 중이면 어떻게 잡지?",
+    "should_trigger": true
+  },
+  {
+    "query": "useEffect 안에서 setState 호출했더니 무한 렌더 발생해. 어떻게 고치지? 의존성 배열은 [props.id] 인데 그 props.id 가 매 렌더마다 새 객체로 와.",
+    "should_trigger": false
+  },
+  {
+    "query": "tsc --noEmit 에서 'Property foo does not exist on type Bar' 떠. Bar 타입은 어디서 정의됐고 어떻게 확장하지?",
+    "should_trigger": false
+  },
+  {
+    "query": "next build 가 5분 넘게 걸려. webpack 캐시 가 미스되는 듯. 빌드 시간 줄이는 법 추천해줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "vercel 에 deploy 했더니 환경변수가 누락이라고 나와. local .env.local 에는 있는데 production 에선 안 보여. vercel 대시보드 어디서 설정?",
+    "should_trigger": false
+  },
+  {
+    "query": "Tailwind v4 의 @theme 블록 안에서 dark 모드 변수를 정의하려는데 어떻게 작성해야 prefers-color-scheme 자동 매칭되지? 예시 보여줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "vitest 가 'Cannot find module from-package' 라고 fail. 디버그 해보니 그냥 import path 의 typo 였어. 고치는 김에 비슷한 패턴 자주 나오는데 자동 검출할 방법 있나?",
+    "should_trigger": false
+  },
+  {
+    "query": "이 모노레포 처음 시작하는데 npm workspaces 와 pnpm workspaces 중 뭘 쓰는 게 좋을까? 트레이드오프가 궁금해.",
+    "should_trigger": false
+  },
+  {
+    "query": "[auth][error] TypeError: fetch failed 가 떠서 silent SSO 가 안 됨. dev 환경 keycloak 컨테이너 안 떠있는 거 같은데 docker-compose 로 띄우는 법 알려줘.",
+    "should_trigger": false
+  },
+  {
+    "query": "eslint.config.mjs 만 있는 프로젝트인데 prettier rule 을 추가해서 trailing comma 강제하고 싶어. 현재 config 에 어떻게 끼워 넣지?",
+    "should_trigger": false
+  },
+  {
+    "query": "production 에서 Tailwind 의 max-w-md 가 안 먹는 것 같음. 클래스는 잘 출력되는데 실제 너비 적용이 안 됨. 디버그 어디부터?",
+    "should_trigger": false
+  }
+]

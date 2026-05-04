@@ -1,0 +1,23 @@
+{
+  "skill_name": "build-config-drift",
+  "evals": [
+    {
+      "id": 0,
+      "name": "dev-broken-static-pass",
+      "prompt": "next dev 띄우면 globals.css 의 @import 'shadcn/tailwind.css' 에서 'Can't resolve' 에러로 죽어. 근데 npm run lint 통과하고 npm test 도 379개 다 pass, npm run build 도 통과해. 머지 전 검증 다 초록색이었는데 dev 만 깨져. apps/everysim 은 npm workspaces monorepo 의 한 패키지고 Next.js 16.2.3 + Tailwind v4 + Turbopack 환경이야. 어디서부터 봐야 할지. 진단해서 4섹션 (Drift / Trigger / Consumer / Smoke) 으로 정리해주고 어떤 commit 들로 분리해서 fix 할지 알려줘.",
+      "files": ["evals/fixtures/eval-1-dev-broken/"]
+    },
+    {
+      "id": 1,
+      "name": "post-migration-audit",
+      "prompt": "방금 `npx @tailwindcss/upgrade` 돌려서 Tailwind v3.4 → v4.2 마이그레이션 끝냈어. 도구가 apps/everysim/postcss.config.mjs 를 새로 만들고 globals.css 도 v4 syntax (@theme/@custom-variant/@plugin) 로 바꿨고 tailwind.config.ts 는 삭제됐어. lint/test 다 통과. PR 올리기 전에 자동 도구가 안 봐줄 만한 잔재 같은 거 점검할 거 있을까? 4섹션 (Drift / Trigger / Consumer / Smoke) 으로 정리해줘.",
+      "files": ["evals/fixtures/eval-2-post-migration/"]
+    },
+    {
+      "id": 2,
+      "name": "deps-cleanup-pr-review",
+      "prompt": "libs/workbench/package.json 에서 사용 안 하는 devDeps 정리하는 청소 PR 리뷰해줘. libs/workbench/src 안에서 import grep 다 돌려서 사용 안 하는 거 확인했고 npm install 후 lint/test 다 통과해. monorepo (npm workspaces) 환경이라 root node_modules 도 있는데 머지해도 안전할까? 4섹션 (Drift / Trigger / Consumer / Smoke) 으로 정리해줘.",
+      "files": ["evals/fixtures/eval-3-deps-cleanup/"]
+    }
+  ]
+}

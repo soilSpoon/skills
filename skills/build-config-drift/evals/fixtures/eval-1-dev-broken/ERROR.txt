@@ -1,0 +1,15 @@
+# next dev 출력 (요약)
+
+▲ Next.js 16.2.3 (Turbopack)
+✓ Ready in 278ms
+
+⨯ ./apps/everysim/src/app/globals.css
+Error evaluating Node.js code
+CssSyntaxError: tailwindcss: /workspaces/proj/apps/everysim/src/app/globals.css:2:1:
+  Can't resolve 'shadcn/tailwind.css' in '/workspaces/proj/apps/everysim/src/app'
+    [at Input.error (turbopack:///[project]/node_modules/postcss/lib/input.js:135:16)]
+    [at Object.Once (/workspaces/proj/node_modules/@tailwindcss/postcss/dist/index.js:10:6913)]
+
+# npm run lint  → 0 errors, 0 warnings
+# npm run test  → 379 passed (379)
+# npm run build → success

@@ -1,0 +1,19 @@
+# Tailwind CSS v3.4 → v4.2 자동 마이그레이션
+
+방금 다음 명령으로 마이그레이션 완료:
+  npx @tailwindcss/upgrade
+
+도구가 한 일:
+- apps/everysim/postcss.config.mjs 신규 생성 (@tailwindcss/postcss 등록)
+- apps/everysim/src/app/globals.css 를 v4 syntax 로 변환
+  (@theme 블록 / @custom-variant / @plugin 'tailwindcss-animate')
+- apps/everysim/tailwind.config.ts 삭제
+
+# 검증 결과
+npm run lint   → 0 errors, 0 warnings
+npm test       → 379 passed (379)
+npm run build  → success
+
+# 미확인
+- 아직 next dev 띄워보지 않음
+- PR 올리기 전 자동 도구가 안 봐줄 만한 잔재 점검 필요

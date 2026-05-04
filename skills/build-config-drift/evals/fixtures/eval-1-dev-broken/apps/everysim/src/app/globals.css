@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@import 'shadcn/tailwind.css';
+@plugin 'tailwindcss-animate';
+
+@theme {
+  --color-brand: oklch(0.6 0.2 30);
+}

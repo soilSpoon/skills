@@ -1,0 +1,16 @@
+{
+  "name": "@dronerush/workbench",
+  "version": "2.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "devDependencies": {
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^19.0.0",
+    "@types/three": "^0.169.0",
+    "react": "^19.0.0",
+    "shadcn": "^4.2.0",
+    "three": "^0.169.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.0"
+  }
+}

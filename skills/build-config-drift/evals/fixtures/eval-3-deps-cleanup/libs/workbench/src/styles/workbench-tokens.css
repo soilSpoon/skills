@@ -1,0 +1,4 @@
+/* Workbench 자체 스타일은 host 측 globals.css 가 흡수 */
+@theme {
+  --color-workbench-bg: oklch(0.95 0 0);
+}

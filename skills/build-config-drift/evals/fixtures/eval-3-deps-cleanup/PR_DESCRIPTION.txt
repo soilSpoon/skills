@@ -1,0 +1,21 @@
+# PR — chore(workbench): 사용 안 하는 devDeps 정리
+
+libs/workbench 의 SDK 재구성으로 더 이상 사용하지 않는 devDeps 를
+package.json 에서 떼어내는 청소 PR.
+
+# 떼어내려는 devDeps (14개 중 일부)
+- @types/three  (3D 렌더 의존성 외부화로 제거)
+- three          (위와 동일)
+- shadcn         (UI 컴포넌트가 모두 host 측으로 이동)
+- @testing-library/react  (테스트 격리 후 vitest-only)
+- ...
+
+# 검증
+- libs/workbench/src 안에서 import grep:
+    grep -rn "from 'three'" libs/workbench/src       → 0 hits
+    grep -rn "from 'shadcn'" libs/workbench/src      → 0 hits
+    grep -rn "from '@testing-library" libs/workbench → 0 hits
+- npm install / npm run lint / npm test 모두 통과
+- libs/workbench 자체 빌드 통과
+
+머지해도 안전한가?
