@@ -8,8 +8,10 @@
 4. 가설이 도달했는지 검증
 5. 모순 신뢰 — 실험 먼저 의심
 6. 최근 변경 + 두 path 대조
-7. 통합 체크리스트
-8. 메타: 메인테이너 한 줄 질문
+7. Mechanism trace > blind variation
+8. Variable enumeration & causal mapping (모든 원칙의 prerequisite)
+9. 통합 체크리스트
+10. 메타: 메인테이너 한 줄 질문
 
 각 원칙은 [SKILL.md](../SKILL.md)의 §워크플로 5단계 중 어느 단계에서 발동하는지 표시.
 
@@ -144,6 +146,20 @@ invariant: 어떤 시점에 항상 참이어야 하는 명제. 함수 진입/이
 - macro만 하면 "통과한 것 같은데 사실은 그 path를 안 탐" (#4 도달 검증 안 한 경우, 이번 사례에서 발생)
 - 둘 다 해야 진짜 증명이다.
 
+### 함정: 변형 공간이 좁으면 N round 가 모두 같은 답을 반복
+
+A/B 가 효력을 발휘하려면 *변형 공간이 충분히 넓어야* 한다. 흔한 실패: 표면적 변수 (구조 크기, 메서드 개수, 옵션 flag) 만 enumerate 하고 *암묵적 변수* (호출/링크 순서, file/TU 분리 boundary, lazy vs eager, format combo, 시점 결정) 는 무시. 같은 axis 에서 N 점 swap 해도 답은 그 axis 가 결정 변수일 때만 나온다.
+
+- [ ] 변형 공간 정의 시: **표면 변수 + 암묵 변수** 둘 다 list. 암묵 변수 후보:
+  - 빌드/링크 순서 (eager vs lazy, archive 분리)
+  - file/TU boundary (분리 단위가 결정에 영향)
+  - format combo (LTO bitcode vs native object 같은 cross-format)
+  - lifecycle/시점 (init 시점, lazy-resolve, JIT vs AOT)
+  - scope (whole-program vs per-TU)
+- [ ] 5+ round 변형이 모두 0 결과면 *변형 axis 자체* 를 의심 — 다른 axis 로 옮기거나 #7 mechanism trace 로 전환
+
+이번 OCCT/wasm-ld 사례: 21+ round 동안 vtable size, RTTI, multi-level inheritance, 30 forward types 등 *표면 변수* 만 변형. 결정적 변수는 *암묵* 했던 link order (eager driver TU + lazy base archive). axis 자체를 못 짚어서 부피로 회피.
+
 ---
 
 ## 4. 가설이 도달했는지 검증 (단계 4)
@@ -229,6 +245,15 @@ invariant: 어떤 시점에 항상 참이어야 하는 명제. 함수 진입/이
 - 모든 결과를 의심하면 progress 없음. 균형: *사전지식과 어긋날 때만* 즉시 셋업 의심.
 - 사전지식이 없을 때 (낯선 코드베이스) 는 모순 신호가 약하다 — 이때 #6의 path 대조가 사전지식을 빠르게 만들어준다.
 
+### "한계 도달" 결론도 모순 신호
+
+자기가 *"한계에 부딪쳤다"* 고 결론짓는 순간이 가장 중요한 모순 신호다. 표준 패턴 (C++ vtable, ABI, archive linking, file format protocol 등) 으로 작동하는 시스템에서 *generic 합성이 불가능하다* 는 결론은 거의 항상 잘못이다. 표준 패턴이면 정의상 흉내 가능 — 못 흉내냈다는 건 *내가 결정 변수를 못 짚은 것*.
+
+- [ ] "X-specific 이라 generic 으로 안 됨" 결론 직전 — *내가 시도한 변형 공간 list* 을 적고, *내가 안 건드린 axis* 가 무엇인지 1분 self-check
+- [ ] "시간 한도라 한계" — 진짜 한계인지, 다음 *결정적 단일 step* 이 보이는지 self-check. 결정적 단일 step 이 보이면 그건 한계 아니고 회피.
+
+이번 OCCT/wasm-ld 사례: "21+ round 모두 0 → OCCT-specific 결정" 결론 직전. 사용자가 "표준 C++ 인데 흉내 가능해야" 한 줄이 모순 신호 catch → mechanism trace 로 전환 → 1.5h 안에 답.
+
 ---
 
 ## 6. 최근 변경 + 두 path 대조 (단계 5의 cross-check)
@@ -274,7 +299,255 @@ git log -S '<changed signature or symbol>' --since='6 months ago'
 
 ---
 
-## 7. 통합 체크리스트
+## 7. Mechanism trace > blind variation (단계 3·4 의 우선순위 결정)
+
+### 정의
+
+**source 가 알려져 있으면 표면 변형 N번 시도하기 전에 직접 mechanism trace 가 빠르다.** OSS toolchain (LLVM, V8, CPython, lld, glibc 등) 처럼 source 접근 가능한 시스템에서, *어느 단계에서 분기되는지* `errs() << ` 한 줄 patch + rebuild + dump 면 결정적 답. blind 변형은 답을 향한 우회로 — variation space 가 정확히 정의됐을 때만 효율적.
+
+### 발동 신호
+
+- A/B 변형 5+ round 모두 0 결과 — 변형 공간이 좁거나 axis 가 잘못
+- "X-specific 이라 generic 으로 안 됨" 결론 직전
+- "한계" / "여기까지" / "더 이상 시도할 게 없음" 결론 직전
+- *source 가 알려진* 시스템인데 변형 시도만 반복
+- "21 round 시도했으니 충분" — 부피로 노력 합리화
+
+### 4 anti-pattern (variation 차원의 회피 패턴 — 변수 차원의 enumeration 패턴은 #8 참조)
+
+#### A. Mechanism trace 미루기
+
+source 알면서 *간접 변형* 만 시도. trace 가 결정적인 경우에도 reproducer 만 굴림.
+
+```diff
+- # 21 round 동안 Handle template, vtable size, multi-driver 변형
+- # 모두 0 결과 → "한계" 결론
++ # 1 round: lld/wasm/SymbolTable.cpp 의 handleSymbolVariants 에 errs() 패치 + rebuild
++ # workbench dump → "sig=()->void in bitcode side, sig=(i64,i64)->void in native side"
++ # mechanism 식별 → minimal 합성 (1.5h 안)
+```
+
+#### B. "X-specific" 결론 빠르게
+
+표준 패턴 (vtable, ABI, linking, format spec) 이면 정의상 흉내 가능. *흉내 못 했다 = 내가 결정 변수를 못 짚었다* 가 default. "이 시스템 specific 해서" 라는 결론은 게으른 답.
+
+```diff
+- # 21 round 모두 0 → OCCT 가 unique 한 무엇이 있다고 결론
++ # 21 round 모두 0 → 내가 본 변형 axis 가 잘못. 표준 패턴이면 흉내 가능해야 함.
++ # → mechanism trace 로 결정 변수 식별
+```
+
+> 변형 axis 자체가 좁았던 *진단* 은 #8 anti-pattern A (변수로 인식 안 함) — variable enumeration 차원에서 다룸. #7 의 #B 는 *결론 받아들이기 전 self-check* 에 초점.
+
+#### C. 외부 push 없이 멈춤 (구 D)
+
+"한계 도달" 결론은 *진짜 한계인지 게으름인지* self-check. 다음 *단일 결정적 step* 이 보이면 한계 아니고 회피. 사용자/외부 push 없이도 그 step 에 진입할 수 있어야 함.
+
+```diff
+- # "21 round 모두 0. 시간 한도. 한계." → 사용자에게 보고
+- # 사용자: "OCCT-free 여야 돼"
+- # → 다시 시도
+- # 사용자가 push 한 만큼만 진전, push 안 했으면 그만뒀을 것
++ # "21 round 모두 0" 시점에 self-check:
++ # - source 접근 가능한가? → mechanism trace
++ # - "X-specific" 결론은 합리적인가? → 표준 패턴이면 의심
++ # - 다음 단일 결정적 step 이 보이는가? → 보이면 그게 한계 아님
++ # 위 self-check 후에도 step 안 보이면 *그때* 진짜 한계
+```
+
+#### D. 부피로 노력 합리화
+
+"21 round 시도" 같은 부피로 *충분히 했다* 결론. 그러나 *같은 변형 공간 내 N 점* 은 회피의 다른 형태. *N 다른 axis* 가 아니다.
+
+```diff
+- # "Handle template 6 변형 + vtable size 5 변형 + multi-driver 4 변형 = 15 round"
+- # → 부피 충분, 한계 결론
++ # 15 round 의 axis 분석:
++ # - 모두 'derived TU 의 surface composition' axis
++ # - 안 건드린 axis: link order, archive composition, format combo
++ # → 다른 axis 로 1 round 시도
+```
+
+> 변수와 값 혼동 (vtable size 4/30/31 = 1 axis 의 3 값) 의 detail 은 #8 anti-pattern B 참조. #7 의 #D 는 *부피로 self-justify* 하는 행동에 초점.
+
+### 적용 방법
+
+- [ ] **5+ round 0 trigger** — variation 5+ round 모두 0 이면 *axis 자체* 의심. 다음 round 전 *변형 axis list* 적고 *안 건드린 axis* enumerate
+- [ ] **Mechanism trace 임계** — source 가 알려졌고 5+ variation round 0 이면 *direct trace 로 전환*. trace 비용 (clone + build + patch + rebuild) 보다 *N 추가 round* 가 비싼지 비교
+- [ ] **"X-specific" 결론 self-check** — 그 결론 적기 전에 *표준 패턴 list* 와 비교. 표준 패턴이면 흉내 가능 → 내가 못 짚은 변수 의심
+- [ ] **"한계" 결론 self-check** — *다음 단일 결정적 step* 이 보이면 한계 아님. 안 보이면 한계
+- [ ] **부피 vs 다양성** — N round 의 axis 분포. 같은 axis 면 다른 axis 로 이동
+
+### Mechanism trace 의 전형적 비용 vs 가치
+
+| 시스템 | clone | build | dump patch | total |
+|---|---|---|---|---|
+| LLVM/lld (sparse checkout) | 5분 | 30분 | 1줄 errs() | ~45분 |
+| V8 | 30분 | 1시간 | DEBUG flag | ~1.5시간 |
+| CPython | 5분 | 3분 | printf | ~10분 |
+| Linux kernel module | 5분 | 30분 | printk | ~45분 |
+
+비교: 1 variation round = 5–30분 (build + run + analyze). **5+ round 가 0 trigger 면 mechanism trace 가 항상 더 빠름**.
+
+### 트레이드오프
+
+- Mechanism trace 가 항상 가능하지 않음. proprietary system, source unavailable, build infrastructure 없을 때 fallback to variation
+- 그러나 *대부분 의 OSS 환경* 에서는 trace 가능. clone + build 가 *생각보다* 빠름 (LLVM lld만은 1시간 안에 가능)
+- "변형 더 시도" vs "trace 시도" 결정 시 *비용 비교* 명시화 — 막연히 "변형이 더 쉬워 보이는데" 가 아니라 시간 추정
+
+### 외부 push 없이도 진행할 의지
+
+이 워크플로 자체가 anti-pattern 인 것 — *내가 한계 결론* → *사용자가 push* → *다시 시도* → *답 발견*. 사용자 push 가 매번 필요하면 워크플로 실패. 진짜 mechanism trace 가 *내 default move* 가 되어야 한다. self-check 항목:
+- "이 결론 (한계/X-specific) 을 사용자가 push 안 했으면 받아들였을 텐가?"
+- "내가 *지금* 식별 가능한 다음 결정적 step 이 있는가?"
+- 답 yes 면 그 step 진행. 답 no 면 진짜 한계.
+
+---
+
+## 8. Variable enumeration & causal mapping (단계 0 — 모든 원칙의 prerequisite)
+
+### 정의
+
+**분석 시작 전에 *시스템 동작에 영향 주는 변수* 를 명시적으로 enumerate 하고, 각 변수가 *어떤 mechanism 으로 trigger 에 영향 주는지* causal chain 가설을 1줄 적는다.** 매 round 마다 list 가 *완전한지* 의심한다.
+
+이 원칙은 #1–#7 모두의 prerequisite. invariant 도 *어떤 변수에 대한* invariant 인지, A/B 도 *어떤 변수* swap 인지, mechanism trace 도 *어느 변수가 결정적인지* 가설 위에 작동. variable list 자체가 부족하면 모든 다음 원칙이 헛돈다.
+
+### 발동 신호
+
+- 분석 시작 시점 — *항상* 1단계여야
+- variation 5+ round 0 결과 — list 자체 부족 의심 신호
+- "이 변수만 다르고 결과 같다" 결론 직전 — 못 본 변수 가능성
+- 새 system 분석 — 익숙하지 않을수록 list 빠뜨릴 위험
+
+### Variable taxonomy (8 카테고리)
+
+분석 시작 시 매 카테고리 훑어서 *변할 수 있는 것* 적기. 모르겠으면 "?" 로 적어둠 (그것도 진전).
+
+| 카테고리 | 예시 |
+|---|---|
+| **Surface** | 옵션 flag, 파라미터 값, 데이터 크기, 카운트 (vtable slot 수, method count) |
+| **Composition** | 클래스 계층, vtable layout, RTTI macro, type 구성 |
+| **Order** | call/dispatch 순서, init 순서, **link 순서**, build 순서, evaluation 순서 |
+| **Boundary** | file/TU 경계, 모듈 경계, **archive 경계**, namespace, scope 경계 |
+| **Format/medium** | **LTO bitcode vs native**, text vs binary, sync vs async, JSON vs binary protocol |
+| **Lifetime/timing** | **lazy vs eager**, JIT vs AOT, init 시점, scope (per-TU vs whole-program) |
+| **Linkage/visibility** | static vs dynamic, hidden vs default, weak vs strong, external vs internal |
+| **Environment** | OS, locale, time zone, hardware, env var, config |
+
+이번 OCCT case 에서 *13 round 모두 Surface + Composition* 만 변형. **Order (link 순서) + Boundary (archive 분리) + Format (LTO bitcode ↔ native) + Timing (lazy vs eager)** 가 결정적이었지만 변수 list 에 *없었다*.
+
+### Causal chain 가설 (변수 → mechanism → 결과)
+
+각 변수마다 *이 변수가 어떤 mechanism 으로 어떤 결과* 인지 1줄 가설. 가설 없이 변형하면 결과 0 일 때 *왜 0 인지* 추론 불가.
+
+**예 (OCCT case 의 정답 변수)**:
+- 변수: `link order` (eager driver TU + lazy base archive)
+- Mechanism: SymbolTable 가 placeholder undefined sig 를 *first non-null sig* (eager native wasm) 로 attach → 후에 다른 sig (lazy archive) add 시 mismatch → variant
+- 결과: variant 30개 → handleSymbolVariants → 30 mismatch warnings
+
+이런 mapping 이 있으면 변형 결과 해석 가능. 없으면 *값만 던지고 받기*.
+
+### 5 anti-pattern (이번 OCCT case 에서 직접 발현)
+
+#### A. 변수로 인식 안 함 (Unrecognized variable)
+
+13 round 동안 link order, archive composition 자체가 *변수 list 에 없었다*. enumerate 못 한 변수는 시도 못 함.
+
+```diff
+- # 변수 list: vtable size, RTTI, inheritance level, forward type, driver count
+- # → Surface + Composition 만 enumerate
++ # 변수 list 확장:
++ # - Surface: vtable size, RTTI, ...
++ # - Order: link order, init order
++ # - Boundary: archive composition, file/TU split
++ # - Format: LTO bitcode ↔ native cross-format
++ # - Timing: lazy vs eager linking
++ # → Order axis 에서 trigger 발견
+```
+
+#### B. 변수와 값 혼동
+
+"vtable size 4/30/31 변형" 은 *변수 1개의 N 값*. 별개 변수가 N 개가 아님. 부피 N 으로 보이지만 실제로는 axis 1.
+
+```diff
+- # 13 variations = "13 variables" 로 자기 합리화
++ # 13 variations = "1 axis 의 13 점" — diversity 없음
++ # axis 다양성 = 카테고리 다양성, 값 다양성 아님
+```
+
+#### C. Causal mapping 부재
+
+"vtable size 늘리면 trigger 될지도" — 가설 없는 시도. 늘려서 0 결과 시 *왜 0 인지* 추론 못 함.
+
+```diff
+- # "vtable size 30 으로 늘려보자" → 0 → "더 늘려보자"
++ # 가설: vtable size 가 trigger 라면 mechanism 은 ?
++ # → 못 적으면 그 변형 무의미. mechanism 가설 없는 variation = blind.
+```
+
+#### D. 변수 list 갱신 안 함
+
+5 round 0 결과 = list 부족 의심 신호. 그런데 같은 list 로 6, 7, 8 round. 새 결과를 *list 의 정합성 evidence* 로 쓰지 않고 *값 fail evidence* 로만.
+
+```diff
+- # Round 5 0 → "vtable size 더 늘려보자" (같은 list)
+- # Round 10 0 → "RTTI 추가" (같은 list)
++ # Round 5 0 → variable list 자체 의심
++ # → taxonomy 8 카테고리 재훑기 → 빠뜨린 카테고리 발견
+```
+
+#### E. Self-doubt 부재
+
+"내가 본 변수가 진짜 다인가?" 자기점검 없음. 사용자/외부 push 가 self-doubt 강제 → "이 결론 push 없이도 받아들였을지?" 항상 self-check.
+
+### Self-doubt protocol
+
+N round 0 결과 시점에 다음을 *적어서* 자기점검 (속으로만 하면 회피 쉬움):
+
+1. **내가 변형한 axis 들** (카테고리별): ___
+2. **taxonomy 8 카테고리 중 안 건드린 것**: ___
+3. **시스템에 본질적으로 영향 주는데 변수로 인식 안 한 것**: ___ (예: 이번 OCCT 의 link order)
+4. **다른 system 의 비슷한 bug case 에서 결정적이었던 변수**: ___ (검색/회상)
+5. **외부 push 없이도 "내 변수 list 가 완전" 이라고 결론지을 자신** 있나: y/n
+
+### 적용 방법
+
+- [ ] 분석 시작 시 *variable taxonomy* 8 카테고리 훑기 (10분)
+- [ ] 각 카테고리에서 *변할 수 있는 것* 적기 (모르면 "?")
+- [ ] 각 변수에 *causal chain 가설* 1줄 (변수 → mechanism → 결과)
+- [ ] 매 5 round 마다 list 재검토 — 새 변수 후보 brainstorm
+- [ ] N round 0 결과 시 self-doubt protocol 5문항 *적어서* 답하기
+
+### 트레이드오프
+
+- variable enumeration 10–30분. trivial bug 에 과잉.
+- 그러나 *5+ round 0 trigger* 시점에서 enumeration 비용 < N 추가 round. 거의 모든 serious bug 에 worth.
+- taxonomy 8 카테고리가 *모든* domain 에 정확히 맞지는 않음. 익숙하지 않은 domain 이면 *해당 domain 의 taxonomy* 학습 우선 (예: networking bug → protocol/timing/topology, ML bug → data/model/optimizer/hyperparameter).
+
+### 이번 OCCT 사례 — 변수 list 누락 분석
+
+| Round | 변형 변수 | Category | 결과 |
+|---|---|---|---|
+| 1–6 | Handle template 모양 (trivial vs non-trivial) | Surface/Composition | 0 |
+| 7–8 | vtable size (4, 30, 31) | Surface | 0 |
+| 9 | RTTI macro 유무 | Composition | 0 |
+| 10 | multi-level inheritance | Composition | 0 |
+| 11 | 30 different forward types | Composition | 0 |
+| 12 | 17 driver classes | Composition | 0 |
+| 13 | Forward declared T + dtor anchor | Composition | 0 |
+
+13 round 의 axis 분포: *Surface 2, Composition 11*. **Order, Boundary, Format, Timing, Linkage = 0**.
+
+자가 점검을 round 5 시점에 했다면:
+- "내가 본 5 변수 다 surface/composition. order/boundary/format/timing 카테고리 0 — 누락"
+- → round 6 부터 *order axis* (link sequence) 시도
+- → 1 round 에 답
+
+실제로는 13 round 후 사용자 push (외부 self-doubt 강제) → trace 후 발견. **anti-pattern E (self-doubt 부재)** 가 가장 비용 컸다.
+
+---
+
+## 9. 통합 체크리스트
 
 조사를 끝맺기 전에 점검. 라벨은 최소 엄격도. (SKILL.md 본문과 동일.)
 
@@ -304,9 +577,23 @@ git log -S '<changed signature or symbol>' --since='6 months ago'
 - `[SHOULD]` 최근 6개월 git log에서 의심 영역 변경 commit을 봤는가
 - `[NIT]` 모르겠으면 메인테이너에게 reduced repro와 함께 한 줄 질문
 
+**Mechanism trace 우선순위 (#7)**
+- `[MUST]` 5+ variation round 가 0 trigger 면 변형 axis list 적고 안 건드린 axis enumerate
+- `[MUST]` source 접근 가능한 시스템에서 5+ round 0 이면 *direct mechanism trace 시작* (errs() 패치 + rebuild + dump)
+- `[MUST]` "X-specific" 또는 "한계" 결론 직전 *다음 단일 결정적 step* 이 있는지 self-check
+- `[SHOULD]` 변형 axis 가 표면 변수 (size, count) 만이 아니라 암묵 변수 (link order, file boundary, format combo, 시점) 도 포함하는가
+- `[SHOULD]` "사용자 push 없이도 받아들였을 결론인가" self-check
+
+**Variable enumeration & causal mapping (#8)**
+- `[MUST]` 분석 시작 시 *variable taxonomy* 8 카테고리 (Surface / Composition / Order / Boundary / Format / Timing / Linkage / Environment) 훑었는가
+- `[MUST]` 각 변수에 *causal chain 가설* (변수 → mechanism → 결과) 1줄 적었는가
+- `[MUST]` N round 0 결과 시 *self-doubt protocol 5문항* 적어서 답했는가 (속으로만 ❌)
+- `[SHOULD]` 변형 부피가 *axis 다양성* 인지 *값 다양성* 인지 점검 (anti-pattern B: 변수와 값 혼동)
+- `[SHOULD]` 5 round 마다 변수 list 재검토하고 새 후보 brainstorm 했는가
+
 ---
 
-## 8. 메타: 메인테이너 한 줄 질문
+## 10. 메타: 메인테이너 한 줄 질문
 
 PR 만들기 전 — 
 

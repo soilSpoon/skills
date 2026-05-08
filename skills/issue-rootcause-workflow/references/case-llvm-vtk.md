@@ -1,6 +1,8 @@
 # Case Study: LLVM PR #194184 검증 (VTK 9.6.1 standardized-EH crash)
 
-이 케이스는 [SKILL.md](../SKILL.md)의 6원칙 워크플로가 어떤 실제 흐름에서 도출됐는지를 보여준다. 각 원칙이 어느 turning point에서 발동했는지 시간순으로 매핑.
+> **자매 case**: [case-occt-wasm-ld.md](case-occt-wasm-ld.md). 두 케이스 모두 *외부 push 없이 받아들였을 결론* 이라는 공통 anti-pattern; LLVM/VTK 는 #5 (모순 신뢰) 강조, OCCT 는 #7/#8 (mechanism trace, variable enumeration) 강조.
+
+이 케이스는 [SKILL.md](../SKILL.md)의 워크플로가 어떤 실제 흐름에서 도출됐는지를 보여준다. 각 원칙이 어느 turning point에서 발동했는지 시간순으로 매핑.
 
 ## 목차
 
