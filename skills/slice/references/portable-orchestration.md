@@ -39,8 +39,8 @@ framework, layout). Run the measure command via shell yourself and record the ex
   silent behavior changes, interface drift, purpose gaps. Ask for structured JSON and validate it
   yourself — schema discipline by convention when the harness can't force it.
 - **Repair**: one attempt; continue (max 3) only while the issue count strictly shrinks.
-  Two consecutive untrusted leaves → ABORT the unit and surface it: the approach failed,
-  not the leaf.
+  3 consecutive untrusted leaves → ABORT the unit and surface it: the approach failed,
+  not the leaf (`MAX_UNTRUSTED_STREAK = 3` in the engine; aligns with the repair-loop budget).
 
 **3. Integrate.** Run the FULL measure command yourself — the verdict comes from its exit code,
 not from a model's impression. Then the wiring audit: diff the run for new exported symbols and

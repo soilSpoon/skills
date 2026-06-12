@@ -145,12 +145,14 @@ the engine writes a deterministic lock (`rs-lock`) into the tree's REAL gitdir (
 excluded, isolated worktrees may run concurrently. A held lock aborts the run before any change;
 the lock is removed deterministically at the end. A crashed run leaves a stale lock — the front
 door clears it only after confirming no run is alive. Note this guards the *tree*, not the API
-quota: workflows also share one quota, so the front-door rule is **one workflow at a time**.
+quota: workflows also share one quota, so the front-door rule is **one workflow per working tree** (same tree excluded; isolated worktrees may run concurrently; quota burn is a separate concern managed by the owner).
 
 ### Git mode (reversibility + evidence as physics)
 Auto-on when the repo is under git. Per-leaf **two-hats commits**, **SHA-pinned baseline**
-(drift detection), untrusted leaves **reverted** (`git revert`, preserving history), and
-evidence = `git diff`. *Trust deposits survive an orchestrator crash because they're commits*
+(drift detection), untrusted leaves **reverted via `git reset --hard <leafStart>`** (conflict-free:
+captures the leaf's pre-state SHA before work begins, so the hard reset erases exactly this leaf's
+commits while preserving all sibling commits — replacing the old batch `git revert` which corrupted
+trees on interdependent commits; see Lesson 7), and evidence = `git diff`. *Trust deposits survive an orchestrator crash because they're commits*
 (proven — see [pitfalls-and-lessons.md](pitfalls-and-lessons.md)). The Baseliner now **must**
 capture `gitSha` for a git repo (a silent omission once disabled git mode entirely).
 
@@ -193,11 +195,19 @@ null-guarded**: baseline-null aborts before any change; assess-null defaults to 
 **verify-null = untrusted** (trust-correct); executor-null records a RED leaf and continues.
 A single rate-limit can no longer crash the whole run (it once did — see lessons).
 
+**Quota circuit breaker (`agentSafe`)**: a session/usage-limit error is not a one-off null —
+left alone it kills every subsequent agent serially. The breaker trips on the FIRST
+quota-shaped error string, OR on **3 consecutive nulls spanning ≥2 different call classes**
+(the class-gate is essential: the 3-lens heavy-verify loop produces 3 same-class nulls by
+design; only a cross-class streak signals session instability). Once tripped, `agentSafe`
+no-ops for all remaining agents; the run ends resumable instead of burning retries until
+the harness gives up.
+
 ## Anti-explosion backstops (deterministic, model-proof)
 `FLOOR` (depth cap → forced execute), `MAX_LEAVES`, `MAX_DISCOVERED`, `MAX_SPIKES`,
 convergence guard (a non-reducing slice → execute), budget gate, and `executedKeys` dedupe.
 Plus **run-level no-progress detection**: leaf-level guards bound one leaf, but nothing used to
-detect a run going *systemically* wrong — `MAX_UNTRUSTED_STREAK` consecutive reverted leaves
+detect a run going *systemically* wrong — `MAX_UNTRUSTED_STREAK` (= 3) consecutive reverted leaves
 (wrong decomposition / broken env / API trouble) now halts the unit and surfaces it in `aborts`
 instead of grinding the budget into more reverts. Every cap **logs when hit** (no silent truncation).
 
