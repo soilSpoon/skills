@@ -564,13 +564,22 @@ ${INV}`,
   if (groups) {
     const N = groups.indep.length;
     const wtPaths = groups.indep.map((_, i) => `${REPO}/.rs-wt/g${i}`);
-    const clearWorktrees = async (label) => {
+    const clearWorktrees = async (label, mergedOnly = false) => {
       for (let i = 0; i < N; i++) await sh(`git -C ${REPO} worktree remove --force ${wtPaths[i]} 2>/dev/null; true`, `${label}-rm:${i}`);
       await sh(`git -C ${REPO} worktree prune`, `${label}-prune`);
-      for (let i = 0; i < N; i++) await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`);
+      if (mergedOnly) {
+        const merged = await sh(`git -C ${REPO} branch --merged HEAD`, `${label}-merged-list`);
+        const mergedNames = (merged.stdout || "").split("\n").map((l) => l.trim().replace(/^\*\s*/, ""));
+        for (let i = 0; i < N; i++) {
+          if (mergedNames.includes(`rs/g${i}`))
+            await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`);
+        }
+      } else {
+        for (let i = 0; i < N; i++) await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`);
+      }
       await sh(`rm -rf ${REPO}/.rs-wt 2>/dev/null; true`, `${label}-rmdir`);
     };
-    await clearWorktrees("wt-pre");
+    await clearWorktrees("wt-pre", true);
     const paths = {};
     for (let i = 0; i < N; i++) {
       const r = await sh(`git -C ${REPO} worktree add -b rs/g${i} ${wtPaths[i]} ${BASE_SHA}`, `wt-add:${i}`);
@@ -596,33 +605,37 @@ Interface: ${s.interface}`, repo, 1, idx, true, s.kind, buildNoteFor(repo));
       if (r && r.done) done.push(...r.done);
     });
     phase("Coordinate");
-    let conflicts = 0;
-    for (let i = 0; i < N; i++) {
-      if (paths[i] == null) continue;
-      const m = await sh(`git -C ${REPO} merge --no-ff --no-edit rs/g${i}`, `merge:${i}`);
-      if (m.exitCode !== 0) {
-        conflicts++;
-        await agentSafe(
-          `${R_COORD}
+    if (QUOTA_HALT) {
+      log(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`);
+    } else {
+      let conflicts = 0;
+      for (let i = 0; i < N; i++) {
+        if (paths[i] == null) continue;
+        const m = await sh(`git -C ${REPO} merge --no-ff --no-edit rs/g${i}`, `merge:${i}`);
+        if (m.exitCode !== 0) {
+          conflicts++;
+          await agentSafe(
+            `${R_COORD}
 
 Repo: ${REPO}
 The deterministic \`git -C ${REPO} merge --no-ff rs/g${i}\` FAILED (conflict). Resolve ONLY this branch's conflict (slice "${groups.indep[i].desc}"), honoring both sides' intent, complete the merge commit, then confirm the tree builds.
 ${INV}`,
-          { phase: "Coordinate", label: `merge-conflict:${i}`, schema: VERDICT }
-        );
+            { phase: "Coordinate", label: `merge-conflict:${i}`, schema: VERDICT }
+          );
+        }
       }
-    }
-    const mergeRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "merge-fullsuite");
-    merge = await agentSafe(
-      `${R_VERIFY}
+      const mergeRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "merge-fullsuite");
+      merge = await agentSafe(
+        `${R_VERIFY}
 
 Repo: ${REPO}
 ${N} parallel branches were merged into the working branch (${conflicts} needed conflict resolution). The FULL measure command was JUST run DETERMINISTICALLY with exit=${mergeRun.exitCode} (${mergeRun.exitCode === 0 ? "GREEN" : "RED"}) — do NOT re-run it; JUDGE from that result whether every baseline invariant holds and NO slice's work was lost.
 ${INV}`,
-      { phase: "Coordinate", label: "merge-verify", schema: VERDICT }
-    );
-    log(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? "OK" : "ISSUES"}`);
-    await clearWorktrees("wt-post");
+        { phase: "Coordinate", label: "merge-verify", schema: VERDICT }
+      );
+      log(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? "OK" : "ISSUES"}`);
+      await clearWorktrees("wt-post");
+    }
     const all = groups.all, seq = groups.seq;
     const idxOf = (s) => all.indexOf(s), inSeq = new Set(seq.map(idxOf));
     const seqOrdered = [], placed = /* @__PURE__ */ new Set();
@@ -726,7 +739,7 @@ Judge from those counts — re-grep a symbol yourself ONLY when its count is amb
     ...integration && integration.purposeGap ? [integration.purposeGap] : []
   ];
   let briefing = null;
-  if (trusted.length) {
+  if (trusted.length && !QUOTA_HALT) {
     const ledgerForBriefing = done.map((d, j) => ({
       i: j,
       task: String(d.task).slice(0, 140),

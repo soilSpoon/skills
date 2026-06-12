@@ -42,7 +42,7 @@ export const isSh = (c) => {
   const r = c.opts.schema && c.opts.schema.required
   return Array.isArray(r) && r.length === 1 && r[0] === 'exitCode'
 }
-const has = (c, re) => re.test(c.opts.label || '')
+export const has = (c, re) => re.test(c.opts.label || '')
 
 // ---- canned role outputs (schema-complete) -----------------------------------
 export const FIX = {
@@ -105,3 +105,6 @@ export function dispatcher(over) {
 }
 
 export const ARGS = { task: 'fixture task — change one thing', repo: '/tmp/rs-fixture', maxDepth: 2 }
+// Parallel-mode args: opts into parallel worktrees + gitClean gate.
+// FIX.slices3 already has 3 independent:true slices — the Plan phase partition picks them up.
+export const ARGS_PARALLEL = { ...ARGS, parallel: true }

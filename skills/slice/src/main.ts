@@ -588,13 +588,26 @@ if (groups) {
   // Two-PHASE cleanup so `branch -D` is never blocked by a still-registered worktree (the cause of
   // a leaked rs/g* branch + empty .rs-wt/ seen in testing): remove ALL worktrees, prune the
   // registry, THEN delete the branches, THEN drop the now-empty .rs-wt/ parent. Leave nothing behind.
-  const clearWorktrees = async (label: string) => {
+  // A5: mergedOnly=true (wt-pre): only delete branches that are already merged — a branch that is NOT
+  // merged is live work from another run or a resume-in-progress; blindly -D-ing it destroys that work.
+  // wt-post never needs this guard (the branches were JUST merged by this run; --merged HEAD is trivially true).
+  const clearWorktrees = async (label: string, mergedOnly = false) => {
     for (let i = 0; i < N; i++) await sh(`git -C ${REPO} worktree remove --force ${wtPaths[i]} 2>/dev/null; true`, `${label}-rm:${i}`)
     await sh(`git -C ${REPO} worktree prune`, `${label}-prune`)
-    for (let i = 0; i < N; i++) await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`)
+    if (mergedOnly) {
+      // A5: query merged branches once, then -D only the subset that are already merged into HEAD.
+      const merged = await sh(`git -C ${REPO} branch --merged HEAD`, `${label}-merged-list`)
+      const mergedNames = (merged.stdout || '').split('\n').map(l => l.trim().replace(/^\*\s*/, ''))
+      for (let i = 0; i < N; i++) {
+        if (mergedNames.includes(`rs/g${i}`))
+          await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`)
+      }
+    } else {
+      for (let i = 0; i < N; i++) await sh(`git -C ${REPO} branch -D rs/g${i} 2>/dev/null; true`, `${label}-br:${i}`)
+    }
     await sh(`rm -rf ${REPO}/.rs-wt 2>/dev/null; true`, `${label}-rmdir`)
   }
-  await clearWorktrees('wt-pre')   // clear any stale worktrees/branches left by a previous run
+  await clearWorktrees('wt-pre', true)   // clear any stale worktrees/branches left by a previous run (merged-only -D)
   const paths: Record<number, string> = {}
   for (let i = 0; i < N; i++) {
     const r = await sh(`git -C ${REPO} worktree add -b rs/g${i} ${wtPaths[i]} ${BASE_SHA}`, `wt-add:${i}`)
@@ -619,6 +632,16 @@ if (groups) {
   //    coordinator is invoked ONLY to resolve a real conflict. Then a single re-verify, then
   //    unconditional DETERMINISTIC cleanup.
   phase('Coordinate')
+  // A4: Coordinate halt gate — if quota was exhausted during the parallel Work phase, skip all
+  // merge sh calls and branch cleanup entirely (worktrees are PRESERVED so a resume can replay
+  // from the committed leaf states without losing any work). Without this gate, the prior code
+  // called sh(merge) + sh(merge-fullsuite) after quota death — both no-opped via agentSafe but
+  // the merge verdict would be null/ISSUES and the wt-post clearWorktrees would delete the
+  // worktree branches that a resume needs, causing the next run's wt-pre branch -D to abort on
+  // non-existent refs and the merge step to re-do all the parallel work from scratch.
+  if (QUOTA_HALT) {
+    log(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`)
+  } else {
   let conflicts = 0
   for (let i = 0; i < N; i++) {
     if (paths[i] == null) continue                              // group never built — nothing to merge
@@ -643,6 +666,7 @@ if (groups) {
     { phase: 'Coordinate', label: 'merge-verify', schema: VERDICT })) as Verdict | null
   log(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? 'OK' : 'ISSUES'}`)
   await clearWorktrees('wt-post')   // unconditional two-phase cleanup — no leaked worktrees/branches/.rs-wt
+  } // end QUOTA_HALT gate
 
   // 4) Dependent groups run on main AFTER the merge (so they see integrated independent work),
   //    ordered by dependsOn (prerequisites first; cycle/odd-dep → emission order).
@@ -774,7 +798,10 @@ const purposeGaps = [
 // material (decisions, concerns, gaps, tangents); one agent turns it into a cheap GUIDED read instead
 // of an unaided archaeology dig. Failure here never blocks the run (try/catch, payload survives).
 let briefing: Briefing | null = null
-if (trusted.length) {
+// A4: explicit QUOTA_HALT gate — even if trusted.length > 0 (e.g. some leaves trusted before the
+// halt fired), skip the briefing agent entirely; the halt log already carries the resume instruction
+// and spawning another agent would re-trip the same quota immediately.
+if (trusted.length && !QUOTA_HALT) {
   const ledgerForBriefing = done.map((d, j) => ({
     i: j, task: String(d.task).slice(0, 140), trusted: !!(d.verdict && d.verdict.trustworthy),
     commits: d.commits || [], files: d.filesChanged || [],

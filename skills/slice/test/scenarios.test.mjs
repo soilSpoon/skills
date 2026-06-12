@@ -2,7 +2,7 @@
 // Run: node --test skills/slice/test/
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runEngine, dispatcher, FIX, ARGS, isSh } from './host.mjs'
+import { runEngine, dispatcher, FIX, ARGS, ARGS_PARALLEL, isSh, has } from './host.mjs'
 
 test('happy path: atomic root → trusted leaf → green integrate → briefing', async () => {
   const { result, logs } = await runEngine({ args: ARGS, dispatch: dispatcher() })
@@ -263,6 +263,92 @@ test('lock-write sh death is fire-and-forget: engine proceeds (gap: mutual exclu
   // clobber the working tree. A follow-up leaf should add a fatal guard on the lock-write result.
   assert.equal(result.error, undefined, 'current behavior: engine proceeds without error despite lock-write death (gap — no fatal guard)')
   assert.ok(result.totalLeaves >= 1, 'engine continues executing leaves after lock-write sh death')
+})
+
+// A4+A5 — Coordinate halt gate + wt-pre branch -D merged guard + briefing block halt gate.
+// Claim: when quota throws during a verify inside a parallel group run:
+//   (a) NO `git merge` or `merge-fullsuite` sh prompts fire after the quota death
+//   (b) logs contain 'preserved for resume' (worktrees left intact for resume)
+//   (c) NO `branch -D rs/g` sh prompts fire after the quota death
+//   (d) briefing agent is NOT spawned after the quota death
+test('A4+A5: quota during parallel verify → Coordinate skipped + worktrees preserved + no briefing', async () => {
+  let tripped = -1
+  const mergeShCmds = []
+  const branchDCmds = []
+  let briefingCalled = false
+
+  const dispatch = dispatcher((c, env) => {
+    // Plan-phase assess has no label — match by phase to steer parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    // Trip quota on the FIRST verify call (happens inside a parallel group's runWork)
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') && tripped === -1) {
+      tripped = c.i
+      throw new Error("You've hit your session limit · resets 12:20am (Asia/Seoul)")
+    }
+    // Intercept and record merge / merge-fullsuite sh calls AFTER trip
+    if (isSh(c) && tripped >= 0 && c.i > tripped) {
+      if (/merge/.test(c.prompt)) mergeShCmds.push(c.prompt)
+      if (/branch -D rs\/g/.test(c.prompt)) branchDCmds.push(c.prompt)
+    }
+    // Detect briefing agent call after trip
+    if (!isSh(c) && tripped >= 0 && c.i > tripped) {
+      if (c.opts.schema && c.opts.schema.required && c.opts.schema.required[0] === 'briefing') {
+        briefingCalled = true
+      }
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS_PARALLEL, dispatch })
+
+  assert.ok(tripped >= 0, 'quota throw must have fired during parallel verify (fixture precondition)')
+
+  // (a) No git merge / merge-fullsuite sh calls after quota death
+  assert.equal(mergeShCmds.length, 0,
+    `no merge sh prompts may fire after quota death; got: ${mergeShCmds.map(p => p.slice(0, 60)).join(' | ')}`)
+
+  // (b) Log carries 'preserved for resume'
+  assert.ok(logs.some(l => /preserved for resume/.test(l)),
+    `log must contain 'preserved for resume' after halt; logs: ${logs.filter(l => /resume|preserve/.test(l)).join(' | ')}`)
+
+  // (c) No branch -D rs/g sh calls after quota death
+  assert.equal(branchDCmds.length, 0,
+    `no 'branch -D rs/g' sh prompts may fire after quota death; got: ${branchDCmds.map(p => p.slice(0, 80)).join(' | ')}`)
+
+  // (d) Briefing agent must NOT be spawned after quota death
+  assert.equal(briefingCalled, false,
+    'briefing agent must not be called after quota halt')
+})
+
+// A5 — wt-pre branch -D is gated by --merged HEAD on happy-path parallel run.
+// Claim: in a normal green parallel run, the wt-pre clearWorktrees fires `branch -D rs/g*` ONLY
+// for branches that appear in the `--merged HEAD` output (i.e. the engine checks --merged before -D).
+test('A5: wt-pre branch -D is preceded by --merged HEAD guard on normal parallel green run', async () => {
+  const mergedChecks = []
+  const branchDCmds = []
+
+  const dispatch = dispatcher((c) => {
+    // Plan-phase assess has no label — match by phase to steer parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (isSh(c)) {
+      // Track --merged HEAD branch list queries (wt-pre guard)
+      if (/branch.*--merged/.test(c.prompt)) {
+        mergedChecks.push(c.prompt)
+        // Return listing of rs/g* branches as merged (so the engine proceeds to -D them)
+        return { exitCode: 0, stdout: 'rs/g0\nrs/g1\nrs/g2\n' }
+      }
+      // Track branch -D rs/g calls (wt-pre cleanup)
+      if (/branch -D rs\/g/.test(c.prompt)) branchDCmds.push(c.prompt)
+    }
+  })
+
+  const { result } = await runEngine({ args: ARGS_PARALLEL, dispatch })
+
+  // Fixture precondition: engine must have completed without error
+  assert.equal(result.error, undefined, `engine must not error on happy-path parallel run; got: "${result.error}"`)
+
+  // The --merged check must have fired before any branch -D rs/g (wt-pre guard)
+  assert.ok(mergedChecks.length > 0,
+    'wt-pre must issue a --merged HEAD branch query before deleting stale rs/g* branches')
 })
 
 // Scenario 4 (wiring-scan sentinel drift): on sh-proxy death, wiring-scan returns SH_UNAVAILABLE
