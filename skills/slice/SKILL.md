@@ -1,6 +1,6 @@
 ---
 name: slice
-description: Trust-first recursive decomposition of a development task. Establishes a baseline, recursively classifies the task (easy/hard × small/big) into vertical slices, executes each atomic leaf with call-your-shot + TDD, and adversarially verifies every result against the baseline. Use when a task is big or risky enough to warrant decompose-and-conquer rather than just doing it. Args = the task description (optionally with a repo path).
+description: Trust-first recursive decomposition of a development task — baseline → vertical slices → Canon-TDD execution → adversarial verification → per-leaf commits → deterministic integration + owner's briefing. Use whenever a coding task is big, risky, multi-file, or vague enough that "just doing it" could silently break things — "implement X across the app", "refactor this subsystem", "migrate Y", "fix this and also clean up around it" — and whenever the user asks to decompose work, wants TDD discipline enforced, or wants changes they can verify and trust rather than take on faith. Works on any language/stack (the baseline step learns the repo's own build/test physics). Not for a single-file fix already diagnosed to a line — do that directly. Args = the task description (optionally with a repo path).
 ---
 
 # /slice — recursive, trust-first decomposition
@@ -18,7 +18,28 @@ silent surprise.
    - The repo = the relevant project root. If ambiguous, infer from the conversation/cwd; ask
      only if you genuinely cannot tell.
 
-2. **Right-size the call.** Tune the workflow args before launching:
+2. **Don't loop what doesn't need a loop** (judgment stays with you, not the engine). A
+   diagnosed, single-file, single-leaf fix (you already have file:line + the failing behavior)
+   is cheaper and safer done DIRECTLY in-conversation with the same discipline inline: failing
+   test first → fix → filtered suite → full gate → one commit. Reserve the engine for work
+   with ≥2 genuinely separate leaves, an unknown decomposition, or a risky seam needing
+   adversarial verification. A full lane spends 100k-700k tokens on ceremony that a 10-line
+   wiring fix does not need.
+
+3. **Write the task as a LANE SPEC, not a wish.** Runs given precise specs went 11/11–12/12
+   trusted; vague specs produced verifier rejections and repair loops. Include, in the task string:
+   - **Evidence**: the defect/feature anchored to `file:line` + the observed symptom (paste the
+     line of code if you've already diagnosed it). Diagnose BEFORE launching, not inside the run.
+   - **MUST PRESERVE**: behaviors the run may not regress (the baseline protects tests; this
+     protects un-tested behaviors you know matter).
+   - **Purpose**: what the USER should observe afterward — this feeds the purposeGap check.
+   - **Wiring clause** (UI/feature lanes): name the REAL production path the change must be
+     reachable from ("wire into the screen/endpoint the app actually serves, not a legacy variant") —
+     the #1 recurring defect class is built-tested-but-unwired.
+   - **Known flakes**: name them (e.g. "exit 137 = watchdog timeout, not a failure"). The engine
+     already auto-retries the integrate gate once on exit 137.
+
+4. **Right-size the call.** Tune the workflow args before launching:
    - `maxDepth`: 2 for a contained task, 3–4 for a genuinely large one. Keep it small — the
      floor is the anti-explosion guard.
    - `parallel: true` (opt-in) ONLY for a git repo + a task with ≥2 truly file-independent
@@ -26,11 +47,11 @@ silent surprise.
      compile-bound projects (Swift/Rust/C++) or a dirty main tree; `forceParallel: true` overrides.
    - `sharedScratch: true` lifts the compile-bound fallback PROPERLY: all worktrees share one
      build dir (`--scratch-path`), so dependencies compile once and builds serialize on its lock
-     (3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for SwiftPM-style repos whose test
-     wrapper passes flags through.
+     (measured on one compile-bound repo: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for
+     compile-bound toolchains (SwiftPM/Cargo/CMake-style) whose builder supports a shared build dir.
    - Pass `repo` as an absolute path so the agents (whose cwd may differ) find it.
 
-3. **Check the runway, then launch** via the Workflow tool, pointing at the bundled engine:
+5. **Check the runway, then launch** via the Workflow tool, pointing at the bundled engine:
    `Workflow({ scriptPath: '<skill-base-dir>/recursive-slice.js', args: { task, repo, maxDepth, parallel } })`
    (or copy `recursive-slice.js` to `~/.claude/workflows/` once and use `{ name: 'recursive-slice' }`)
    It runs in the background; you'll be notified on completion. Tell the user they can watch
@@ -47,8 +68,8 @@ silent surprise.
      with `Workflow({ scriptPath: <persisted script>, resumeFromRunId: <run id> })` — completed
      agents replay from the journal cache; only the stalled leaf re-runs live.
    - **After killing a run, also kill its ORPHANED test processes**: stopping a workflow does
-     NOT kill the test runner its executor had in flight (`swift-test` / `swiftpm-testing-helper`
-     etc.). The orphan keeps the build/test lock forever (its parent is dead), and the NEXT test
+     NOT kill the test runner its executor had in flight (whatever the stack spawns:
+     `swift-test`/`swiftpm-testing-helper`, jest/vitest workers, `cargo test` runners…). The orphan keeps the build/test lock forever (its parent is dead), and the NEXT test
      run hangs at 0% CPU waiting on it — looks like "tests are slow", is actually a deadlock.
      Check `ps` for stale runners (old etime, 0 CPU) and kill them before re-running anything.
    - **Hang triage in one line**: `ps -o pcpu,etime` — old etime + ~0% CPU = deadlock, not work
@@ -58,28 +79,7 @@ silent surprise.
      minutes). For anything that can hang, build the wall-clock watchdog INTO the command
      (e.g. `( sleep N && kill … ) &`) — never rely on the harness timeout in background mode.
 
-3a. **Don't loop what doesn't need a loop** (judgment stays with you, not the engine). A
-   diagnosed, single-file, single-leaf fix (you already have file:line + the failing behavior)
-   is cheaper and safer done DIRECTLY in-conversation with the same discipline inline: failing
-   test first → fix → filtered suite → full gate → one commit. Reserve the engine for work
-   with ≥2 genuinely separate leaves, an unknown decomposition, or a risky seam needing
-   adversarial verification. A full lane spends 100k-700k tokens on ceremony that a 10-line
-   wiring fix does not need.
-
-3b. **Write the task as a LANE SPEC, not a wish.** Runs given precise specs went 11/11–12/12
-   trusted; vague specs produced verifier rejections and repair loops. Include, in the task string:
-   - **Evidence**: the defect/feature anchored to `file:line` + the observed symptom (paste the
-     line of code if you've already diagnosed it). Diagnose BEFORE launching, not inside the run.
-   - **MUST PRESERVE**: behaviors the run may not regress (the baseline protects tests; this
-     protects un-tested behaviors you know matter).
-   - **Purpose**: what the USER should observe afterward — this feeds the purposeGap check.
-   - **Wiring clause** (UI/feature lanes): name the REAL production path the change must be
-     reachable from ("wire into the unified detail view actually rendered, not the legacy one") —
-     the #1 recurring defect class is built-tested-but-unwired.
-   - **Known flakes**: name them (e.g. "exit 137 = watchdog timeout, not a failure"). The engine
-     already auto-retries the integrate gate once on exit 137.
-
-4. **On completion, report the trust ledger** — not a wall of text:
+6. **On completion, report the trust ledger** — not a wall of text:
    - the baseline that was protected,
    - how the task was sliced (the decomposition tree),
    - per-leaf: passed + whether the verifier trusted it,
@@ -97,17 +97,35 @@ silent surprise.
    Also report `wiringGaps` (the engine's built-tested-unwired audit) right after untrusted leaves —
    a gap there means a feature landed unreachable; queue the wiring fix before anything else.
 
-5. **Visually verify UI lanes before handover** (Screen Recording granted): after a lane that
-   changes UI, launch the app and capture its window WITHOUT stealing focus via
-   `<skill-base-dir>/scripts/capture-window.sh <AppName> /tmp/verify.png` (window-ID capture works on
-   occluded windows — never fight the owner for displays/focus), then Read the image to confirm
-   the change is actually VISIBLE (the purposeGap check, done by you, not the owner). If the
-   screenshot contradicts the green ledger, that's a wiring gap: report it as a failure, not a
-   success. Driving the UI (clicks) via System Events needs spare-display etiquette and explicit
-   `with timeout`; NEVER run an `entire contents` AX query against a SwiftUI app — it wedges the
-   app's accessibility server for minutes and times out every subsequent AppleEvent (-1712).
+7. **Visually verify UI lanes before handover.** A green ledger proves tests pass, not that the
+   user can SEE the feature — after a lane that changes UI, render the real interface and read
+   the pixels yourself (the purposeGap check, done by you, not the owner). If the screenshot
+   contradicts the green ledger, that's a wiring gap: report it as a failure, not a success.
+   Per platform:
+   - **Web**: headless-browser screenshot (playwright/puppeteer) of the changed route/state.
+   - **macOS app** (needs Screen Recording permission): capture the app's window WITHOUT
+     stealing focus via `<skill-base-dir>/scripts/capture-window.sh <AppName> /tmp/verify.png` —
+     window-ID capture works on occluded windows; never fight the owner for displays/focus.
+     Driving the UI (clicks) needs an idle display and explicit `with timeout`; never run an
+     `entire contents` AX query against an app — it wedges the app's accessibility server for
+     minutes and every subsequent AppleEvent times out (-1712).
+   - **CLI/TUI**: capture real terminal output (PTY run if output is block-buffered).
 
-6. **Keep the loop's memory in the repo, not the conversation** (the agent forgets, the repo
+8. **Compound the lane before closing it** (each unit of work must make the next one easier —
+   not just ship). After relaying the briefing, spend one explicit pass on three questions:
+   - **Repo convention?** If the lane established a pattern (e.g. "thread data explicitly into
+     views, never via store selection state"), add ONE line to the target repo's CLAUDE.md
+     conventions — that's how the next lane's agents inherit it without re-deriving it.
+   - **Caught next time?** For every defect class the lane fixed, name the regression canary
+     that now catches it (a test, a compile-gated parameter, a t0 gate). If none exists, that's
+     unfinished work — queue it, don't close.
+   - **Feel regression checklist**: every owner complaint about look/feel (a janky scroll, a
+     wrong icon, a missing header) becomes a permanent entry in the repo's
+     `docs/polish-checklist.md`; after any UI lane, walk that checklist yourself with the
+     platform's capture method (step 7) before handover. Owner taste, once stated, is system
+     property — never make them say it twice.
+
+9. **Keep the loop's memory in the repo, not the conversation** (the agent forgets, the repo
    doesn't). The durable queue lives in `docs/BACKLOG.md` of the target repo: every briefing's
    "buried bodies"/follow-ups, deferred funList items, and known-gap canaries get appended there
    (with file:line evidence) when you relay the briefing; completed items get checked off at the

@@ -30,7 +30,7 @@ loop is **Canon TDD**, one test at a time.
 
 - One thing at a time. New scenarios you discover (edge cases the test list missed) go in
   `discovered` — do NOT chase them; they feed back into the list. Unrelated tangents → `funList`.
-- If the task says "only add tests", do NOT modify `Sources/` — if you must, that is a finding:
+- If the task says "only add tests", do NOT modify production source dirs (`Sources/`, `src/`, `lib/` — whatever the repo uses) — if you must, that is a finding:
   report it, don't paper over it. When sharing a file, ADD cases, never overwrite.
 - **Git mode:** if the repo is under git, commit the behavior step after green
   (`git add -A && git commit -m "test: …"`), then a SEPARATE commit after any refactor (two hats
@@ -54,3 +54,10 @@ loop is **Canon TDD**, one test at a time.
   only hand-written fakes/mocks (the prompt)? A fake passing proves the prompt, not the feature.
 - A false green — including a test that passes against a hardcoded/over-fit implementation — is
   the worst possible trust withdrawal. If red, blocked, or skipped, say so with the actual output.
+
+## Search before you write / tests carry their why
+
+Before implementing anything, grep the codebase for an existing implementation or helper —
+never assume not-implemented; duplicating an existing seam is a trust withdrawal. And each new
+test states in a one-line comment the behavioral claim it pins: future agents and the owner
+will not have your context, and a test whose reason is lost gets deleted or neutered later.

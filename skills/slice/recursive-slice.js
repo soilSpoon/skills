@@ -166,9 +166,13 @@ const R_EXEC =
   '`interfaceConcern`. Wear ONE HAT AT A TIME (Beck): (1) BEHAVIOR — call your shot, write the FAILING test ' +
   'FIRST, confirm red for that reason, then make it pass simply. (2) STRUCTURE — refactor is NOT optional: ' +
   'after green either refactor (separate, behavior-preserving) or put in `refactor` WHY none is needed. Never ' +
-  'change behavior and structure in one step. If "tests only", do not modify Sources/ (if you must, that is a ' +
-  'finding). When sharing a file, ADD cases, never overwrite. New edge cases you notice → `discovered` (do NOT ' +
-  'chase them). `passed` MUST reflect a REAL deterministic run (the tier-0 gate): build + the relevant tests ' +
+  'change behavior and structure in one step. If "tests only", do not modify production source dirs — Sources/, ' +
+  'src/, lib/, whatever this repo uses (if you must, that is a finding). When sharing a file, ADD cases, never overwrite. New edge cases you notice → `discovered` (do NOT ' +
+  'chase them). SEARCH BEFORE YOU WRITE: before implementing anything, grep the codebase for an existing ' +
+  'implementation/helper — never assume not-implemented; duplicating an existing seam is a trust withdrawal. ' +
+  'TESTS CARRY THEIR WHY: each new test states in a one-line comment the behavioral claim it pins (future ' +
+  'agents and the owner will not have your context; a test whose reason is lost gets deleted or neutered later). ' +
+  '`passed` MUST reflect a REAL deterministic run (the tier-0 gate): build + the relevant tests ' +
   'actually green — a false green, or one passing against a hardcoded/over-fit impl, is the worst trust ' +
   'withdrawal. SPEED (see LEAF TEST DISCIPLINE below — measured #1 time cost): run ONLY this leaf\'s FILTERED tests + a full BUILD; ' +
   'NEVER the whole test suite — that recompiles+runs all unrelated tests and is reserved for the integration net. ' +
@@ -596,8 +600,8 @@ if (PARALLEL && GIT && !goParallel)
 const SCRATCH = (goParallel && SHARED_SCRATCH) ? `${REPO}/.rs-scratch` : ''
 const buildNoteFor = repo => (SCRATCH && repo !== REPO)
   ? `\nSHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation ` +
-    `(swift build / swift test / the test wrapper — it passes flags through; if this project's builder uses a ` +
-    `different shared-cache flag, use its equivalent). The parallel worktrees share that ONE build dir so ` +
+    `(SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their ` +
+    `own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so ` +
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 if (goParallel) {
@@ -609,7 +613,7 @@ if (goParallel) {
       `${R_SLICE}\n\nRepo: ${REPO}\nThis is the PARALLEL PARTITION — NOT fine slicing. Each group you emit becomes ` +
       `its OWN git worktree with its OWN full (cold) build, so every extra group costs a whole build. Therefore ` +
       `produce the FEWEST, COARSEST groups: ONE per LARGEST independent unit (a whole feature/module/file-set that ` +
-      `shares NO files — including manifests like Package.swift — with any sibling). Aim for 2-3 groups; NEVER split ` +
+      `shares NO files — including manifests (Package.swift / Cargo.toml / package.json / pom.xml) — with any sibling). Aim for 2-3 groups; NEVER split ` +
       `one coherent feature into multiple groups — its fine-grained, one-test-at-a-time decomposition happens INSIDE ` +
       `the group later (cheap, warm builds). Over-splitting here forces redundant cold builds and is the dominant ` +
       `cost. Mark \`independent\`=true only for a group that truly shares no files with any sibling.\nTask: ${TASK}\n${INV}`,
