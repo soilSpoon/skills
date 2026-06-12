@@ -174,9 +174,9 @@ ${baseline.projectCard}` : "";
 Purpose (does it ACTUALLY work for the user, not just the tests?): ${baseline.purposeCheck}${baseline.inProcessVerifiable === false ? " [NOT verifiable in-process — needs a real env / human; a purposeGap is expected]" : ""}` : "";
   const SKILL_PATHS = (Array.isArray(A.skills) ? A.skills : []).filter((s) => typeof s === "string" && !!s.trim()).slice(0, 8);
   const SKILLS_NOTE = SKILL_PATHS.length ? `
-DOMAIN GUIDANCE (part of the contract): before working, Read these guide files — house style / best-practice rules the owner expects. Follow their progressive disclosure: read the index/SKILL.md, then only the rule files relevant to YOUR change.
+DOMAIN GUIDANCE (part of the contract): RELEVANCE GATE first — match each guide's domain (visible in its path/name) against YOUR contract's files and topic, and SKIP entirely (do not read even its index) any guide whose domain clearly does not apply to this leaf (e.g. a frontend guide on a backend-only leaf). For the guides that DO apply: Read them — house style / best-practice rules the owner expects. Follow their progressive disclosure: read the index/SKILL.md, then only the rule files relevant to YOUR change.
 - ${SKILL_PATHS.join("\n- ")}
-Executors apply them; verifiers treat clear violations as issues. On conflict, the repo's own established conventions win.` : "";
+Executors apply them; verifiers treat clear violations as issues (a skipped non-matching guide is never a violation). On conflict, the repo's own established conventions win.` : "";
   const INV = `Baseline to preserve:
 - ${baseline.invariants.join("\n- ")}
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;

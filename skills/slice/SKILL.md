@@ -54,13 +54,24 @@ silent surprise.
      (measured on one compile-bound repo: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for
      compile-bound toolchains (SwiftPM/Cargo/CMake-style) whose builder supports a shared build dir.
    - `skills: [paths]` — domain-guidance guide files threaded into every executor/verifier
-     (executors apply them, verifiers enforce them; repo conventions win on conflict). Scan the
-     local skill library (`~/.claude/skills/`, `~/.claude/skill-library/` — see its INDEX.md)
-     for guides matching the task's domain — `code-fundamentals` (language-agnostic 4-axis
-     quality) fits ANY substantial lane and is the default pick; a frontend/React lane adds the
-     react/composition guides + the house frontend fundamentals on top; a lane in a domain with
-     no matching guide gets none. Pass each skill's SKILL.md (or AGENTS.md) absolute path. Only genuinely relevant
-     guides — every entry taxes every leaf's attention.
+     (executors apply them, verifiers enforce them; repo conventions win on conflict).
+     **AUTO-SELECT these yourself** — selection is part of right-sizing the call, never
+     something the user must ask for. Resolve each name to its SKILL.md absolute path,
+     checking in order: project `.agents/skills/<name>/`, user `~/.agents/skills/<name>/`,
+     plugin cache `~/.claude/plugins/cache/*/*/<sha>/skills/<name>/` (latest sha), then any
+     local skill-library index. Selection table (COMPOSE matching rows; cap ~4 entries):
+
+     | lane touches | add |
+     |---|---|
+     | any substantial code (default) | `code-fundamentals` |
+     | React/Next.js UI (.tsx/.jsx, components/hooks/routes) | `toss-frontend-fundamentals` + `vercel-react-best-practices` + `vercel-composition-patterns` |
+     | build config / deps / workspace / codemod migration | `build-config-drift` |
+     | bug-hunt / regression / rootcause lane | `issue-rootcause-workflow` |
+
+     A lane in a domain with no matching guide gets none. Every entry taxes every leaf's
+     attention, but the engine's per-leaf RELEVANCE GATE (leaves skip guides whose domain
+     doesn't match their contract) bounds the cost for mixed lanes — so a full-stack lane may
+     safely carry both backend and frontend guides.
    - Pass `repo` as an absolute path so the agents (whose cwd may differ) find it.
 
 5. **Check the runway, then launch** via the Workflow tool, pointing at the bundled engine:
