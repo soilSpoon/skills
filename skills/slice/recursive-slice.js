@@ -253,8 +253,16 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
   let LOCKFILE = "";
   if (GIT) {
-    const lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir");
-    const gd = shUnavailable(lockDirR) ? "" : (lockDirR.stdout || "").trim().split("\n").pop() || "";
+    let lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir");
+    if (shUnavailable(lockDirR)) {
+      log("shell-proxy returned no result for lock-dir — retrying once …");
+      lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir-retry");
+    }
+    if (shUnavailable(lockDirR)) {
+      log("FATAL: shell-proxy unavailable at lock-dir (both attempts) — cannot establish mutual exclusion; aborting.");
+      return { error: "shell-proxy unavailable at lock-dir decision point", task: TASK };
+    }
+    const gd = (lockDirR.stdout || "").trim().split("\n").pop() || "";
     if (gd && gd.startsWith("/")) {
       LOCKFILE = `${gd}/rs-lock`;
       const lockCheckR = await sh(`cat ${LOCKFILE} 2>/dev/null || true`, "lock-check");
@@ -267,7 +275,11 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
         log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`);
         return { error: "working tree locked by another recursive-slice run", lock: held, lockFile: LOCKFILE, task: TASK };
       }
-      await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, "lock-write");
+      const lockWriteR = await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, "lock-write");
+      if (shUnavailable(lockWriteR)) {
+        log("FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.");
+        return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
+      }
     }
   }
   const verifyLeaf = async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {

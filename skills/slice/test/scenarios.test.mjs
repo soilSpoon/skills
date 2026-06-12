@@ -137,20 +137,37 @@ test('sh proxy death at git-sha is fatal (A1+A7): no silent git-mode-OFF, result
   assert.ok(!logs.some((l) => /git mode OFF/.test(l)), 'must not silently log "git mode OFF" and continue')
 })
 
-// Scenario 1 (lock-dir graceful): when `rev-parse --absolute-git-dir` sh call dies, gd='' so the
-// lock block is skipped entirely — the sentinel flows through without needing a fatal guard there.
-// Claim: engine completes normally (no result.error) despite the lock-dir sh death.
-test('lock-dir sh death skips lock block gracefully (sentinel flows through, no fatal)', async () => {
+// A1 lock-dir sentinel fatal (4th unlisted A1 point): when `rev-parse --absolute-git-dir` sh dies
+// (sentinel returned), the engine must retry ONCE then abort with result.error — NOT silently skip
+// the lock block (which would set LOCKFILE='' and allow concurrent runs to clobber the working tree).
+// Behavioral claim: both absolute-git-dir attempts return sentinel → result.error is set AND no leaf runs.
+test('lock-dir sh death is fatal after retry: result.error set, no leaf executes without lock (A1-lock-dir)', async () => {
+  // Behavioral claim: when rev-parse --absolute-git-dir returns sentinel on both the initial attempt
+  // AND the 1-retry, the engine must abort (result.error) rather than silently proceeding lock-less.
+  // This pins that 'git mode ON' + sh proxy death at lock-dir can never reach a leaf execution.
+  let lockDirAttempts = 0
+  const execLabels = []
   const dispatch = dispatcher((c) => {
     if (isSh(c) && /rev-parse --absolute-git-dir/.test(c.prompt)) {
-      throw new Error('shell-proxy transport died on lock-dir (fixture: transport error)')
+      lockDirAttempts++
+      throw new Error('shell-proxy transport died on lock-dir (fixture: A1 lock-dir sentinel)')
+    }
+    // Track any exec calls (must be zero — no leaf should run without lock)
+    if (!isSh(c) && /^exec:|exec:/.test(c.opts.label || '')) {
+      execLabels.push(c.opts.label)
     }
   })
   const { result } = await runEngine({ args: ARGS, dispatch })
-  // Engine must NOT surface result.error — the lock block gracefully skips when gd=''
-  assert.equal(result.error, undefined, `engine must complete normally when lock-dir sh dies; got error: "${result.error}"`)
-  // Engine must have produced a leaf result (work ran, not aborted at the lock stage)
-  assert.ok(result.totalLeaves >= 1, 'at least one leaf must complete when lock-dir sh dies gracefully')
+  // Engine must abort with result.error — not silently proceed lock-less
+  assert.ok(result.error, `engine must return result.error when lock-dir sh dies on both attempts; got undefined`)
+  assert.ok(/shell.?proxy|lock.?dir/i.test(result.error),
+    `result.error must name shell-proxy or lock-dir; got: "${result.error}"`)
+  // Retry must have fired (2 total attempts)
+  assert.ok(lockDirAttempts >= 2,
+    `engine must retry lock-dir once before aborting (expected ≥2 attempts); got ${lockDirAttempts}`)
+  // No leaf must have executed — lock-less execution is forbidden after 'git mode ON'
+  assert.equal(execLabels.length, 0,
+    `no exec must fire after lock-dir fatal abort; got: ${execLabels.join(', ')}`)
 })
 
 // Scenario 3 (lock-check fatal guard unpinned): the fatal guard at lock-check (main.ts ~line 212)
@@ -233,14 +250,15 @@ test('filterCommand {scope} substitutes as file path, t0 fires per-leaf with cor
   )
 })
 
-// Scenario 8 (lock-write fire-and-forget): `await sh('echo rs-... > rs-lock', 'lock-write')` is
-// fire-and-forget — if the sh proxy dies between lock-check and lock-write, the engine proceeds
-// without actually holding the lock (mutual exclusion silently not established). This pins the
-// current behavior: engine produces no result.error (proceeds despite lock-write death). Noted as a
-// discovered implementation gap: the lock-write result should be guarded fatally to prevent a
-// second concurrent engine from clobbering the working tree.
-test('lock-write sh death is fire-and-forget: engine proceeds (gap: mutual exclusion not established)', async () => {
+// A1 lock-write sentinel fatal (same class as lock-dir): if the sh proxy dies writing the lock
+// file, the engine believes it holds the lock when it does not — a second concurrent run can
+// clobber the working tree. Guard: treat lock-write sentinel as fatal, same class as lock-check.
+// Behavioral claim: lock-write sh returns sentinel → result.error set, no leaf executes (A1-lock-write).
+test('lock-write sh death is fatal: result.error set, no leaf executes (engine must not believe lock held when it is not) (A1-lock-write)', async () => {
+  // Behavioral claim: when the sh call writing the lock file returns sentinel, the engine must abort
+  // (result.error) rather than continuing under the false belief that it holds mutual exclusion.
   let lockWriteFired = false
+  const execLabels = []
   const dispatch = dispatcher((c) => {
     if (isSh(c)) {
       if (/rev-parse --absolute-git-dir/.test(c.prompt)) {
@@ -252,17 +270,24 @@ test('lock-write sh death is fire-and-forget: engine proceeds (gap: mutual exclu
       }
       if (/rs-lock/.test(c.prompt) && /echo /.test(c.prompt)) {
         lockWriteFired = true
-        throw new Error('shell-proxy transport died on lock-write (fixture: transport error)')
+        throw new Error('shell-proxy transport died on lock-write (fixture: A1 lock-write sentinel)')
       }
+    }
+    // Track any exec calls (must be zero — no leaf should run if lock was never written)
+    if (!isSh(c) && /^exec:|exec:/.test(c.opts.label || '')) {
+      execLabels.push(c.opts.label)
     }
   })
   const { result } = await runEngine({ args: ARGS, dispatch })
   assert.ok(lockWriteFired, 'lock-write sh call must have been attempted (fixture precondition)')
-  // Current behavior: engine proceeds despite lock-write death (fire-and-forget — no fatal guard)
-  // DISCOVERED: this means mutual exclusion is NOT established; a second concurrent engine could
-  // clobber the working tree. A follow-up leaf should add a fatal guard on the lock-write result.
-  assert.equal(result.error, undefined, 'current behavior: engine proceeds without error despite lock-write death (gap — no fatal guard)')
-  assert.ok(result.totalLeaves >= 1, 'engine continues executing leaves after lock-write sh death')
+  // Engine must abort with result.error — not proceed believing lock is held
+  assert.ok(result.error,
+    `engine must return result.error when lock-write sh dies (sentinel); got undefined`)
+  assert.ok(/shell.?proxy|lock.?write/i.test(result.error),
+    `result.error must name shell-proxy or lock-write; got: "${result.error}"`)
+  // No leaf must have executed — execution without an established lock is forbidden
+  assert.equal(execLabels.length, 0,
+    `no exec must fire after lock-write fatal abort; got: ${execLabels.join(', ')}`)
 })
 
 // A4+A5 — Coordinate halt gate + wt-pre branch -D merged guard + briefing block halt gate.

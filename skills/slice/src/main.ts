@@ -230,8 +230,19 @@ if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edit
 // the front door clears it after confirming no run is alive. Cleared deterministically at the end.
 let LOCKFILE = ''
 if (GIT) {
-  const lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir')
-  const gd = shUnavailable(lockDirR) ? '' : ((lockDirR.stdout || '').trim().split('\n').pop() || '')
+  // A1 (4th point): if sh proxy dies at lock-dir, retry ONCE — silent skip would set LOCKFILE=''
+  // and dissolve mutual exclusion entirely (lock-check is never reached). A sentinel on both
+  // attempts is fatal: proceeding lock-less after 'git mode ON' is strictly forbidden.
+  let lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir')
+  if (shUnavailable(lockDirR)) {
+    log('shell-proxy returned no result for lock-dir — retrying once …')
+    lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir-retry')
+  }
+  if (shUnavailable(lockDirR)) {
+    log('FATAL: shell-proxy unavailable at lock-dir (both attempts) — cannot establish mutual exclusion; aborting.')
+    return { error: 'shell-proxy unavailable at lock-dir decision point', task: TASK }
+  }
+  const gd = (lockDirR.stdout || '').trim().split('\n').pop() || ''
   if (gd && gd.startsWith('/')) {
     LOCKFILE = `${gd}/rs-lock`
     // A1/A7: if sh proxy is dead here, treat as fatal — a null result would read as "held=''"
@@ -246,7 +257,14 @@ if (GIT) {
       log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`)
       return { error: 'working tree locked by another recursive-slice run', lock: held, lockFile: LOCKFILE, task: TASK }
     }
-    await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, 'lock-write')
+    // A1 (same class as lock-check): if sh proxy dies writing the lock, the engine would proceed
+    // believing it holds the lock when it does not — a second concurrent run could clobber the
+    // working tree. Treat as fatal: aborting is safer than running with unestablished mutual exclusion.
+    const lockWriteR = await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, 'lock-write')
+    if (shUnavailable(lockWriteR)) {
+      log('FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.')
+      return { error: 'shell-proxy unavailable at lock-write decision point', task: TASK }
+    }
   }
 }
 
