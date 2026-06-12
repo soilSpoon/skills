@@ -125,6 +125,11 @@ async function __main() {
     QUOTA_HALT = why;
     log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`);
   };
+  const bumpNullStreak = (opts) => {
+    NULL_STREAK++;
+    NULL_STREAK_CLASSES.add(callClass(opts));
+    if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+  };
   const agentSafe = async (prompt, opts) => {
     if (QUOTA_HALT) {
       log(`agent skipped (quota halt): ${opts && (opts.label || opts.phase) || ""}`);
@@ -133,9 +138,7 @@ async function __main() {
     try {
       const r = await agent(prompt, opts);
       if (r === null) {
-        NULL_STREAK++;
-        NULL_STREAK_CLASSES.add(callClass(opts));
-        if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+        bumpNullStreak(opts);
       } else {
         NULL_STREAK = 0;
         NULL_STREAK_CLASSES = /* @__PURE__ */ new Set();
@@ -149,9 +152,7 @@ async function __main() {
         return null;
       }
       log(`agent threw (treated as null): ${m.slice(0, 140)}`);
-      NULL_STREAK++;
-      NULL_STREAK_CLASSES.add(callClass(opts));
-      if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+      bumpNullStreak(opts);
       return null;
     }
   };

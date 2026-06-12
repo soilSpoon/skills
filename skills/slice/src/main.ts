@@ -50,14 +50,17 @@ const quotaHalt = (why: string) => {
   QUOTA_HALT = why
   log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`)
 }
+// A6: shared bump used in both null-return and catch paths — keeps the class-gate condition DRY.
+const bumpNullStreak = (opts?: AgentOpts) => {
+  NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
+  if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
+}
 const agentSafe: typeof agent = async (prompt, opts) => {
   if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
   try {
     const r = await agent(prompt, opts)
-    if (r === null) {
-      NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
-      if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
-    } else { NULL_STREAK = 0; NULL_STREAK_CLASSES = new Set() }
+    if (r === null) { bumpNullStreak(opts) }
+    else { NULL_STREAK = 0; NULL_STREAK_CLASSES = new Set() }
     return r
   }
   catch (e: any) {
@@ -65,8 +68,7 @@ const agentSafe: typeof agent = async (prompt, opts) => {
     if (/budget|ceiling/i.test(m)) throw e
     if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
     log(`agent threw (treated as null): ${m.slice(0, 140)}`)
-    NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
-    if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
+    bumpNullStreak(opts)
     return null
   }
 }
