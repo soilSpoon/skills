@@ -96,11 +96,21 @@ const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection �
 // agent is reduced to a verbatim `bash -c` proxy with zero latitude. Used for all purely-
 // MECHANICAL git (no judgment) so it is not left to a non-deterministic LLM. The sandbox has
 // no real exec(); this is the closest approximation — deterministic command, LLM as transport.
+//
+// A1/A7: When agentSafe returns null (sh proxy died — non-quota), we MUST NOT silently return
+// { stdout:'', exitCode:1 } — that disguises the outage as "command ran but failed", which at
+// decision points (git-sha / git-clean / lock-check) produces false reads (BASE_SHA='',
+// gitClean=true, held=''). Instead we return SH_UNAVAILABLE so callers can detect the outage.
+const SH_UNAVAILABLE: ShResult = { exitCode: -2, stdout: '\x00SH_UNAVAILABLE' }
+const shUnavailable = (r: ShResult) => r === SH_UNAVAILABLE
 const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { type: 'string' }, exitCode: { type: 'integer' } } }
-const sh = async (cmd: string, label?: string): Promise<ShResult> => ((await agentSafe(
-  `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
-  `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
-  { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null) || { stdout: '', exitCode: 1 }
+const sh = async (cmd: string, label?: string): Promise<ShResult> => {
+  const r = (await agentSafe(
+    `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
+    `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
+    { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null
+  return r ?? SH_UNAVAILABLE
+}
 
 // =============================================================================
 phase('Baseline')
@@ -152,10 +162,23 @@ const LEAF_TEST = (scope?: string) =>
 
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
 // didn't, disabling git mode). A fixed `git rev-parse HEAD`, run verbatim, owns this.
-const headOut = (await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, 'git-sha')).stdout || ''
+// A1/A7: if the shell proxy is dead, shUnavailable(r) is true; treat that as FATAL — not as
+// "no git" (which would silently downgrade to sequential-no-revert mode, hiding the outage).
+const headR = await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, 'git-sha')
+if (shUnavailable(headR)) {
+  log('FATAL: shell-proxy agent returned no result for git-sha capture — cannot determine git state; aborting.')
+  return { error: 'shell-proxy unavailable at git-sha decision point', task: TASK }
+}
+const headOut = headR.stdout || ''
 const BASE_SHA = (headOut.match(/[0-9a-f]{40}/i) || [''])[0]
 const GIT = !!BASE_SHA
-const gitClean = GIT ? ((await sh(`git -C ${REPO} status --porcelain`, 'git-clean')).stdout || '').trim() === '' : false
+// A1/A7: a shell-proxy death at git-clean must not be silently read as "clean tree" (empty output = clean).
+const gitCleanR = GIT ? await sh(`git -C ${REPO} status --porcelain`, 'git-clean') : null
+if (gitCleanR && shUnavailable(gitCleanR)) {
+  log('FATAL: shell-proxy agent returned no result for git-clean capture — cannot determine working tree state; aborting.')
+  return { error: 'shell-proxy unavailable at git-clean decision point', task: TASK }
+}
+const gitClean = GIT ? ((gitCleanR!.stdout || '').trim() === '') : false
 const GIT_EXEC = GIT
   ? `\nGit: after GREEN, commit the behavior step (\`git add -A && git commit -m "test: ..."\`); after any ` +
     `refactor, a SEPARATE commit (two hats). Commit ONLY in-scope files. Report SHAs in \`commits\`.`
@@ -179,10 +202,18 @@ if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edit
 // the front door clears it after confirming no run is alive. Cleared deterministically at the end.
 let LOCKFILE = ''
 if (GIT) {
-  const gd = ((await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir')).stdout || '').trim().split('\n').pop()
+  const lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir')
+  const gd = shUnavailable(lockDirR) ? '' : ((lockDirR.stdout || '').trim().split('\n').pop() || '')
   if (gd && gd.startsWith('/')) {
     LOCKFILE = `${gd}/rs-lock`
-    const held = ((await sh(`cat ${LOCKFILE} 2>/dev/null || true`, 'lock-check')).stdout || '').trim()
+    // A1/A7: if sh proxy is dead here, treat as fatal — a null result would read as "held=''"
+    // (no lock held) and allow a second concurrent engine to clobber the working tree.
+    const lockCheckR = await sh(`cat ${LOCKFILE} 2>/dev/null || true`, 'lock-check')
+    if (shUnavailable(lockCheckR)) {
+      log('FATAL: shell-proxy agent returned no result for lock-check — cannot verify mutual exclusion; aborting.')
+      return { error: 'shell-proxy unavailable at lock-check decision point', task: TASK }
+    }
+    const held = (lockCheckR.stdout || '').trim()
     if (held) {
       log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`)
       return { error: 'working tree locked by another recursive-slice run', lock: held, lockFile: LOCKFILE, task: TASK }

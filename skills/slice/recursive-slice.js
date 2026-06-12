@@ -164,13 +164,18 @@ async function __main() {
   const MAX_REPAIR_HARD = 3;
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
+  const SH_UNAVAILABLE = { exitCode: -2, stdout: "\0SH_UNAVAILABLE" };
+  const shUnavailable = (r) => r === SH_UNAVAILABLE;
   const SH = { type: "object", required: ["exitCode"], properties: { stdout: { type: "string" }, exitCode: { type: "integer" } } };
-  const sh = async (cmd, label) => await agentSafe(
-    `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
+  const sh = async (cmd, label) => {
+    const r = await agentSafe(
+      `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
 
 ${cmd}`,
-    { label: label || "sh", model: "haiku", schema: SH }
-  ) || { stdout: "", exitCode: 1 };
+      { label: label || "sh", model: "haiku", schema: SH }
+    );
+    return r ?? SH_UNAVAILABLE;
+  };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
@@ -201,10 +206,20 @@ Executors apply them; verifiers treat clear violations as issues (a skipped non-
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const LEAF_TEST = (scope) => `
 LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test suite/class you add so this exact token matches it (the engine re-runs this filter as a deterministic gate; a name mismatch = zero tests matched = an untrusted leaf). ` : `Filter to the test suite/file you add or touch (project-card filter syntax). `) + `A full BUILD is fine; a full TEST run is not. Minimize re-runs: red once, green once, post-refactor once — do not re-run unchanged. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`;
-  const headOut = (await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, "git-sha")).stdout || "";
+  const headR = await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, "git-sha");
+  if (shUnavailable(headR)) {
+    log("FATAL: shell-proxy agent returned no result for git-sha capture — cannot determine git state; aborting.");
+    return { error: "shell-proxy unavailable at git-sha decision point", task: TASK };
+  }
+  const headOut = headR.stdout || "";
   const BASE_SHA = (headOut.match(/[0-9a-f]{40}/i) || [""])[0];
   const GIT = !!BASE_SHA;
-  const gitClean = GIT ? ((await sh(`git -C ${REPO} status --porcelain`, "git-clean")).stdout || "").trim() === "" : false;
+  const gitCleanR = GIT ? await sh(`git -C ${REPO} status --porcelain`, "git-clean") : null;
+  if (gitCleanR && shUnavailable(gitCleanR)) {
+    log("FATAL: shell-proxy agent returned no result for git-clean capture — cannot determine working tree state; aborting.");
+    return { error: "shell-proxy unavailable at git-clean decision point", task: TASK };
+  }
+  const gitClean = GIT ? (gitCleanR.stdout || "").trim() === "" : false;
   const GIT_EXEC = GIT ? `
 Git: after GREEN, commit the behavior step (\`git add -A && git commit -m "test: ..."\`); after any refactor, a SEPARATE commit (two hats). Commit ONLY in-scope files. Report SHAs in \`commits\`.` : "";
   const gitVerify = (repo, from) => GIT ? `
@@ -214,10 +229,16 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
   let LOCKFILE = "";
   if (GIT) {
-    const gd = ((await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir")).stdout || "").trim().split("\n").pop();
+    const lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir");
+    const gd = shUnavailable(lockDirR) ? "" : (lockDirR.stdout || "").trim().split("\n").pop() || "";
     if (gd && gd.startsWith("/")) {
       LOCKFILE = `${gd}/rs-lock`;
-      const held = ((await sh(`cat ${LOCKFILE} 2>/dev/null || true`, "lock-check")).stdout || "").trim();
+      const lockCheckR = await sh(`cat ${LOCKFILE} 2>/dev/null || true`, "lock-check");
+      if (shUnavailable(lockCheckR)) {
+        log("FATAL: shell-proxy agent returned no result for lock-check — cannot verify mutual exclusion; aborting.");
+        return { error: "shell-proxy unavailable at lock-check decision point", task: TASK };
+      }
+      const held = (lockCheckR.stdout || "").trim();
       if (held) {
         log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`);
         return { error: "working tree locked by another recursive-slice run", lock: held, lockFile: LOCKFILE, task: TASK };

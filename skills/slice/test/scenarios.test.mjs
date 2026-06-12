@@ -64,3 +64,44 @@ test('sh proxy routing sanity: deterministic commands go through the SH schema',
   await runEngine({ args: ARGS, dispatch })
   assert.ok(shCmds.some((p) => /rev-parse HEAD/.test(p)), 'git sha captured deterministically')
 })
+
+// A1+A7 — sh proxy death is fatal at decision points, not a silent green disguise.
+// Claim: when the shell proxy agent dies (non-quota throw on a git decision call),
+// (a) status --porcelain death → result.error names "shell-proxy", and NO reset --hard sh call fires
+// (b) rev-parse HEAD death → result.error is returned (not a silent "git mode OFF")
+
+test('sh proxy death at git-clean is fatal (A1+A7): no silent gitClean=true, no reset --hard fired', async () => {
+  // Behavioral claim: agentSafe returning null (non-quota) for "status --porcelain" must NOT
+  // be silently treated as "output is empty = git is clean"; it must surface as a fatal error
+  // in result.error before any leaf runs (so no reset --hard or merge sh calls ever fire).
+  let porcelainCalls = 0
+  const shResets = []
+  const dispatch = dispatcher((c) => {
+    if (isSh(c)) {
+      if (/status --porcelain/.test(c.prompt)) {
+        porcelainCalls++
+        throw new Error('shell-proxy transport died (non-quota test)')
+      }
+      if (/reset --hard/.test(c.prompt)) shResets.push(c.prompt)
+    }
+  })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(result.error, 'engine must return result.error when sh proxy dies at git-clean decision')
+  assert.ok(/shell.?proxy/i.test(result.error), `result.error must name shell-proxy; got: "${result.error}"`)
+  assert.equal(shResets.length, 0, 'no reset --hard must fire after sh proxy death')
+})
+
+test('sh proxy death at git-sha is fatal (A1+A7): no silent git-mode-OFF, result.error returned', async () => {
+  // Behavioral claim: agentSafe returning null for "rev-parse HEAD" must NOT silently downgrade
+  // to "git mode OFF" (log + continue); it must return result.error before any leaf runs.
+  const dispatch = dispatcher((c) => {
+    if (isSh(c) && /rev-parse HEAD/.test(c.prompt)) {
+      throw new Error('shell-proxy transport died (non-quota test)')
+    }
+  })
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(result.error, 'engine must return result.error when sh proxy dies at git-sha decision')
+  assert.ok(/shell.?proxy/i.test(result.error), `result.error must name shell-proxy; got: "${result.error}"`)
+  // Must NOT merely log "git mode OFF" and continue — that is the pre-fix silent bug
+  assert.ok(!logs.some((l) => /git mode OFF/.test(l)), 'must not silently log "git mode OFF" and continue')
+})
