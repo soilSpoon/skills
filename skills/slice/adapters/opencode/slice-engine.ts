@@ -73,6 +73,23 @@ const readConfig = (repo: string): Config | null => {
   return null
 }
 
+const stripAnsi = (x: string) => x.replace(/\x1b\[[0-9;]*m/g, "")
+// Formatted `opencode run` output contains OTHER brace blobs (tool-call echoes, code fences),
+// so first-{-to-last-} grabbing breaks. Scan balanced {...} candidates from the END; the
+// first that parses is the agent's final JSON answer.
+const lastJson = (out: string): unknown => {
+  const t = stripAnsi(out)
+  for (let end = t.lastIndexOf("}"); end !== -1; end = t.lastIndexOf("}", end - 1)) {
+    let depth = 0
+    for (let i = end; i >= 0; i--) {
+      const c = t[i]
+      if (c === "}") depth++
+      else if (c === "{") { depth--; if (depth === 0) { try { return JSON.parse(t.slice(i, end + 1)) } catch { } break } }
+    }
+  }
+  return null
+}
+
 const SH_PREFIX = "Run EXACTLY this shell command"
 const roleOf = (label: string, phase?: string, model?: string): Role => {
   const l = label.replace(/^(g\d+|seq\d+):/, "")           // strip parallel-group tags
@@ -210,9 +227,9 @@ export default tool({
         for (let attempt = 0; attempt < 2; attempt++) {           // one retry on parse/process failure
           try {
             const out = await ocRun(p, role)
-            if (!opts?.schema) return out.trim()
-            const m = out.match(/\{[\s\S]*\}/)
-            if (m) return JSON.parse(m[0])
+            if (!opts?.schema) return stripAnsi(out).trim()
+            const j = lastJson(out)
+            if (j !== null) return j
           } catch { /* retry once, then null — the engine treats null as distrust */ }
         }
         return null
