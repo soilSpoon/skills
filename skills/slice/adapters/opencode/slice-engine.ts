@@ -119,12 +119,16 @@ export default tool({
     task: tool.schema.string().describe("the lane spec (precise: evidence file:line, MUST PRESERVE, purpose, wiring clause)"),
     repo: tool.schema.string().describe("absolute path to the target repo"),
     maxDepth: tool.schema.number().optional().describe("recursion cap (default 3; 2 for contained tasks)"),
+    parallel: tool.schema.boolean().optional().describe("opt-in: run independent top-level slices in parallel git worktrees"),
+    forceParallel: tool.schema.boolean().optional().describe("override compile-bound auto-fallback to sequential (brute-force parallel even for expensive cold builds)"),
+    sharedScratch: tool.schema.boolean().optional().describe("compile-bound parallel WITHOUT per-worktree cold builds: worktrees share ONE build dir (--scratch-path); serializes builds but avoids thrash"),
+    skills: tool.schema.array(tool.schema.string()).optional().describe("paths to SKILL.md-style domain-guidance files forwarded to every leaf/verifier (up to 8)"),
     enginePath: tool.schema.string().optional().describe("override path to the recursive-slice.js artifact"),
     resume: tool.schema.boolean().optional().describe("replay the repo's slice-journal prefix (crash recovery / idempotent re-run)"),
     writeConfig: tool.schema.string().optional().describe(
       'setup: JSON {"roles":{baseliner,assessor,slicer,executor,verifier,heavyLens,critic,spiker,coordinator,briefing,wiringAudit,default},"models":{...}} — written to the global config, then the run proceeds'),
   },
-  async execute(a: { task: string; repo: string; maxDepth?: number; enginePath?: string; resume?: boolean; writeConfig?: string }) {
+  async execute(a: { task: string; repo: string; maxDepth?: number; parallel?: boolean; forceParallel?: boolean; sharedScratch?: boolean; skills?: string[]; enginePath?: string; resume?: boolean; writeConfig?: string }) {
     if (a.writeConfig) {
       const cfg = JSON.parse(a.writeConfig)
       mkdirSync(`${HOME}/.config/opencode`, { recursive: true })
@@ -241,7 +245,7 @@ export default tool({
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...a: string[]) => (...v: unknown[]) => Promise<unknown>
     const run = new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "workflow", "args", "budget", code)
     const result = await run(agent, parallel, null, phase, log, null,
-      { task: a.task, repo: a.repo, maxDepth: a.maxDepth }, budget)
+      { task: a.task, repo: a.repo, maxDepth: a.maxDepth, parallel: a.parallel, forceParallel: a.forceParallel, sharedScratch: a.sharedScratch, skills: a.skills }, budget)
     return JSON.stringify({ engine: enginePath, roles: config.roles || {}, logs, result }, null, 2)
   },
 })
