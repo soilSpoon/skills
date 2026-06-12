@@ -15,5 +15,12 @@
     "./skills/human-like-browser/SKILL.md",
     "./skills/toss-frontend-fundamentals/SKILL.md",
     "./skills/slice/SKILL.md"
+  ],
+  "agents": [
+    "./skills/slice/agents/slice-baseliner.md",
+    "./skills/slice/agents/slice-assessor.md",
+    "./skills/slice/agents/slice-slicer.md",
+    "./skills/slice/agents/slice-executor.md",
+    "./skills/slice/agents/slice-verifier.md"
   ]
 }

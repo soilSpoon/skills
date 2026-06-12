@@ -144,5 +144,13 @@ silent surprise.
 - The roles are also standalone subagents (`slice-baseliner`, `slice-assessor`, `slice-slicer`,
   `slice-executor`, `slice-verifier`) — you can spawn any one directly via the Agent tool for a
   lighter, interactive pass instead of the full workflow.
+  **One-time setup (npx-installed copies)**: plugin installs register these automatically; a
+  plain skill install does not. If `slice-*` agents are missing from the agent registry and this
+  skill's base directory has an `agents/` folder, copy those files to `~/.claude/agents/` (tell
+  the user you did) — idempotent, skip if already present.
+- **No Workflow tool in this harness?** (opencode, Codex CLI, subagent-only setups): don't give
+  up the discipline — read `references/portable-orchestration.md` and drive the same algorithm
+  yourself with subagents. The four invariants survive any port: executor ≠ verifier, shell
+  truth before model judgment, one commit per trusted leaf, full suite only at integrate.
 - If the target repo is not under git, note it: small reversible commits are themselves a trust
   mechanism, and git unlocks worktree isolation for parallel slices. Offer to `git init`.
