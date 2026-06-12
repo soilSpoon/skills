@@ -247,7 +247,19 @@ const CARD = baseline.projectCard
 const PURPOSE = baseline.purposeCheck
   ? `\nPurpose (does it ACTUALLY work for the user, not just the tests?): ${baseline.purposeCheck}${baseline.inProcessVerifiable === false ? ' [NOT verifiable in-process — needs a real env / human; a purposeGap is expected]' : ''}`
   : ''
-const INV = `Baseline to preserve:\n- ${baseline.invariants.join('\n- ')}\nMeasure: ${baseline.measureCommand}${CARD}${PURPOSE}`
+// Domain-guidance skills (args.skills): paths to SKILL.md-style guide files (framework
+// best-practices, house style). Threaded into EVERY role prompt via INV so executors apply
+// them and verifiers enforce them. Selecting WHICH guides fit the task is the front door's
+// judgment — the engine just delivers paths (agents Read them on demand; content never
+// inflates the prompt). Capped to keep leaf context lean.
+const SKILL_PATHS = (Array.isArray(A.skills) ? A.skills : []).filter(s => typeof s === 'string' && s.trim()).slice(0, 8)
+const SKILLS_NOTE = SKILL_PATHS.length
+  ? `\nDOMAIN GUIDANCE (part of the contract): before working, Read these guide files — house style / ` +
+    `best-practice rules the owner expects. Follow their progressive disclosure: read the index/SKILL.md, ` +
+    `then only the rule files relevant to YOUR change.\n- ${SKILL_PATHS.join('\n- ')}\n` +
+    `Executors apply them; verifiers treat clear violations as issues. On conflict, the repo's own established conventions win.`
+  : ''
+const INV = `Baseline to preserve:\n- ${baseline.invariants.join('\n- ')}\nMeasure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`
 
 // ④ Leaf test discipline (MEASURED on a real run: re-running the FULL suite at every leaf — recompiling +
 // running all unrelated tests — was 68% of shell time and 61% of test runs). The engine DETERMINISTICALLY

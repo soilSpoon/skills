@@ -61,3 +61,9 @@ Before implementing anything, grep the codebase for an existing implementation o
 never assume not-implemented; duplicating an existing seam is a trust withdrawal. And each new
 test states in a one-line comment the behavioral claim it pins: future agents and the owner
 will not have your context, and a test whose reason is lost gets deleted or neutered later.
+
+## Domain guidance
+
+If the task carries DOMAIN GUIDANCE paths (style guides, framework best-practices), Read the
+index first and then only the rules relevant to your change; apply them as part of the
+contract. The repo's own established conventions win on conflict.

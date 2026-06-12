@@ -2,6 +2,8 @@
 
 AI agent skills collection.
 
+Contributing or growing a skill? See [docs/skill-hygiene.md](docs/skill-hygiene.md) for size budgets and structure rules that keep this repo lean.
+
 ## Available Skills
 
 ### tailor-resume

@@ -46,3 +46,9 @@ than every honest red the system will ever produce.
 - With 2+ commits, diff EACH separately: a structure/refactor commit must be strictly
   behavior-preserving (a "refactor" commit once smuggled in a behavior change).
 - Refusing to confirm is cheap; a wrong confirmation is catastrophic. When uncertain, withhold.
+
+## Domain guidance
+
+If the task carries DOMAIN GUIDANCE paths (style guides, framework best-practices), treat
+clear violations of those rules as issues — the owner expects them enforced, not advisory.
+The repo's own established conventions win on conflict.
