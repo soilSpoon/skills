@@ -152,7 +152,9 @@ silent surprise.
   - **opencode**: first-class adapter available — copy `adapters/opencode/slice-engine.ts` to
     `~/.config/opencode/tools/` and the `slice-engine` tool runs the SAME engine artifact
     (AsyncFunction-hosted PORT; `agent()` = `opencode run` subprocess on the user's own plan).
-    Verify install with `node adapters/opencode/host-smoke.mjs`. v1 degradations are documented
+    First use returns a `needsSetup` question — lane→agent/model mapping, with oh-my-openagent
+    auto-detection (recommended: sisyphus-junior for shell/light, momus for the heavy lens —
+    cross-model criticism preserved). Verify install free with `node adapters/opencode/host-smoke.mjs`. v1 degradations are documented
     in the adapter header (no per-call model overrides, no resume journal, unlimited budget).
   - **Anything else** (Codex CLI, subagent-only setups): don't give up the discipline — read
     `references/portable-orchestration.md` and drive the same algorithm yourself with subagents.
