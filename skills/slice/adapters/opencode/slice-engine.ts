@@ -9,16 +9,18 @@
 //   the body  → executed via AsyncFunction, whose function-body context makes the artifact's
 //               top-level `return await __main()` legal — same trick the Workflow runtime uses
 //
-// ROLE ROUTING — the engine annotates every call (the sh() proxy prompt, opts.model tier);
-// the adapter maps those lanes onto opencode agents/models from config:
-//   shell  — the deterministic sh() proxy (verbatim bash + exit code; cheapest obedient agent)
-//   light  — engine `model:'sonnet'` calls (assessor, executor, light verifier, baseliner)
-//   heavy  — engine `model:'opus'` calls (the cross-model heavy verification lens)
-//   main   — everything else (slicer, standard verifier, integrator, briefing)
-// With oh-my-openagent installed the recommended mapping is
-//   { shell: "sisyphus-junior", light: "sisyphus-junior", heavy: "momus", main: "" }
-// — momus (criticism, GPT-5.5 xhigh) as the heavy lens preserves the engine's cross-model
-// diversity goal; "" means the session's default agent.
+// ROLE ROUTING — the engine annotates every call (label + phase + model tier); the adapter
+// resolves each to an engine ROLE and routes it to a configured opencode agent. With
+// oh-my-openagent installed, the recommendation maps roles to OMO's specialist pantheon:
+//   slicer → prometheus (planner)     verifier/heavyLens/critic → momus (criticism)
+//   spiker → oracle (debug/arch)      briefing → librarian (docs)
+//   wiringAudit → explore (fast grep) baseliner/assessor/executor → sisyphus-junior
+//   coordinator/default → "" (the session's main agent, e.g. Sisyphus)
+// momus on the heavy lens preserves the engine's cross-model-diversity goal (GPT vs Claude).
+//
+// NATIVE sh() — the engine's deterministic shell proxy ("Run EXACTLY this shell command…")
+// is executed DIRECTLY via /bin/sh, no LLM at all: free, instant, and MORE deterministic
+// than any agent transport. (On opencode the tier-0 gates are therefore truly deterministic.)
 //
 // FIRST RUN — if no config exists the tool does NOT guess silently: it returns a
 // `needsSetup` payload (with a recommended mapping and how it was derived) and instructs the
@@ -48,9 +50,10 @@ const ENGINE_CANDIDATES = [
   `${HOME}/.config/opencode/skills/slice/recursive-slice.js`,
 ].filter(Boolean)
 
-type Lane = "shell" | "light" | "heavy" | "main"
-interface LaneMap { shell?: string; light?: string; heavy?: string; main?: string }
-interface Config { agents?: LaneMap; models?: LaneMap }
+type Role = "baseliner" | "assessor" | "slicer" | "executor" | "verifier" | "heavyLens"
+  | "critic" | "spiker" | "coordinator" | "briefing" | "wiringAudit" | "default"
+type RoleMap = Partial<Record<Role, string>>
+interface Config { roles?: RoleMap; models?: RoleMap }
 
 const readConfig = (repo: string): Config | null => {
   for (const p of [`${repo}/.opencode/slice-engine.json`, GLOBAL_CONFIG]) {
@@ -59,11 +62,22 @@ const readConfig = (repo: string): Config | null => {
   return null
 }
 
-const laneOf = (prompt: string, model?: string): Lane =>
-  prompt.startsWith("Run EXACTLY this shell command") ? "shell"
-  : model === "opus" ? "heavy"
-  : model === "sonnet" ? "light"
-  : "main"
+const SH_PREFIX = "Run EXACTLY this shell command"
+const roleOf = (label: string, phase?: string, model?: string): Role => {
+  const l = label.replace(/^(g\d+|seq\d+):/, "")           // strip parallel-group tags
+  if (phase === "Baseline") return "baseliner"
+  if (/^assess/.test(l)) return "assessor"
+  if (/^(slice|partition)/.test(l)) return "slicer"
+  if (/^exec/.test(l)) return "executor"
+  if (/^spike/.test(l)) return "spiker"
+  if (/^critic/.test(l)) return "critic"
+  if (/^owner-briefing/.test(l)) return "briefing"
+  if (/^wiring-audit/.test(l)) return "wiringAudit"
+  if (/^merge-conflict/.test(l)) return "coordinator"
+  if (model === "opus") return "heavyLens"
+  if (/^(verify|merge-verify|integration)/.test(l) || phase === "Integrate" || phase === "Coordinate") return "verifier"
+  return "default"
+}
 
 export default tool({
   description:
@@ -79,13 +93,13 @@ export default tool({
     maxDepth: tool.schema.number().optional().describe("recursion cap (default 3; 2 for contained tasks)"),
     enginePath: tool.schema.string().optional().describe("override path to the recursive-slice.js artifact"),
     writeConfig: tool.schema.string().optional().describe(
-      'setup: JSON {"agents":{shell,light,heavy,main},"models":{...}} — written to the global config, then the run proceeds'),
+      'setup: JSON {"roles":{baseliner,assessor,slicer,executor,verifier,heavyLens,critic,spiker,coordinator,briefing,wiringAudit,default},"models":{...}} — written to the global config, then the run proceeds'),
   },
   async execute(a: { task: string; repo: string; maxDepth?: number; enginePath?: string; writeConfig?: string }) {
     if (a.writeConfig) {
       const cfg = JSON.parse(a.writeConfig)
       mkdirSync(`${HOME}/.config/opencode`, { recursive: true })
-      writeFileSync(GLOBAL_CONFIG, JSON.stringify({ agents: cfg.agents || {}, models: cfg.models || {} }, null, 2))
+      writeFileSync(GLOBAL_CONFIG, JSON.stringify({ roles: cfg.roles || cfg.agents || {}, models: cfg.models || {} }, null, 2))
     }
     let config = readConfig(a.repo)
     if (!config) {
@@ -94,18 +108,29 @@ export default tool({
         needsSetup: true,
         question: "First use: how should the engine's lanes map to your opencode agents/models? " +
           "ASK THE USER (do not decide silently), then call this tool again with writeConfig.",
-        lanes: {
-          shell: "deterministic bash proxy — cheapest obedient agent",
-          light: "assess/execute/light-verify — a capable mid-tier implementer",
-          heavy: "the adversarial heavy lens — strongest critic, ideally a DIFFERENT model family",
-          main: "slicer/integrator/briefing — your default orchestrator ('' = session default)",
+        roles: {
+          baseliner: "repo physics capture (runs the suite once)",
+          assessor: "easy/hard × small/big classification",
+          slicer: "vertical decomposition + interface design (global view)",
+          executor: "Canon-TDD leaf implementation",
+          verifier: "adversarial trust audit (standard tier + integrate/merge judgment)",
+          heavyLens: "the cross-model heavy lens — strongest critic, DIFFERENT model family",
+          critic: "completeness critic (missing scenarios)",
+          spiker: "de-risking experiments",
+          coordinator: "parallel-branch merge conflicts (global context)",
+          briefing: "the owner's guided read",
+          wiringAudit: "new-symbol production-callsite grep",
+          default: "anything unmapped ('' = session default agent)",
         },
+        note: "the engine's sh() shell proxy is executed NATIVELY (no LLM, no config needed).",
         recommended: omo
-          ? { agents: { shell: "sisyphus-junior", light: "sisyphus-junior", heavy: "momus", main: "" } }
-          : { agents: { shell: "", light: "", heavy: "", main: "" } },
+          ? { roles: { baseliner: "sisyphus-junior", assessor: "sisyphus-junior", slicer: "prometheus",
+                       executor: "sisyphus-junior", verifier: "momus", heavyLens: "momus", critic: "momus",
+                       spiker: "oracle", coordinator: "", briefing: "librarian", wiringAudit: "explore", default: "" } }
+          : { roles: { default: "" } },
         recommendedBecause: omo
-          ? "oh-my-openagent detected: sisyphus-junior (sonnet) fits obedient shell/implement lanes; momus (criticism, GPT-5.5 xhigh) fits the heavy lens AND preserves the engine's cross-model-diversity goal; '' keeps Sisyphus for global-context work."
-          : "no oh-my-openagent detected: '' everywhere uses your session default; set models per lane instead if you prefer.",
+          ? "oh-my-openagent detected — role→specialist mapping: prometheus(planner)→slicer, momus(criticism, GPT-5.5)→verifier/heavyLens/critic (cross-model diversity preserved), oracle(debug)→spiker, librarian(docs)→briefing, explore(fast grep)→wiringAudit, sisyphus-junior(sonnet)→mechanical roles, ''(Sisyphus)→global-context work."
+          : "no oh-my-openagent detected: '' everywhere uses your session default; map models per role instead if you prefer.",
         billingNote: "each engine call is an `opencode run` on YOUR provider (OpenRouter/API credits if so configured) — a full lane can be hundreds of calls; route shell/light lanes to cheap models.",
       }, null, 2)
     }
@@ -118,9 +143,16 @@ export default tool({
     const log = (m: string) => { logs.push(String(m)) }
     const phase = (t: string) => { logs.push(`══ ${t} ══`) }
 
-    const ocRun = (prompt: string, lane: Lane) => new Promise<string>((resolve, reject) => {
-      const agentName = config!.agents?.[lane] || ""
-      const model = config!.models?.[lane] || ""
+    const shNative = (prompt: string) => new Promise<{ stdout: string; exitCode: number }>(resolve => {
+      // engine sh() format: "...this one command:\n\n<cmd>" — extract and exec verbatim
+      const cmd = prompt.split("\n\n").slice(1).join("\n\n")
+      execFile("/bin/sh", ["-c", cmd], { cwd: a.repo, maxBuffer: 32e6, timeout: 30 * 60_000 },
+        (err: (Error & { code?: number }) | null, stdout: string, stderr: string) =>
+          resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: err ? (typeof err.code === "number" ? err.code : 1) : 0 }))
+    })
+    const ocRun = (prompt: string, role: Role) => new Promise<string>((resolve, reject) => {
+      const agentName = config!.roles?.[role] || ""
+      const model = config!.models?.[role] || ""
       const argv = ["run",
         ...(agentName ? ["--agent", agentName] : []),
         ...(model ? ["--model", model] : []),
@@ -129,14 +161,15 @@ export default tool({
         { cwd: a.repo, maxBuffer: 32e6, timeout: 30 * 60_000 },
         (err, stdout) => (stdout ? resolve(String(stdout)) : err ? reject(err) : resolve("")))
     })
-    const agent = async (prompt: string, opts?: { schema?: object; label?: string; model?: string }) => {
-      const lane = laneOf(prompt, opts?.model)
+    const agent = async (prompt: string, opts?: { schema?: object; label?: string; phase?: string; model?: string }) => {
+      if (prompt.startsWith(SH_PREFIX)) return shNative(prompt)   // tier-0 truth without an LLM
+      const role = roleOf(opts?.label || "", opts?.phase, opts?.model)
       const p = opts?.schema
         ? `${prompt}\n\nRespond with ONLY a single JSON object matching this JSON-Schema — no prose, no code fences:\n${JSON.stringify(opts.schema)}`
         : prompt
       for (let attempt = 0; attempt < 2; attempt++) {           // one retry on parse/process failure
         try {
-          const out = await ocRun(p, lane)
+          const out = await ocRun(p, role)
           if (!opts?.schema) return out.trim()
           const m = out.match(/\{[\s\S]*\}/)
           if (m) return JSON.parse(m[0])
@@ -151,6 +184,6 @@ export default tool({
     const run = new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "workflow", "args", "budget", code)
     const result = await run(agent, parallel, null, phase, log, null,
       { task: a.task, repo: a.repo, maxDepth: a.maxDepth }, budget)
-    return JSON.stringify({ engine: enginePath, lanes: config.agents || {}, logs, result }, null, 2)
+    return JSON.stringify({ engine: enginePath, roles: config.roles || {}, logs, result }, null, 2)
   },
 })
