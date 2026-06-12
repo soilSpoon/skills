@@ -175,7 +175,7 @@ async function __main() {
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
   const SH_UNAVAILABLE = { exitCode: -2, stdout: "\0SH_UNAVAILABLE" };
-  const shUnavailable = (r) => r === SH_UNAVAILABLE;
+  const shUnavailable = (r) => r === SH_UNAVAILABLE || !!r && r.exitCode === -2 && String(r.stdout).startsWith("\0SH_UNAVAILABLE");
   const SH = { type: "object", required: ["exitCode"], properties: { stdout: { type: "string" }, exitCode: { type: "integer" } } };
   const sh = async (cmd, label) => {
     const r = await agentSafe(

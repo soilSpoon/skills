@@ -112,7 +112,11 @@ const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection â
 // decision points (git-sha / git-clean / lock-check) produces false reads (BASE_SHA='',
 // gitClean=true, held=''). Instead we return SH_UNAVAILABLE so callers can detect the outage.
 const SH_UNAVAILABLE: ShResult = { exitCode: -2, stdout: '\x00SH_UNAVAILABLE' }
-const shUnavailable = (r: ShResult) => r === SH_UNAVAILABLE
+// Shape-match fallback: reference equality breaks silently if a future refactor clones/serializes
+// results between sh() and a decision site. exitCode -2 is unreachable from a real shell (0-255)
+// and the \x00 prefix is unprintable â€” only the sentinel (or a lying proxy, fail-safe) matches.
+const shUnavailable = (r: ShResult) =>
+  r === SH_UNAVAILABLE || (!!r && r.exitCode === -2 && String(r.stdout).startsWith('\x00SH_UNAVAILABLE'))
 const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { type: 'string' }, exitCode: { type: 'integer' } } }
 const sh = async (cmd: string, label?: string): Promise<ShResult> => {
   const r = (await agentSafe(

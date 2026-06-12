@@ -1050,3 +1050,20 @@ test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add
   assert.equal(wtSetupCallsAbsent.length, 0,
     `wt-setup must NOT fire when worktreeSetupCommand is absent; got ${wtSetupCallsAbsent.length} calls`)
 })
+
+// Artifact-freshness canary (BACKLOG): the suite executes the BUILT artifact, so editing
+// src/*.ts without rebuilding yields green against stale code. mtime guard with a clear
+// remedy message; RS_SKIP_FRESHNESS=1 opts out (e.g. exotic checkout tools).
+test('artifact freshness: recursive-slice.js is not older than src/*.ts', async () => {
+  if (process.env.RS_SKIP_FRESHNESS) return
+  const { statSync, readdirSync } = await import('node:fs')
+  const { join, dirname } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+  const base = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const artifact = statSync(join(base, 'recursive-slice.js')).mtimeMs
+  for (const f of readdirSync(join(base, 'src')).filter((f) => f.endsWith('.ts'))) {
+    const src = statSync(join(base, 'src', f)).mtimeMs
+    assert.ok(artifact >= src,
+      `src/${f} is newer than recursive-slice.js — rebuild: cd skills/slice && bash scripts/build-engine.sh`)
+  }
+})
