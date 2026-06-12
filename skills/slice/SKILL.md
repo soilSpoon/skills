@@ -42,9 +42,13 @@ silent surprise.
 4. **Right-size the call.** Tune the workflow args before launching:
    - `maxDepth`: 2 for a contained task, 3–4 for a genuinely large one. Keep it small — the
      floor is the anti-explosion guard.
-   - `parallel: true` (opt-in) ONLY for a git repo + a task with ≥2 truly file-independent
-     top-level groups + cheap cold builds. The engine auto-falls-back to sequential on
-     compile-bound projects (Swift/Rust/C++) or a dirty main tree; `forceParallel: true` overrides.
+   - `parallel: true` — DEFAULT TO IT (with `sharedScratch`) whenever the spec splits into ≥2
+     coarse groups and the owner hasn't constrained burn rate. The partition ENGINEERS
+     independence (file-disjoint cores in parallel; shared-file wiring as a final sequential
+     group), and light overlap is fine — the Coordinator merges branches and resolves conflicts
+     honoring both sides, with the deterministic full-suite net behind it. Sequential remains
+     right only for single-seam work. Requires git + a clean main tree; the engine auto-falls
+     back on compile-bound projects unless `sharedScratch`/`forceParallel` lifts it.
    - `sharedScratch: true` lifts the compile-bound fallback PROPERLY: all worktrees share one
      build dir (`--scratch-path`), so dependencies compile once and builds serialize on its lock
      (measured on one compile-bound repo: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for
@@ -64,10 +68,12 @@ silent surprise.
    (or copy `recursive-slice.js` to `~/.claude/workflows/` once and use `{ name: 'recursive-slice' }`)
    It runs in the background; you'll be notified on completion. Tell the user they can watch
    live progress with `/workflows`. BEFORE launching, enforce the operational rules:
-   - **ONE workflow at a time** (across ALL repos): concurrent workflows share one API quota —
-     three at once starved every agent into harness stall-kills ("no progress 180s × 6").
-     Check TaskList for a running workflow first; treat "its git deposits landed" as proof of
-     NOTHING — a run can stall-retry for hours after its last commit. Queue, don't stack.
+   - **ONE workflow per WORKING TREE, always** (rs-lock enforces it — two runs mutating one
+     tree corrupt each other; correctness, not cost). ACROSS repos, concurrent workflows are
+     fine when the owner accepts the burn rate — they share one API quota, and three at once
+     once starved every agent into stall-kills, so check what else is consuming quota before
+     stacking. Treat "its git deposits landed" as proof of NOTHING — a run can stall-retry for
+     hours after its last commit.
    - **Quiesced, clean tree**: nobody (human or other run) edits the target tree while a run is
      live. The engine refuses a tree another run holds (lock in the tree's gitdir, `rs-lock`);
      if a run crashed and left a stale lock, confirm no workflow task is alive, then remove it.
