@@ -677,7 +677,7 @@ ${INV}`,
         `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | sed -E 's/^\\+\\s*//' | head -40`,
         "wiring-scan"
       );
-      const symbols = (newPub.stdout || "").trim();
+      const symbols = shUnavailable(newPub) ? "" : (newPub.stdout || "").trim();
       if (symbols) {
         const names = [...new Set((symbols.match(/(?:func|fn|function|var|let|class|struct|enum|const)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || []).map((m) => m.replace(/^.*\s/, "")))].slice(0, 20);
         let refCounts = "";

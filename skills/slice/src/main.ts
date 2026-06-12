@@ -699,7 +699,10 @@ if (GIT && trusted.length && !QUOTA_HALT) {
       `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | ` +
       `grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | ` +
       `sed -E 's/^\\+\\s*//' | head -40`, 'wiring-scan')
-    const symbols = (newPub.stdout || '').trim()
+    // A1/A7: if the sh proxy is dead, newPub is SH_UNAVAILABLE (sentinel object); its stdout
+    // '\x00SH_UNAVAILABLE' is truthy, which would fire the wiring-auditor with garbage input.
+    // Guard first so proxy death keeps the old skip behavior (advisory only — never gate the run).
+    const symbols = shUnavailable(newPub) ? '' : (newPub.stdout || '').trim()
     if (symbols) {
       // Deterministic reference COUNTS (engine-owned, ONE sh call): the judge should weigh
       // evidence, not gather it. Symbol names come from the declaration lines via a strict
