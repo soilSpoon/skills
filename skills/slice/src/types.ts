@@ -23,6 +23,7 @@ export interface Baseline {
   coldBuildCost?: 'cheap' | 'expensive'
   purposeCheck?: string
   inProcessVerifiable?: boolean
+  worktreeSetupCommand?: string   // E: shell command run once per parallel git-worktree right after creation
 }
 export interface Assessment {
   difficulty: 'easy' | 'hard'

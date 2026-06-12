@@ -800,3 +800,81 @@ test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prom
   assert.ok(tbdPrompts.length === 0 || !tbdPrompts.some((p) => /Interface \(FIXED\):/.test(p)),
     `exec prompt for TBD/exploratory interface slice must NOT contain 'Interface (FIXED):'; found in: ${tbdPrompts.filter(p => /Interface \(FIXED\):/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
 })
+
+// GROUP E — BASELINE.worktreeSetupCommand: parallel worktree setup command fires exactly once per
+// worktree, immediately after wt-add, carrying the worktree path and the setup command.
+// Behavioral claim: when baseline.worktreeSetupCommand is set and parallel mode is active, the
+// engine issues one 'wt-setup' sh prompt per worktree (total = N independent groups), each prompt
+// containing the worktree path and the setup command string. When the field is absent, zero
+// wt-setup sh prompts fire (contrast assertion). Order: all wt-setup calls precede the first
+// exec/assess call in any parallel group.
+test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add, before work begins; absent = 0 calls', async () => {
+  const SETUP_CMD = 'npm ci --fixture'
+  const baselineWithSetup = { ...FIX.baseline, worktreeSetupCommand: SETUP_CMD }
+
+  // ── sub-case A: worktreeSetupCommand present ──────────────────────────────
+  const wtSetupCalls = []
+  const wtAddCalls = []
+  const firstExecOrAssessIdx = { val: Infinity }
+  let callCounter = 0
+
+  const dispatchWithSetup = dispatcher((c) => {
+    const idx = callCounter++
+    if (c.opts.phase === 'Baseline') return baselineWithSetup
+    // Plan-phase assess (no label) steers to slice for parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (isSh(c)) {
+      if (/worktree add/.test(c.prompt)) { wtAddCalls.push({ idx, prompt: c.prompt }); return { exitCode: 0, stdout: '' } }
+      if (/wt-setup/.test(c.opts.label || '')) {
+        wtSetupCalls.push({ idx, prompt: c.prompt, label: c.opts.label || '' })
+        return { exitCode: 0, stdout: '' }
+      }
+    }
+    // Track the first non-sh leaf work call (exec or assess inside a group)
+    if (!isSh(c) && (has(c, /exec:/) || has(c, /assess/)) && idx < firstExecOrAssessIdx.val) {
+      firstExecOrAssessIdx.val = idx
+    }
+  })
+
+  const { result: resultA } = await runEngine({ args: ARGS_PARALLEL, dispatch: dispatchWithSetup })
+  assert.equal(resultA.error, undefined, `engine must not error with worktreeSetupCommand set; got: "${resultA.error}"`)
+
+  // Fixture precondition: wt-add must have fired (parallel mode entered)
+  assert.ok(wtAddCalls.length >= 2, `at least 2 wt-add calls must have fired (parallel mode); got ${wtAddCalls.length}`)
+
+  // Core assertion: exactly one wt-setup sh call per worktree (= N = wtAddCalls.length)
+  assert.equal(wtSetupCalls.length, wtAddCalls.length,
+    `wt-setup must fire exactly once per worktree (N=${wtAddCalls.length}); got ${wtSetupCalls.length} calls`)
+
+  // Each wt-setup prompt must contain the setup command
+  for (const c of wtSetupCalls) {
+    assert.ok(c.prompt.includes(SETUP_CMD),
+      `wt-setup prompt must contain the setup command '${SETUP_CMD}'; got: ${c.prompt.slice(0, 200)}`)
+  }
+
+  // Each wt-setup prompt must contain a worktree path (rs-wt/gN pattern)
+  for (const c of wtSetupCalls) {
+    assert.ok(/rs-wt\/g\d/.test(c.prompt),
+      `wt-setup prompt must contain the worktree path (rs-wt/gN); got: ${c.prompt.slice(0, 200)}`)
+  }
+
+  // Order: all wt-setup calls must precede any exec/assess (setup completes before work begins)
+  const lastSetupIdx = Math.max(...wtSetupCalls.map(c => c.idx))
+  assert.ok(lastSetupIdx < firstExecOrAssessIdx.val,
+    `all wt-setup calls (last idx=${lastSetupIdx}) must precede first exec/assess call (idx=${firstExecOrAssessIdx.val})`)
+
+  // ── sub-case B: worktreeSetupCommand absent → zero wt-setup calls ─────────
+  const wtSetupCallsAbsent = []
+  const dispatchWithoutSetup = dispatcher((c) => {
+    // FIX.baseline has no worktreeSetupCommand
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
+      wtSetupCallsAbsent.push(c)
+    }
+  })
+
+  const { result: resultB } = await runEngine({ args: ARGS_PARALLEL, dispatch: dispatchWithoutSetup })
+  assert.equal(resultB.error, undefined, `engine must not error without worktreeSetupCommand; got: "${resultB.error}"`)
+  assert.equal(wtSetupCallsAbsent.length, 0,
+    `wt-setup must NOT fire when worktreeSetupCommand is absent; got ${wtSetupCallsAbsent.length} calls`)
+})

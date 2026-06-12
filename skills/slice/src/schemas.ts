@@ -10,6 +10,7 @@ export const BASELINE = { type: 'object', required: ['invariants', 'measureComma
   coldBuildCost: { type: 'string', enum: ['cheap', 'expensive'] }, // would a FRESH worktree's first build be cheap (interpreted/no-build/shared-cache) or expensive (compiled lang, per-checkout dependency compile)?
   purposeCheck: { type: 'string' },                            // ① how to verify the work ACTUALLY works for the user (PURPOSE) beyond unit tests — e.g. a live integration test / a human action
   inProcessVerifiable: { type: 'boolean' },                    // ① can that purpose be verified deterministically in-process (pure logic / recorded-real bytes), or does it need a real env / human?
+  worktreeSetupCommand: { type: 'string' },                    // E: shell command run ONCE per parallel git-worktree immediately after creation (e.g. 'npm ci'); empty/absent = no setup needed
 } }
 export const ASSESSMENT = { type: 'object', required: ['difficulty', 'action', 'reason'], properties: {
   difficulty: { type: 'string', enum: ['easy', 'hard'] },

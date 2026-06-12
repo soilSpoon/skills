@@ -20,7 +20,11 @@ export const R_BASELINE =
   'PURPOSE (Beck — genies satisfy prompts, not purposes): set `purposeCheck` — beyond unit tests, how would one ' +
   'confirm this ACTUALLY works for the user? e.g. "run the env-gated live integration test", "a human marks a ' +
   'message unread in the app and confirms the server updated". Set `inProcessVerifiable` = can that be checked ' +
-  'deterministically in-process (pure logic / recorded-REAL bytes) or does it need a real environment / human?'
+  'deterministically in-process (pure logic / recorded-REAL bytes) or does it need a real environment / human? ' +
+  'WORKTREE SETUP: set `worktreeSetupCommand` = the shell command that must run ONCE in each parallel git-worktree ' +
+  'right after it is created (e.g. "npm ci" to install deps into the fresh checkout). Leave empty or absent if ' +
+  'no per-worktree setup is needed (interpreted language with no install step, or a shared-cache build dir that is ' +
+  'already populated). This command runs verbatim in each worktree before any leaf work begins.'
 export const R_ASSESS =
   'You are the Assessor — the recursion termination condition. Bias HARD toward execute; over-decomposition ' +
   'is the dominant failure. Judge two orthogonal axes with file:line evidence: difficulty(easy=known/low-risk, ' +

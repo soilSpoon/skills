@@ -640,8 +640,14 @@ if (groups) {
   const paths: Record<number, string> = {}
   for (let i = 0; i < N; i++) {
     const r = await sh(`git -C ${REPO} worktree add -b rs/g${i} ${wtPaths[i]} ${BASE_SHA}`, `wt-add:${i}`)
-    if (r.exitCode === 0) paths[i] = wtPaths[i]
-    else log(`worktree g${i} setup failed (exit ${r.exitCode})`)
+    if (r.exitCode === 0) {
+      paths[i] = wtPaths[i]
+      // E: run worktreeSetupCommand exactly once in each fresh worktree (e.g. 'npm ci') so leaves
+      // start with deps installed and never fail with a fake RED due to a missing-deps error.
+      if (baseline.worktreeSetupCommand) {
+        await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`)
+      }
+    } else log(`worktree g${i} setup failed (exit ${r.exitCode})`)
   }
 
   // 2) Build independent groups in PARALLEL, capped at MAX_WORKERS (batched). Within a group: sequential + feedback.
