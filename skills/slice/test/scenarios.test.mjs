@@ -408,6 +408,84 @@ test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — eac
   assert.equal(result.error, undefined, `run must return normally after same-class verify nulls; got error: "${result.error}"`)
 })
 
+// A6 paired positive — 섞인 호출 클래스 3 연속 null이 정확히 streak=3에서 QUOTA_HALT를 발생시킨다.
+// 이 테스트가 없으면 NULL_STREAK 임계값을 ≥4로 올려도 기존 contrast 테스트(4 nulls, 2 classes)는 통과한다.
+// Behavioral claim: 3 consecutive agentSafe nulls from 3 DIFFERENT classes (verify, exec, assess)
+// sets NULL_STREAK=3 and NULL_STREAK_CLASSES.size=3 ≥ 2 → QUOTA HALT log fires AND no further
+// agent() is called after the halt-triggering call.
+// Engineering:
+//   • GIT=false (empty rev-parse HEAD stdout) removes per-leaf sh calls that would reset the streak
+//   • non-atomic slices: each leaf gets its own assess call
+//   • leaf0: exec→OK, verify→null(streak=1,{verify}), repair-exec→null(streak=2,{verify,exec})
+//   • leaf1: assess→null(streak=3,{verify,exec,assess},size=3≥2 → QUOTA_HALT fires)
+// Paired negative: the A6 test immediately above (same-class heavy 3-lens → no halt).
+test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_HALT at streak=3 (threshold pin)', async () => {
+  // Non-atomic slices so each leaf gets an assess call (atomic:true would skip assess → class=assess never fires)
+  const nonAtomicSlices = {
+    slices: [0, 1].map((i) => ({
+      desc: `mixed-class fixture slice ${i}`, interface: 'TBD/exploratory',
+      contract: `fixture task ${i}`, independent: true,
+      dependsOn: [], kind: 'behavior', atomic: false, riskTier: 'standard', testScope: undefined,
+    })),
+  }
+  let assessLeafCount = 0  // counts assess:d1 calls (leaf-level assesses, NOT the root assess:d0)
+  let haltCallI = -1       // calls.length at the moment QUOTA HALT log fires (detected post-run)
+
+  const dispatch = dispatcher((c) => {
+    // GIT=false: rev-parse HEAD returns a response with no 40-char sha → BASE_SHA='' → GIT=false.
+    // This eliminates leafStart+restore sh() calls that would reset the streak between leaves.
+    if (isSh(c) && /rev-parse HEAD/.test(c.prompt)) {
+      return { exitCode: 0, stdout: '' }
+    }
+    // Root assess (assess:d0) → slice so the slicer fires (must NOT fall through to base assessExecute)
+    if (has(c, /assess:d0/)) return FIX.assessSlice
+    // Return 2 non-atomic slices so both leaves enter their own assess
+    if (has(c, /slice:/)) return nonAtomicSlices
+    // Leaf assesses (assess:d1): first (leaf0) succeeds (fall through), second (leaf1) throws
+    if (has(c, /assess:d1/)) {
+      assessLeafCount++
+      if (assessLeafCount >= 2) throw new Error('transport error on leaf1 assess (fixture: mixed-class streak pin)')
+      return undefined  // fall through → base dispatcher → FIX.assessExecute (leaf0 succeeds)
+    }
+    // Leaf0 verify throws — first null, class=verify (streak=1, classes={verify})
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      throw new Error('transport error on verify (fixture: mixed-class streak pin)')
+    }
+    // Leaf0 repair exec (label ends in .rN) throws — second null, class=exec (streak=2, classes={verify,exec})
+    if (/^exec:|exec:/.test(c.opts.label || '') && /\.r\d/.test(c.opts.label || '')) {
+      throw new Error('transport error on repair exec (fixture: mixed-class streak pin)')
+    }
+  })
+
+  const { result, logs, calls } = await runEngine({ args: ARGS, dispatch })
+
+  // Fixture preconditions
+  assert.ok(assessLeafCount >= 2,
+    `both leaf assesses must have fired (fixture precondition: need 2 non-atomic slices); got assessLeafCount=${assessLeafCount}`)
+
+  // (a) QUOTA HALT must fire — 3 nulls from 3 different classes must trigger the circuit breaker
+  assert.ok(logs.some((l) => /QUOTA HALT/.test(l)),
+    `QUOTA HALT must fire for 3-class streak (verify→exec→assess); logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
+
+  // (b) Agent spawning stops after halt: the engine's QUOTA_HALT gate (line ~391 in main.ts) breaks
+  // the leaf loop before exec fires — no exec:1 call should appear in calls after the halt.
+  // The 'quota halt — stopping' log (from the loop's QUOTA_HALT break) confirms the gate fired.
+  assert.ok(logs.some((l) => /quota halt.*stopping/.test(l)),
+    `engine must log 'quota halt — stopping' when the loop breaks on QUOTA_HALT; logs: ${logs.filter(l => /quota/.test(l)).join(' | ')}`)
+  // No exec call for leaf1 (exec:1) should appear — spawn truly stopped before it
+  const exec1Calls = calls.filter((c) => !isSh(c) && /^exec:1$/.test(c.opts.label || ''))
+  assert.equal(exec1Calls.length, 0,
+    `exec for leaf1 (exec:1) must NOT fire after quota halt; got: ${exec1Calls.map(c => c.opts.label).join(', ')}`)
+
+  // (c) Run ends without result.error (quota halt is a graceful stop, not a crash)
+  assert.equal(result.error, undefined,
+    `run must end without result.error after quota halt; got: "${result.error}"`)
+
+  // (d) aborts carries the resume instruction
+  assert.ok((result.aborts || []).some((a) => /quota-halt:/.test(a)),
+    `aborts must carry quota-halt resume instruction; got: ${JSON.stringify(result.aborts)}`)
+})
+
 // B1+B3+B4 — 검증자 주입 레이어 정리 (three sub-assertions in one block).
 //
 // (a) Tidy leaf: engine runs measureCommand via sh() labeled 'tidy-fullsuite' BEFORE calling the
