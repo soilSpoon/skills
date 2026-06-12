@@ -408,6 +408,153 @@ test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — eac
   assert.equal(result.error, undefined, `run must return normally after same-class verify nulls; got error: "${result.error}"`)
 })
 
+// B1+B3+B4 — 검증자 주입 레이어 정리 (three sub-assertions in one block).
+//
+// (a) Tidy leaf: engine runs measureCommand via sh() labeled 'tidy-fullsuite' BEFORE calling the
+//     verifier, and the tidy verify prompt contains 'ENGINE-RAN' instead of a 're-run' instruction.
+// (b) light tier: the light verify prompt must NOT contain 'LEAF TEST DISCIPLINE' (engineT0 or
+//     light mode already covers the reproduction; injecting the filter discipline is redundant noise).
+// (c) standard tier with engineT0 green: the standard verify prompt must NOT contain 'LEAF TEST
+//     DISCIPLINE' (the engine already ran the filtered gate; the verifier must judge the artifact,
+//     not re-run the same command).
+
+test('B1: tidy leaf — engine runs measureCommand (tidy-fullsuite sh) before verifier; verify prompt has ENGINE-RAN, no re-run instruction', async () => {
+  // Behavioral claim: for a tidy leaf the engine MUST run measureCommand deterministically (via sh
+  // labeled 'tidy-fullsuite') before calling the LLM verifier, then pass ENGINE-RAN in the verify
+  // prompt so the verifier judges the artifact instead of re-running the full suite itself (resolving
+  // the R_VERIFY "NEVER the whole suite" vs tidy "run the FULL existing suite" contradiction).
+  const tidyFullsuiteCmds = []
+  const tidyVerifyPrompts = []
+
+  // Inject a single tidy slice via the slicer intercept
+  const tidySlices = {
+    slices: [
+      { desc: 'tidy: extract helper (fixture)', interface: 'TBD/exploratory',
+        contract: 'pure rename/extract — no behavior change', independent: true,
+        dependsOn: [], kind: 'tidy', atomic: true, riskTier: 'standard', testScope: undefined },
+      // second slice so non-reducing path is NOT taken (slicer must return 2+ to avoid direct execute)
+      { desc: 'behavior: use helper (fixture)', interface: 'TBD/exploratory',
+        contract: 'call the extracted helper', independent: false,
+        dependsOn: ['tidy: extract helper (fixture)'], kind: 'behavior', atomic: true, riskTier: 'standard', testScope: undefined },
+    ],
+  }
+
+  const dispatch = dispatcher((c) => {
+    // Drive decomposition: root assess → slice, then the slicer returns our tidy+behavior pair
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/slice:/.test(c.opts.label || '')) return tidySlices
+    // Capture tidy-fullsuite sh call
+    if (isSh(c) && /tidy-fullsuite/.test(c.opts.label || '')) {
+      tidyFullsuiteCmds.push(c.prompt)
+      return { exitCode: 0, stdout: 'ok 1\n# pass 1' }
+    }
+    // Capture tidy verify prompt (label contains '·tidy')
+    if (/verify.*tidy/.test(c.opts.label || '')) {
+      tidyVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  // Precondition: tidy verify must have been called
+  assert.ok(tidyVerifyPrompts.length > 0, 'tidy verify must have been invoked (fixture precondition)')
+
+  // (1) The engine must have issued a tidy-fullsuite sh call before the verifier
+  assert.ok(tidyFullsuiteCmds.length > 0,
+    `engine must run measureCommand via sh (label 'tidy-fullsuite') before tidy verify; no such call found`)
+
+  // (2) The tidy-fullsuite sh prompt must contain the baseline measureCommand
+  assert.ok(tidyFullsuiteCmds.every((p) => /true/.test(p)),
+    `tidy-fullsuite sh prompt must include the measureCommand ('true' in fixture baseline); got: ${tidyFullsuiteCmds.join(' | ')}`)
+
+  // (3) The tidy verify prompt must contain 'ENGINE-RAN' (engine result hand-off)
+  assert.ok(tidyVerifyPrompts.every((p) => /ENGINE-RAN/.test(p)),
+    `tidy verify prompt must contain 'ENGINE-RAN'; got first 300: ${tidyVerifyPrompts[0] && tidyVerifyPrompts[0].slice(0, 300)}`)
+
+  // (4) The tidy verify prompt must NOT contain a 're-run the full suite' instruction
+  assert.ok(!tidyVerifyPrompts.some((p) => /run the FULL existing suite/.test(p)),
+    `tidy verify prompt must NOT contain 'run the FULL existing suite' re-run instruction (contradiction with R_VERIFY); found in: ${tidyVerifyPrompts.filter(p => /run the FULL existing suite/.test(p)).map(p => p.slice(0, 200)).join(' | ')}`)
+})
+
+test('B3: light-tier verify prompt does NOT inject LEAF_TEST filter-run text (is FORBIDDEN here absent)', async () => {
+  // Behavioral claim: when riskTier='light', the verifier is R_VERIFY_LIGHT which is a diff-audit
+  // path — injecting LEAF_TEST(scope) appendage ('is FORBIDDEN here') is contradictory noise since
+  // R_VERIFY_LIGHT already doesn't ask for a full re-run; the phrase 'is FORBIDDEN here' (unique to
+  // LEAF_TEST injection) must NOT appear in the light verify prompt.
+  const lightVerifyPrompts = []
+
+  const lightSlices = {
+    slices: [
+      { desc: 'light fixture slice A', interface: 'TBD/exploratory',
+        contract: 'pure-function change', independent: true,
+        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'light', testScope: 'LightSuite' },
+      { desc: 'light fixture slice B', interface: 'TBD/exploratory',
+        contract: 'another low-risk unit', independent: true,
+        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'light', testScope: 'LightSuite' },
+    ],
+  }
+
+  const dispatch = dispatcher((c) => {
+    if (/slice:/.test(c.opts.label || '')) return lightSlices
+    // Capture light verify prompts
+    if (/verify.*light/.test(c.opts.label || '')) {
+      lightVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(lightVerifyPrompts.length > 0, 'light verify must have been invoked (fixture precondition)')
+
+  // 'is FORBIDDEN here' is injected ONLY by LEAF_TEST(scope) — not by R_VERIFY or R_VERIFY_LIGHT themselves.
+  // If this phrase is absent, the concrete filter-run instruction was NOT injected (redundant noise removed).
+  assert.ok(!lightVerifyPrompts.some((p) => /is FORBIDDEN here/.test(p)),
+    `light verify prompt must NOT contain the LEAF_TEST 'is FORBIDDEN here' injection; found in: ${lightVerifyPrompts.filter(p => /is FORBIDDEN here/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
+})
+
+test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF_TEST injection (is FORBIDDEN here absent)', async () => {
+  // Behavioral claim: when the engine has already run the filtered gate (engineT0 non-empty / green),
+  // injecting LEAF_TEST(scope) appendage ('is FORBIDDEN here') into the standard verify prompt is
+  // contradictory noise — the engine already ran it; the verifier must judge the ARTIFACT, not re-run.
+  // After engine t0 green the standard verify prompt must contain 'ENGINE-RAN' and must NOT contain
+  // 'is FORBIDDEN here' (the unique marker of the LEAF_TEST injection appendage).
+  const stdVerifyPrompts = []
+  const t0Cmds = []
+
+  // Use FIX.slices3 which has testScope='S0'/'S1'/'S2' (scopeSafe passes)
+  // FIX.baseline filterCommand = 'true # {scope}' so t0cmd fires
+  const dispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    // Capture t0 sh calls and let them succeed
+    if (isSh(c) && /t0:/.test(c.opts.label || '')) {
+      t0Cmds.push(c.prompt)
+      return { exitCode: 0, stdout: 'ok 1\n# pass 1' }
+    }
+    // Capture standard verify prompts (no '·tidy' or '·light' suffix)
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
+        !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
+      stdVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(t0Cmds.length > 0, 'engine t0 must have fired (fixture precondition: need 2+ slices with testScope)')
+  assert.ok(stdVerifyPrompts.length > 0, 'standard verify must have been invoked (fixture precondition)')
+
+  // (1) Standard verify prompt must contain 'ENGINE-RAN' when engineT0 ran
+  assert.ok(stdVerifyPrompts.every((p) => /ENGINE-RAN/.test(p)),
+    `standard verify prompt must contain 'ENGINE-RAN' when engine t0 ran; got first 300: ${stdVerifyPrompts[0] && stdVerifyPrompts[0].slice(0, 300)}`)
+
+  // (2) Standard verify prompt must NOT contain the LEAF_TEST injection ('is FORBIDDEN here') when
+  // ENGINE-RAN is present — 'is FORBIDDEN here' is unique to LEAF_TEST(scope) appendage (not in R_VERIFY itself).
+  assert.ok(!stdVerifyPrompts.some((p) => /is FORBIDDEN here/.test(p)),
+    `standard verify prompt must NOT contain LEAF_TEST injection ('is FORBIDDEN here') when ENGINE-RAN is present; found in: ${stdVerifyPrompts.filter(p => /is FORBIDDEN here/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
+})
+
 // A6 contrast — cross-class streak must still fire QUOTA_HALT (circuit breaker preserved).
 // Sequence: heavy leaf → all 3 lens-verify calls throw (class=verify, streak=3, size=1 → no halt)
 // → repair exec ALSO throws (class=exec added, streak=4, classes={verify,exec} size=2 ≥3 → HALT).

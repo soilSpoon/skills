@@ -255,7 +255,9 @@ if (GIT) {
 //   standard        → one independent reproduction
 //   heavy (hard)    → 3 perspective-diverse skeptics (SEQUENTIAL — avoids nested parallel()); UNANIMOUS trust required
 const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
-  const leafTest = node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)   // ④ tidy needs broad behavior-preservation, not a filter
+  // ④ tidy: engine already ran the full suite (ENGINE-RAN); light: diff-audit path — no filter-run;
+  // engineT0 non-empty: engine already ran filtered gate — injecting LEAF_TEST is contradictory noise.
+  const leafTest = (node.kind === 'tidy' || tier === 'light' || !!engineT0) ? '' : LEAF_TEST(node.testScope)
   // F5: the executor's own ADMISSIONS (discovered/refactor/interfaceConcern) are the verifier's best leads —
   // never truncate those away; clip only the prose. The real diff is read via git, not from `res.diff`.
   const reported = JSON.stringify({
@@ -458,6 +460,21 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
               `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — ` +
               `zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. ` +
               `If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
+          }
+        }
+        // B1: tidy leaf behavior-preservation gate — engine runs the FULL measure command deterministically
+        // (not the executor's claim: a tidy "existing suite is GREEN" was once a self-report with no proof).
+        // Passing ENGINE-RAN into verifyLeaf lets the verifier judge the artifact instead of re-running the
+        // suite itself (resolving the R_VERIFY "NEVER the whole suite" vs tidy "run the full suite" contradiction).
+        if (!t0red && node.kind === 'tidy' && baseline!.measureCommand) {
+          const tidyFull = await sh(`cd ${repo} && ${baseline!.measureCommand}`, `tidy-fullsuite:${lbl}`)
+          if (tidyFull.exitCode !== 0) {
+            t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || '').slice(-300)}`] }
+          } else {
+            engineT0 = `\nENGINE-RAN: \`${baseline!.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. ` +
+              `Output tail: ${String(tidyFull.stdout || '').slice(-300)}\n` +
+              `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). ` +
+              `Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`
           }
         }
         // A repaired leaf is verified at the SAME tier or stricter — never looser (a leaf that failed the

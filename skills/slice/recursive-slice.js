@@ -271,7 +271,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
     }
   }
   const verifyLeaf = async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
-    const leafTest = node.kind === "tidy" ? "" : LEAF_TEST(node.testScope);
+    const leafTest = node.kind === "tidy" || tier === "light" || !!engineT0 ? "" : LEAF_TEST(node.testScope);
     const reported = JSON.stringify({
       summary: String(res.summary || "").slice(0, 400),
       passed: res.passed,
@@ -475,6 +475,16 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
               engineT0 = `
 ENGINE-RAN: \`${t0cmd}\` exited 0. Output tail: ${String(t0.stdout || "").slice(-300)}
 FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`;
+            }
+          }
+          if (!t0red && node.kind === "tidy" && baseline.measureCommand) {
+            const tidyFull = await sh(`cd ${repo} && ${baseline.measureCommand}`, `tidy-fullsuite:${lbl}`);
+            if (tidyFull.exitCode !== 0) {
+              t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || "").slice(-300)}`] };
+            } else {
+              engineT0 = `
+ENGINE-RAN: \`${baseline.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. Output tail: ${String(tidyFull.stdout || "").slice(-300)}
+Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`;
             }
           }
           verdict = t0red || await verifyLeaf(lbl, node, res, attempt === 0 ? tier : tier === "light" ? "standard" : tier, repo, leafStart, engineT0, buildNote);
