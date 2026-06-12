@@ -1,6 +1,20 @@
 # Skills
 
-AI agent skills collection.
+AI agent skills collection — a Claude Code plugin marketplace.
+
+## Install
+
+```
+/plugin marketplace add soilSpoon/skills
+/plugin install slice@soilspoon-skills          # the trust-first engineering workflow (+5 role agents)
+/plugin install soilspoon-toolkit@soilspoon-skills   # the productivity skills
+```
+
+Individual skills also install standalone (any SKILL.md-compatible tool — Claude Code, opencode, …):
+
+```
+npx skills add soilSpoon/skills@<skill-name>
+```
 
 Contributing or growing a skill? See [docs/skill-hygiene.md](docs/skill-hygiene.md) for size budgets and structure rules that keep this repo lean.
 

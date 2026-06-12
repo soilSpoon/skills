@@ -1,0 +1,43 @@
+{
+  "name": "soilspoon-skills",
+  "owner": {
+    "name": "Daehee Lee",
+    "email": "lee111dae11@proton.me"
+  },
+  "metadata": {
+    "description": "soilSpoon's agent skills — trust-first engineering workflow + productivity skills"
+  },
+  "plugins": [
+    {
+      "name": "slice",
+      "description": "Trust-first recursive decomposition engine: baseline → vertical slices → Canon-TDD leaves → adversarial verification → per-leaf commits → deterministic integrate + owner's briefing. Installs the /slice skill and the 5 role subagents.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/slice"
+      ],
+      "agents": [
+        "./skills/slice/agents/slice-baseliner.md",
+        "./skills/slice/agents/slice-assessor.md",
+        "./skills/slice/agents/slice-slicer.md",
+        "./skills/slice/agents/slice-executor.md",
+        "./skills/slice/agents/slice-verifier.md"
+      ]
+    },
+    {
+      "name": "soilspoon-toolkit",
+      "description": "Productivity skills: resume tailoring, job applications, fact-checking, browser automation, frontend fundamentals, build-config drift, issue root-cause workflow.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/tailor-resume",
+        "./skills/fact-check",
+        "./skills/apply-wishket",
+        "./skills/human-like-browser",
+        "./skills/toss-frontend-fundamentals",
+        "./skills/build-config-drift",
+        "./skills/issue-rootcause-workflow"
+      ]
+    }
+  ]
+}
