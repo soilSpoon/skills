@@ -11,50 +11,22 @@
     {
       "name": "slice",
       "description": "Trust-first recursive decomposition engine: baseline → vertical slices → Canon-TDD leaves → adversarial verification → per-leaf commits → deterministic integrate + owner's briefing. Installs the /slice skill and the 5 role subagents.",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/slice"
-      ],
-      "agents": [
-        "./skills/slice/agents/slice-baseliner.md",
-        "./skills/slice/agents/slice-assessor.md",
-        "./skills/slice/agents/slice-slicer.md",
-        "./skills/slice/agents/slice-executor.md",
-        "./skills/slice/agents/slice-verifier.md"
-      ]
+      "source": "./plugins/slice"
     },
     {
       "name": "dev-toolkit",
       "description": "Engineering fundamentals & diagnostics: language-agnostic code-quality core (가독성/예측가능성/응집도/결합도), Toss frontend fundamentals (a11y/React/디자인토큰), build-config drift detection, issue root-cause workflow.",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/code-fundamentals",
-        "./skills/toss-frontend-fundamentals",
-        "./skills/build-config-drift",
-        "./skills/issue-rootcause-workflow"
-      ]
+      "source": "./plugins/dev-toolkit"
     },
     {
       "name": "job-hunt",
       "description": "Job application automation: resume tailoring with fit evaluation, Wishket application workflow.",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/tailor-resume",
-        "./skills/apply-wishket"
-      ]
+      "source": "./plugins/job-hunt"
     },
     {
       "name": "research-tools",
       "description": "Verification & web research: 6-agent parallel fact-checking, human-like browser automation.",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/fact-check",
-        "./skills/human-like-browser"
-      ]
+      "source": "./plugins/research-tools"
     }
   ]
 }
