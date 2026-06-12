@@ -2,7 +2,7 @@
 // The engine is a PORT: it only touches the world through ambient `agent/log/phase/budget/args`
 // (even shell runs go through agent() — the SH proxy). So the WHOLE engine runs here with a
 // scripted dispatcher and zero filesystem/git: every decision path is testable in-process.
-// Run: node --test skills/slice/test/
+// Run: node --test skills/slice/test/scenarios.test.mjs  (passing the DIR fails on Node 22 — MODULE_NOT_FOUND)
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
