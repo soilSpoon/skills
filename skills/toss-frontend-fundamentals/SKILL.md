@@ -1,6 +1,6 @@
 ---
 name: toss-frontend-fundamentals
-description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·응집도·결합도) + 접근성 + 채용 평가축(완성도·확장성·라이브러리 동작 이해·실용성) + 토스 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript 프론트엔드 코드를 작성·리뷰·리팩토링한다. 트리거 - (1) "리뷰해줘"·"개선해줘"·"PR 봐줘"·"code review", (2) React 컴포넌트·훅·유틸 작성·리팩토링, (3) "토스 코딩 컨벤션"·"frontend-fundamentals"·"변경하기 쉬운 코드"·4대 축 명칭, (4) props drilling, 매직 넘버, 중첩 삼항, 커스텀 훅 분리/통합, 전역 상태, 폼 설계, 조건부 렌더링, 디렉토리 구조, (5) "접근성"·"a11y"·"aria"·"스크린 리더"·"semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 a11y 점검, (6) "토스 사전과제"·"기술과제"·"라이브 코딩"·"토스 평가"·"토스 지원"·"코드 리뷰 하는 듯한 경험", (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change. Use when reviewing/writing React/TypeScript frontend code that should follow Toss coding principles or Toss-style hiring evaluation.
+description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·응집도·결합도) + 접근성 + 채용 평가축(완성도·확장성·라이브러리 동작 이해·실용성) + 토스 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript 프론트엔드 코드를 작성·리뷰·리팩토링한다. 트리거 - (1) "리뷰해줘"·"개선해줘"·"PR 봐줘"·"code review", (2) React 컴포넌트·훅·유틸 작성·리팩토링, (3) "토스 코딩 컨벤션"·"frontend-fundamentals"·"변경하기 쉬운 코드"·4대 축 명칭, (4) props drilling, 매직 넘버, 중첩 삼항, 커스텀 훅 분리/통합, 전역 상태, 폼 설계, 조건부 렌더링, 디렉토리 구조, (5) "접근성"·"a11y"·"aria"·"스크린 리더"·"semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 a11y 점검, (6) "토스 사전과제"·"기술과제"·"라이브 코딩"·"토스 평가"·"토스 지원"·"코드 리뷰 하는 듯한 경험", (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change. 4대 축 코어(언어 불문)는 code-fundamentals 스킬이 담당하며 이 스킬은 프론트엔드 고유 관점을 얹는다 — 둘을 함께 설치/활성화. Use when reviewing/writing React/TypeScript frontend code that should follow Toss coding principles or Toss-style hiring evaluation.
 ---
 
 # Toss Frontend Fundamentals
@@ -21,6 +21,12 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | **접근성** | 스크린 리더·키보드·색각 이상 사용자도 쓸 수 있는가? |
 
 원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기). 스킬은 답을 강제하지 않고 트레이드오프를 드러내며, 맥락에 따라 선택을 돕는다.
+
+> 🧩 **분담** — 4대 축의 본체(원칙 references + 언어 불문 리뷰)는
+> [code-fundamentals](../code-fundamentals/SKILL.md) 스킬이 담당한다(함께 설치 권장 —
+> dev-toolkit 플러그인은 둘을 같이 설치한다). 이 스킬은 그 위에 **프론트엔드 고유
+> 관점**(접근성·React 런타임·디자인 토큰·라이브러리 저자 패턴·토스 평가/문화/플랫폼
+> 철학)을 얹는다. L1/L2 lane의 references는 code-fundamentals 쪽 파일을 가리킨다.
 
 > ⚠️ **로드 규율** — `references/*.md`와 외부 URL은 **on-demand**로만 로드한다. 스킬 활성화 시점에 preload 하지 않는다. 트리거 맵에서 해당 패턴이 매칭됐을 때, 또는 리뷰·작성 중 특정 축의 근거가 필요해진 순간에 1-2개씩만 연다. SKILL.md 본문 + 트리거 맵으로 충분한 리뷰가 대부분이다.
 
@@ -87,8 +93,8 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 
 | Lane | 관점 | 활성화 | 매핑 references |
 |---|---|---|---|
-| **L1 readability+predictability** | 인지 부하·이름·시그니처·스코프 가시성 | 항상 | [readability.md](references/readability.md), [predictability.md](references/predictability.md) |
-| **L2 cohesion+coupling** | 모듈 경계·중복 vs 추상·디렉토리·결합 | 항상 | [cohesion.md](references/cohesion.md), [coupling.md](references/coupling.md) |
+| **L1 readability+predictability** | 인지 부하·이름·시그니처·스코프 가시성 | 항상 | [readability.md](../code-fundamentals/references/readability.md), [predictability.md](../code-fundamentals/references/predictability.md) |
+| **L2 cohesion+coupling** | 모듈 경계·중복 vs 추상·디렉토리·결합 | 항상 | [cohesion.md](../code-fundamentals/references/cohesion.md), [coupling.md](../code-fundamentals/references/coupling.md) |
 | **L3 a11y** | WCAG·ARIA·키보드·semantic HTML | UI/JSX 코드 감지 시 | [a11y-basics.md](references/a11y-basics.md), [a11y-components.md](references/a11y-components.md), [a11y-practical.md](references/a11y-practical.md) |
 | **L4 react-runtime+systems** | hook 동작·렌더링·라이브러리 저자 패턴·디자인 토큰 | React/라이브러리/디자인 시스템 코드 감지 시 | [library-patterns.md](references/library-patterns.md), [design-tokens.md](references/design-tokens.md) |
 | **L5 recipes** | 즉시 적용 가능한 코드 변환 패턴 | 작성 모드 또는 리뷰 중 fix 제안 시 | [recipes.md](references/recipes.md) |
@@ -122,18 +128,18 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 
 | 코드에 나타난 것 | 가능한 원칙 | 파일 |
 |---|---|---|
-| 중첩 삼항 `? :`, 4+ 줄 조건문 | 복잡한 조건/삼항 | [readability.md #3, #5](references/readability.md) |
-| 의미 없는 숫자·문자열 상수 | 매직 넘버 | [readability.md #4](references/readability.md) / [cohesion.md #2](references/cohesion.md) |
-| `score >= 80 && score <= 100` | 부등호 순서 | [readability.md #8](references/readability.md) |
-| 한 컴포넌트에 viewer/admin 분기 혼합 | 배타 분기 분리 | [readability.md #1](references/readability.md) |
-| 한 훅이 5개+ 상태 관리 | 로직 종류별 분리 | [readability.md #6](references/readability.md) / [coupling.md #1](references/coupling.md) |
-| 라이브러리와 이름 겹치는 래퍼 | 이름 충돌 | [predictability.md #1](references/predictability.md) |
-| 훅마다 반환 타입 제각각 | 반환 타입 통일 | [predictability.md #2](references/predictability.md) |
-| 함수 내부에서 로깅·리다이렉트 같은 숨은 부작용 | 숨은 로직 | [predictability.md #3](references/predictability.md) |
-| `components/`·`hooks/`·`utils/` 로만 분리 | 디렉토리 응집도 | [cohesion.md #1](references/cohesion.md) |
-| 폼 전체 vs 필드 단위 혼재 | 폼 응집도 | [cohesion.md #3](references/cohesion.md) |
-| 3+ 단 props 전달 | props drilling | [coupling.md #3](references/coupling.md) |
-| 페이지마다 달라지는 로직을 억지로 공통화 | 과도한 DRY | [coupling.md #2](references/coupling.md) |
+| 중첩 삼항 `? :`, 4+ 줄 조건문 | 복잡한 조건/삼항 | [readability.md #3, #5](../code-fundamentals/references/readability.md) |
+| 의미 없는 숫자·문자열 상수 | 매직 넘버 | [readability.md #4](../code-fundamentals/references/readability.md) / [cohesion.md #2](../code-fundamentals/references/cohesion.md) |
+| `score >= 80 && score <= 100` | 부등호 순서 | [readability.md #8](../code-fundamentals/references/readability.md) |
+| 한 컴포넌트에 viewer/admin 분기 혼합 | 배타 분기 분리 | [readability.md #1](../code-fundamentals/references/readability.md) |
+| 한 훅이 5개+ 상태 관리 | 로직 종류별 분리 | [readability.md #6](../code-fundamentals/references/readability.md) / [coupling.md #1](../code-fundamentals/references/coupling.md) |
+| 라이브러리와 이름 겹치는 래퍼 | 이름 충돌 | [predictability.md #1](../code-fundamentals/references/predictability.md) |
+| 훅마다 반환 타입 제각각 | 반환 타입 통일 | [predictability.md #2](../code-fundamentals/references/predictability.md) |
+| 함수 내부에서 로깅·리다이렉트 같은 숨은 부작용 | 숨은 로직 | [predictability.md #3](../code-fundamentals/references/predictability.md) |
+| `components/`·`hooks/`·`utils/` 로만 분리 | 디렉토리 응집도 | [cohesion.md #1](../code-fundamentals/references/cohesion.md) |
+| 폼 전체 vs 필드 단위 혼재 | 폼 응집도 | [cohesion.md #3](../code-fundamentals/references/cohesion.md) |
+| 3+ 단 props 전달 | props drilling | [coupling.md #3](../code-fundamentals/references/coupling.md) |
+| 페이지마다 달라지는 로직을 억지로 공통화 | 과도한 DRY | [coupling.md #2](../code-fundamentals/references/coupling.md) |
 | `{cond && <X/>}`, `<If/>`, 전역 상태, enum vs as const, `if (!val)` 등 논쟁점 | 커뮤니티 합의 | [discussions.md](references/discussions.md) |
 | `<div onClick>`, 아이콘만 있는 버튼, `role=`/`aria-*` 없음 | 접근성 기초 | [a11y-basics.md](references/a11y-basics.md) |
 | 커스텀 Modal/Tab/Accordion/Radio/Checkbox/Switch | UI 접근성 패턴 | [a11y-components.md](references/a11y-components.md) |
@@ -144,42 +150,42 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | `useEffect` 여러 개 + 파생값/이벤트 뒤섞임 | useEffect 최소화 체크리스트 | [recipes.md #9](references/recipes.md) |
 | useQuery 키/옵션 복붙 | Query Key Factory + queryOptions | [recipes.md #10](references/recipes.md) |
 | Zod 스키마 optional 범벅 / 생성/수정 usecase마다 스키마 복제 | `.pick/.omit/.partial` compose | [recipes.md #11](references/recipes.md) |
-| Response/Form/Payload 타입이 서로 다름 | 어댑터 레이어 | [recipes.md #12](references/recipes.md) / [cohesion.md #7](references/cohesion.md) |
+| Response/Form/Payload 타입이 서로 다름 | 어댑터 레이어 | [recipes.md #12](references/recipes.md) / [cohesion.md #7](../code-fundamentals/references/cohesion.md) |
 | 다이얼로그 10개+ `useState` 폭발 | overlay-kit 선언적 패턴 | [recipes.md #13](references/recipes.md) |
 | `z-index: 9999` 등 매직넘버 산재 | 시맨틱 z-index 토큰 | [recipes.md #14](references/recipes.md) |
-| 서버 enum (`"A"|"B"...`) 타이핑 고민 | 코드젠/UNKNOWN/open-union 3전략 | [recipes.md #15](references/recipes.md) / [predictability.md #11](references/predictability.md) |
-| Next.js App Router/RSC 데이터 패칭 위치 | 컴포넌트 곁 fetch + `cache()` | [recipes.md #16](references/recipes.md) / [cohesion.md #8](references/cohesion.md) |
-| `setLoading` / `isLoading` Boolean 네이밍 | Boolean state 네이밍 | [predictability.md #4](references/predictability.md) |
-| prop 이름 `terms` vs `value` | controlled `value/onChange` | [predictability.md #5](references/predictability.md) |
-| `default export` 쓸지 `named` 쓸지 | Named export 기본 | [predictability.md #7](references/predictability.md) |
-| `x != null`, `if (!value)` 느슨한 비교 | Strict 동등 비교 | [predictability.md #8](references/predictability.md) |
-| `onClick={() => ...}` 인라인이 "비효율"? | 인라인 핸들러 통념 교정 | [readability.md #9](references/readability.md) |
-| 단일 상세 vs 리스트에서 데이터 주입 | id vs 데이터 props | [coupling.md #4](references/coupling.md) |
+| 서버 enum (`"A"|"B"...`) 타이핑 고민 | 코드젠/UNKNOWN/open-union 3전략 | [recipes.md #15](references/recipes.md) / [predictability.md #11](../code-fundamentals/references/predictability.md) |
+| Next.js App Router/RSC 데이터 패칭 위치 | 컴포넌트 곁 fetch + `cache()` | [recipes.md #16](references/recipes.md) / [cohesion.md #8](../code-fundamentals/references/cohesion.md) |
+| `setLoading` / `isLoading` Boolean 네이밍 | Boolean state 네이밍 | [predictability.md #4](../code-fundamentals/references/predictability.md) |
+| prop 이름 `terms` vs `value` | controlled `value/onChange` | [predictability.md #5](../code-fundamentals/references/predictability.md) |
+| `default export` 쓸지 `named` 쓸지 | Named export 기본 | [predictability.md #7](../code-fundamentals/references/predictability.md) |
+| `x != null`, `if (!value)` 느슨한 비교 | Strict 동등 비교 | [predictability.md #8](../code-fundamentals/references/predictability.md) |
+| `onClick={() => ...}` 인라인이 "비효율"? | 인라인 핸들러 통념 교정 | [readability.md #9](../code-fundamentals/references/readability.md) |
+| 단일 상세 vs 리스트에서 데이터 주입 | id vs 데이터 props | [coupling.md #4](../code-fundamentals/references/coupling.md) |
 | `function` vs `() =>` React 컴포넌트 선언 | function 권장 | [discussions.md #6](references/discussions.md) |
-| `useInitializeX` 훅 vs `<XInitializer/>` 컴포넌트 | Hook vs Component 결정 규칙 | [cohesion.md #6](references/cohesion.md) |
-| 상수 위치 — 함수 안 vs 밖 | 범용성×도메인 지엽성 | [cohesion.md #4](references/cohesion.md) |
-| `components/`/`hooks/`/`utils/` 만으로 분할 | 도메인 중심 디렉토리 | [cohesion.md #5](references/cohesion.md) |
+| `useInitializeX` 훅 vs `<XInitializer/>` 컴포넌트 | Hook vs Component 결정 규칙 | [cohesion.md #6](../code-fundamentals/references/cohesion.md) |
+| 상수 위치 — 함수 안 vs 밖 | 범용성×도메인 지엽성 | [cohesion.md #4](../code-fundamentals/references/cohesion.md) |
+| `components/`/`hooks/`/`utils/` 만으로 분할 | 도메인 중심 디렉토리 | [cohesion.md #5](../code-fundamentals/references/cohesion.md) |
 | `Object.assign(Fn, {with, Consumer})` / HOC+Consumer 공존 컴포넌트 | 컴포넌트 API 확장 패턴 | [recipes.md #17](references/recipes.md) |
 | ErrorBoundary — fallback 에서 또 에러나면? | FallbackBoundary 위임 | [recipes.md #18](references/recipes.md) |
-| Router / Storage / SDK 등 core 와 외부 환경 분리 | 어댑터 패턴 (얇은 인터페이스 + DI) | [coupling.md #5](references/coupling.md) |
-| 기존 API 유지하면서 새 API로 이전 | `/compat` 어댑터 | [coupling.md #6](references/coupling.md) |
-| `typeof window` / `typeof Buffer` 체크 산재 | 환경 분기 중앙화 | [cohesion.md #9](references/cohesion.md) |
+| Router / Storage / SDK 등 core 와 외부 환경 분리 | 어댑터 패턴 (얇은 인터페이스 + DI) | [coupling.md #5](../code-fundamentals/references/coupling.md) |
+| 기존 API 유지하면서 새 API로 이전 | `/compat` 어댑터 | [coupling.md #6](../code-fundamentals/references/coupling.md) |
+| `typeof window` / `typeof Buffer` 체크 산재 | 환경 분기 중앙화 | [cohesion.md #9](../code-fundamentals/references/cohesion.md) |
 | 타입 시그니처가 복잡한 공개 API 회귀 방지 | 타입 테스트 공존 (`*.test-d.tsx`) | [a11y-basics.md #테스트](references/a11y-basics.md) |
 | **npm 라이브러리 빌드/publish/CI 세팅** | 라이브러리 저자 패턴 | [library-patterns.md](references/library-patterns.md) |
-| 조사·URL 경로·CSS class 같은 **문자열 조합**을 타입으로 보장 | 템플릿 리터럴 타입 | [predictability.md #12](references/predictability.md) |
-| 커스텀 `AbortError`/`TimeoutError`/`ValidationError` 만들 때 | 플랫폼 표준으로 승격 (DOMException/RangeError 등) | [predictability.md #13](references/predictability.md) |
+| 조사·URL 경로·CSS class 같은 **문자열 조합**을 타입으로 보장 | 템플릿 리터럴 타입 | [predictability.md #12](../code-fundamentals/references/predictability.md) |
+| 커스텀 `AbortError`/`TimeoutError`/`ValidationError` 만들 때 | 플랫폼 표준으로 승격 (DOMException/RangeError 등) | [predictability.md #13](../code-fundamentals/references/predictability.md) |
 | 다단계 폼·위저드 — 단계마다 required 필드가 다름 | 빌더 패턴 + 단계별 가드 누적 | [recipes.md #19](references/recipes.md) |
 | RSC prefetch 쿼리가 오래 걸려 페이지 전체 지연 | hydration timeout + CSR 폴백 | [recipes.md #20](references/recipes.md) |
 | **과제에서 요청하지 않은** 애니메이션/View Transitions/커스텀 라우팅 계층 도입 | 자가 도입 복잡성 (완성도·실용성 감점) | §토스 평가 — 위 섹션 |
 | `useEffect`가 `navigate` + 상태 초기화 + race 방지 flag까지 다 포함 | React 동작 이해 — effect는 **동기화**용, 명령형 로직은 이벤트 핸들러/콜백으로 | §토스 평가 — React 동작 이해 |
-| 함수가 조용히 `Promise`를 반환하는데 호출부 절반은 `await`, 절반은 버림 | 시그니처로 비동기 드러내기 (`afterTransition` 콜백 / 이름에 `Async`) | [predictability.md #3](references/predictability.md) + §토스 평가 |
+| 함수가 조용히 `Promise`를 반환하는데 호출부 절반은 `await`, 절반은 버림 | 시그니처로 비동기 드러내기 (`afterTransition` 콜백 / 이름에 `Async`) | [predictability.md #3](../code-fundamentals/references/predictability.md) + §토스 평가 |
 | 컴포넌트 prop이 15개+ / boolean prop 폭증 | Flat → Compound 분해 (props가 끝없이 늘어나면 위험 신호) | [design-tokens.md #flat-vs-compound](references/design-tokens.md) + §플랫폼 철학 #7 |
 | 색상·z-index·spacing이 숫자 이름(`blue-100`, `z-9999`) | Target/Role/Variant/Level 의미 기반 토큰 | [design-tokens.md #4축-네이밍](references/design-tokens.md) |
 | E2E/컴포넌트 테스트 셀렉터가 `data-testid` · XPath 투성이 | `getByRole`/`getByLabelText` 우선 — 테스트와 a11y 동시 강화 | §플랫폼 철학 #5 |
 | 버그 fix PR에 회귀 테스트 없음 / 성능 PR에 측정 수치 없음 | `[MUST]` 차단 (버그·성능은 반드시 돌아온다) | §플랫폼 철학 #4 |
 | 같은 버그 유형이 2회 이상 보고됨 | 개별 패치 대신 **가드레일**(타입·Lint 룰·codemod·테스트) | §플랫폼 철학 #1,#2 |
 | `// @ts-ignore` / `/* eslint-disable */` / `as any` / 디자인 시스템 fork | "우회할 이유를 줄이는 설계" — API 실패의 증상으로 취급 | §플랫폼 철학 #7 |
-| `typeof window` / Universal·Isomorphic 분기가 여러 곳 산재 | 실행 환경을 좁혀 응집도 회복 (toss.tech RN 2024) | [cohesion.md #9](references/cohesion.md) + §플랫폼 철학 |
+| `typeof window` / Universal·Isomorphic 분기가 여러 곳 산재 | 실행 환경을 좁혀 응집도 회복 (toss.tech RN 2024) | [cohesion.md #9](../code-fundamentals/references/cohesion.md) + §플랫폼 철학 |
 | 공개 API breaking change PR에 마이그레이션 가이드/codemod 없음 | 릴리스 노트 + codemod + 업그레이드 원라이너 세트 | [library-patterns.md](references/library-patterns.md) + §플랫폼 철학 #6 |
 | 모바일/RN 앱 번들이 모놀리식 (서비스 A 변경이 B에 영향) | Shared 번들 + Service 번들 분리, 결정적 빌드 도구 선택 | §플랫폼 철학 (toss.tech RN 2024) |
 

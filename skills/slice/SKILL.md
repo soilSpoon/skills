@@ -52,9 +52,10 @@ silent surprise.
    - `skills: [paths]` — domain-guidance guide files threaded into every executor/verifier
      (executors apply them, verifiers enforce them; repo conventions win on conflict). Scan the
      local skill library (`~/.claude/skills/`, `~/.claude/skill-library/` — see its INDEX.md)
-     for guides matching the task's domain — a frontend/React lane wants the react/composition
-     best-practice guides and the house frontend fundamentals; a lane in a domain with no guide
-     gets none. Pass each skill's SKILL.md (or AGENTS.md) absolute path. Only genuinely relevant
+     for guides matching the task's domain — `code-fundamentals` (language-agnostic 4-axis
+     quality) fits ANY substantial lane and is the default pick; a frontend/React lane adds the
+     react/composition guides + the house frontend fundamentals on top; a lane in a domain with
+     no matching guide gets none. Pass each skill's SKILL.md (or AGENTS.md) absolute path. Only genuinely relevant
      guides — every entry taxes every leaf's attention.
    - Pass `repo` as an absolute path so the agents (whose cwd may differ) find it.
 
