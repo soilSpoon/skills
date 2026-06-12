@@ -33,11 +33,22 @@
 // Install: copy this file to ~/.config/opencode/tools/ (global) or <project>/.opencode/tools/.
 // Verify install without spending tokens: node host-smoke.mjs
 //
-// Known v1 degradations (documented, not silent): no resume journal (per-leaf commits remain
-// the durable record); budget is unlimited (watch your provider quota); each agent call is a
-// fresh subprocess session (no cross-call cache).
+// RESUME JOURNAL — every agent()/sh() call is appended to <repo>/.opencode/slice-journal.jsonl
+// as {key: sha256(role+prompt), result}. Re-running with resume:true replays the journal as a
+// PREFIX cache (same Workflow-tool semantics): entries replay in order while keys match; the
+// first mismatch (or exhaustion) switches to live execution and truncates the stale tail.
+// A crashed/killed run therefore resumes for free up to its last completed call.
+//
+// PARALLEL — the engine's parallel worktree mode works here structurally: parallel() is
+// Promise.all over thunks, each chaining its own subprocess calls, and worktree setup runs
+// through the native sh() path. oh-my-openagent's team_* tools are session-internal (not
+// reachable from `opencode run`); wiring them up needs the SDK-plugin form of this adapter.
+//
+// Known degradations (documented, not silent): budget is unlimited (watch your provider
+// quota); each live agent call is a fresh subprocess session (no cross-call provider cache).
 import { tool } from "@opencode-ai/plugin"
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { execFile } from "node:child_process"
 
 const HOME = process.env.HOME || "~"
@@ -92,10 +103,11 @@ export default tool({
     repo: tool.schema.string().describe("absolute path to the target repo"),
     maxDepth: tool.schema.number().optional().describe("recursion cap (default 3; 2 for contained tasks)"),
     enginePath: tool.schema.string().optional().describe("override path to the recursive-slice.js artifact"),
+    resume: tool.schema.boolean().optional().describe("replay the repo's slice-journal prefix (crash recovery / idempotent re-run)"),
     writeConfig: tool.schema.string().optional().describe(
       'setup: JSON {"roles":{baseliner,assessor,slicer,executor,verifier,heavyLens,critic,spiker,coordinator,briefing,wiringAudit,default},"models":{...}} — written to the global config, then the run proceeds'),
   },
-  async execute(a: { task: string; repo: string; maxDepth?: number; enginePath?: string; writeConfig?: string }) {
+  async execute(a: { task: string; repo: string; maxDepth?: number; enginePath?: string; resume?: boolean; writeConfig?: string }) {
     if (a.writeConfig) {
       const cfg = JSON.parse(a.writeConfig)
       mkdirSync(`${HOME}/.config/opencode`, { recursive: true })
@@ -143,6 +155,32 @@ export default tool({
     const log = (m: string) => { logs.push(String(m)) }
     const phase = (t: string) => { logs.push(`══ ${t} ══`) }
 
+    // ---- resume journal (prefix cache, Workflow-journal semantics) ----
+    const journalPath = `${a.repo}/.opencode/slice-journal.jsonl`
+    mkdirSync(`${a.repo}/.opencode`, { recursive: true })
+    type JEntry = { key: string; result: unknown }
+    let journal: JEntry[] = []
+    if (a.resume && existsSync(journalPath)) {
+      try { journal = readFileSync(journalPath, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)) } catch { journal = [] }
+    }
+    let replayIdx = 0
+    let replaying = !!a.resume && journal.length > 0
+    const kept: JEntry[] = []
+    const flush = () => writeFileSync(journalPath, kept.map(e => JSON.stringify(e)).join("\n") + (kept.length ? "\n" : ""))
+    const keyOf = (role: string, prompt: string) => createHash("sha256").update(role + "\n" + prompt).digest("hex")
+    const journaled = async (role: string, prompt: string, live: () => Promise<unknown>) => {
+      const key = keyOf(role, prompt)
+      if (replaying) {
+        const e = journal[replayIdx]
+        if (e && e.key === key) { replayIdx++; kept.push(e); flush(); return e.result }
+        replaying = false                       // prefix diverged — stale tail is discarded by flush()
+        logs.push(`journal: replayed ${replayIdx}/${journal.length}, diverged — live from here`)
+      }
+      const result = await live()
+      kept.push({ key, result }); flush()
+      return result
+    }
+
     const shNative = (prompt: string) => new Promise<{ stdout: string; exitCode: number }>(resolve => {
       // engine sh() format: "...this one command:\n\n<cmd>" — extract and exec verbatim
       const cmd = prompt.split("\n\n").slice(1).join("\n\n")
@@ -162,20 +200,23 @@ export default tool({
         (err, stdout) => (stdout ? resolve(String(stdout)) : err ? reject(err) : resolve("")))
     })
     const agent = async (prompt: string, opts?: { schema?: object; label?: string; phase?: string; model?: string }) => {
-      if (prompt.startsWith(SH_PREFIX)) return shNative(prompt)   // tier-0 truth without an LLM
+      if (prompt.startsWith(SH_PREFIX))
+        return journaled("sh", prompt, () => shNative(prompt))    // tier-0 truth without an LLM
       const role = roleOf(opts?.label || "", opts?.phase, opts?.model)
       const p = opts?.schema
         ? `${prompt}\n\nRespond with ONLY a single JSON object matching this JSON-Schema — no prose, no code fences:\n${JSON.stringify(opts.schema)}`
         : prompt
-      for (let attempt = 0; attempt < 2; attempt++) {           // one retry on parse/process failure
-        try {
-          const out = await ocRun(p, role)
-          if (!opts?.schema) return out.trim()
-          const m = out.match(/\{[\s\S]*\}/)
-          if (m) return JSON.parse(m[0])
-        } catch { /* retry once, then null — the engine treats null as distrust */ }
-      }
-      return null
+      return journaled(role, p, async () => {
+        for (let attempt = 0; attempt < 2; attempt++) {           // one retry on parse/process failure
+          try {
+            const out = await ocRun(p, role)
+            if (!opts?.schema) return out.trim()
+            const m = out.match(/\{[\s\S]*\}/)
+            if (m) return JSON.parse(m[0])
+          } catch { /* retry once, then null — the engine treats null as distrust */ }
+        }
+        return null
+      })
     }
     const parallel = (thunks: Array<() => Promise<unknown>>) => Promise.all(thunks.map(t => t().catch(() => null)))
     const budget = { total: null as number | null, spent: () => 0, remaining: () => Infinity }

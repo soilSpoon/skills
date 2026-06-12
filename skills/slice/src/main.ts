@@ -626,10 +626,25 @@ if (GIT && trusted.length) {
       `sed -E 's/^\\+\\s*//' | head -40`, 'wiring-scan')
     const symbols = (newPub.stdout || '').trim()
     if (symbols) {
+      // Deterministic reference COUNTS (engine-owned, ONE sh call): the judge should weigh
+      // evidence, not gather it. Symbol names come from the declaration lines via a strict
+      // identifier regex (injection-safe by construction); grep -rw counts every mention
+      // outside test paths — a count ≈ the declaration's own lines marks the unwired
+      // candidate. The LLM now judges only the EXCEPTIONS instead of doing its own greps.
+      const names = [...new Set((symbols.match(/(?:func|fn|function|var|let|class|struct|enum|const)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [])
+        .map(m => m.replace(/^.*\s/, '')))].slice(0, 20)
+      let refCounts = ''
+      if (names.length) {
+        const counter = names.map(n =>
+          `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join('; ')
+        refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, 'wiring-count')).stdout || '').trim()
+      }
       const w: { gaps?: string[] } | null = await agent(
         `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} ` +
         `(extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):\n${symbols}\n\n` +
-        `For each, grep the PRODUCTION code (exclude test directories) for actual call/use sites. ` +
+        `DETERMINISTIC reference counts (engine-run \`grep -rw\` over production paths; a count of 1-3 ` +
+        `usually means declaration-only = UNWIRED candidate):\n${refCounts || '(count step unavailable)'}\n\n` +
+        `Judge from those counts — re-grep a symbol yourself ONLY when its count is ambiguous. ` +
         `Report as gaps ONLY symbols that (a) have ZERO production call sites AND (b) look like they were ` +
         `MEANT to be wired into an existing flow — i.e. the feature is unreachable by a user. ` +
         `EXCLUDE: protocol/interface requirements, overrides, library-surface API intended for external ` +
