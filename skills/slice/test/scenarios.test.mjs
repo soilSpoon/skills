@@ -555,6 +555,144 @@ test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF
     `standard verify prompt must NOT contain LEAF_TEST injection ('is FORBIDDEN here') when ENGINE-RAN is present; found in: ${stdVerifyPrompts.filter(p => /is FORBIDDEN here/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
 })
 
+// B2+B5+B6+B7+B8 — 프롬프트 중복·모순 다이어트
+//
+// (a) B7: batch follow-up leaf exec prompt must contain 'Baseline to preserve' EXACTLY ONCE
+//     (currently 2: INV is injected into node.ctx at stack.push, then again directly in exec template).
+// (b) B2: merge-conflict LLM prompt must NOT contain 'FULL measure' or 'worktree remove'
+//     (the engine owns both of those steps; the LLM coordinator only resolves conflicts).
+// (c) B6: leaf verify prompt must NOT contain 'explicitly orders a FULL run'
+//     (that dead branch in R_VERIFY was never reachable — the engine never sends such an instruction).
+// (d) Integrate agentSafe prompt must NOT contain 'PURPOSE (①' pattern
+//     (the integrate prompt must NOT re-inject PURPOSE separately; R_VERIFY already covers it via INV).
+
+test('B7: batch follow-up exec prompt has Baseline to preserve exactly once (no double INV injection)', async () => {
+  // Behavioral claim: when a trusted leaf produces discovered items, the engine pushes a batch follow-up
+  // node with ctx = "Discovered while doing '...'. ${INV}". The exec prompt template also appends ${INV}
+  // directly. This double-injection makes 'Baseline to preserve' appear twice. The fix: strip INV from
+  // node.ctx at push time so it is injected only once by the exec template.
+  // Fixture: FIX.exec.discovered variant triggers the batch push; the second exec is the batch leaf
+  // (task starts with "Address these"). We capture that batch exec prompt to count 'Baseline to preserve'.
+  const execWithDiscovered = {
+    summary: 'fixture change applied', passed: true, evidence: 'filtered run green (fixture)',
+    filesChanged: ['src/x.ts'], refactor: 'none needed (fixture)', commits: [],
+    funList: [],
+    discovered: ['edge case A: empty input should not throw'],  // triggers batch follow-up push
+    purposeVerified: true,
+  }
+
+  let firstExecDone = false
+  const batchExecPrompts = []
+  const dispatch = dispatcher((c) => {
+    if (/^exec:|exec:/.test(c.opts.label || '') && !/\.r/.test(c.opts.label || '')) {
+      if (!firstExecDone) {
+        firstExecDone = true
+        return execWithDiscovered  // first exec: returns discovered item
+      }
+      // Second exec is the batch follow-up leaf (task contains "Address these")
+      batchExecPrompts.push(c.prompt)
+      // fall through → base dispatcher returns FIX.exec (no more discovered)
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(batchExecPrompts.length > 0, 'batch follow-up exec must have been called (fixture precondition: need discovered item)')
+
+  for (const p of batchExecPrompts) {
+    const occurrences = (p.match(/Baseline to preserve/g) || []).length
+    assert.equal(occurrences, 1,
+      `batch follow-up exec prompt must contain 'Baseline to preserve' exactly once; found ${occurrences} times. First 500 chars: ${p.slice(0, 500)}`)
+  }
+})
+
+test('B2: merge-conflict LLM prompt has no FULL measure or worktree remove (engine owns those steps)', async () => {
+  // Behavioral claim: after B2 R_COORD diet, the merge-conflict agentSafe prompt no longer instructs
+  // the LLM to run the FULL measure command or remove worktrees — the engine owns both deterministically.
+  const mergeConflictPrompts = []
+
+  const dispatch = dispatcher((c, env) => {
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    // Force a merge conflict on the first branch
+    if (isSh(c) && /merge --no-ff/.test(c.prompt) && /rs\/g0/.test(c.prompt)) {
+      return { exitCode: 1, stdout: 'CONFLICT (content): Merge conflict in src/x.ts' }
+    }
+    // Capture merge-conflict LLM call prompts
+    if (/merge-conflict/.test(c.opts.label || '')) {
+      mergeConflictPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS_PARALLEL, dispatch })
+
+  assert.ok(mergeConflictPrompts.length > 0, 'merge-conflict LLM must have been called (fixture precondition)')
+
+  for (const p of mergeConflictPrompts) {
+    assert.ok(!/FULL measure/.test(p),
+      `merge-conflict prompt must NOT contain 'FULL measure'; found in: ${p.slice(0, 400)}`)
+    assert.ok(!/worktree remove/.test(p),
+      `merge-conflict prompt must NOT contain 'worktree remove'; found in: ${p.slice(0, 400)}`)
+  }
+})
+
+test('B6: standard-tier leaf verify prompt does NOT contain explicitly orders a FULL run (dead R_VERIFY branch removed)', async () => {
+  // Behavioral claim: the dead branch "if the prompt explicitly orders a FULL run (integration/merge),
+  // run the full suite" in R_VERIFY is never reachable — the engine never sends such an instruction.
+  // After deletion the phrase 'explicitly orders a FULL run' must not appear in any standard leaf verify prompt.
+  // Standard tier is forced by returning difficulty:'medium' from assess (not easy→light, not hard→heavy).
+  const assessStandard = { difficulty: 'medium', size: 'small', action: 'execute', reason: 'fixture: standard', risk: 'medium' }
+  const stdVerifyPrompts = []
+
+  const dispatch = dispatcher((c) => {
+    if (has(c, /assess/)) return assessStandard
+    // Capture standard verify prompts (not light, not heavy, not tidy, not integration)
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
+        !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
+      stdVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(stdVerifyPrompts.length > 0, 'standard-tier leaf verify must have been called (fixture precondition: need assess returning medium difficulty)')
+
+  for (const p of stdVerifyPrompts) {
+    assert.ok(!/explicitly orders a FULL run/.test(p),
+      `standard leaf verify prompt must NOT contain 'explicitly orders a FULL run' (dead R_VERIFY branch); found in: ${p.slice(0, 400)}`)
+  }
+})
+
+test('B8+PURPOSE: integrate agentSafe prompt has no PURPOSE (①) re-injection; R_VERIFY covers it', async () => {
+  // Behavioral claim: after PURPOSE unification the integrate prompt must NOT append a separate
+  // "PURPOSE (①, Beck): ..." clause (R_VERIFY already instructs purposeGap via its own PURPOSE
+  // sentence which now mentions 'remains UNVERIFIED and how to close it').
+  // Also pins that the integrate prompt still contains 'Baseline to preserve' (INV is still present).
+  // The integration call has schema=VERDICT (required[0]==='trustworthy'); briefing has schema=BRIEFING
+  // (required[0]==='briefing') — we capture only the VERDICT-schema calls to avoid the briefing noise.
+  const integratePrompts = []
+
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Integrate' && !isSh(c) &&
+        c.opts.schema && c.opts.schema.required && c.opts.schema.required[0] === 'trustworthy') {
+      integratePrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(integratePrompts.length > 0, 'integrate VERDICT agentSafe must have been called (fixture precondition)')
+
+  for (const p of integratePrompts) {
+    assert.ok(!/PURPOSE \(①/.test(p),
+      `integrate prompt must NOT contain 'PURPOSE (①' re-injection; found in: ${p.slice(0, 500)}`)
+    assert.ok(/Baseline to preserve/.test(p),
+      `integrate prompt must still contain 'Baseline to preserve' (INV present); got first 500: ${p.slice(0, 500)}`)
+  }
+})
+
 // A6 contrast — cross-class streak must still fire QUOTA_HALT (circuit breaker preserved).
 // Sequence: heavy leaf → all 3 lens-verify calls throw (class=verify, streak=3, size=1 → no halt)
 // → repair exec ALSO throws (class=exec added, streak=4, classes={verify,exec} size=2 ≥3 → HALT).

@@ -547,7 +547,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         // Batch leaf INHERITS the parent's testScope: scenarios discovered while working a scope
         // almost always live in/near that suite, and inheritance arms the engine t0 gate for the
         // batch (previously batch leaves carried no scope → the deterministic gate never fired).
-        stack.push({ task: batchTask, ctx: `Discovered while doing "${node.task.slice(0, 40)}". ${INV}`, kind: 'behavior', atomic: true, riskTier: 'standard', testScope: node.testScope, depth: node.depth, spikes: 0 })
+        stack.push({ task: batchTask, ctx: `Discovered while doing "${node.task.slice(0, 40)}".`, kind: 'behavior', atomic: true, riskTier: 'standard', testScope: node.testScope, depth: node.depth, spikes: 0 })
         log(`${tag}+${fresh.length} discovered → 1 batched follow-up leaf`)
       }
     }
@@ -745,10 +745,7 @@ if (QUOTA_HALT) {
     `DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run the whole ` +
     `suite; JUDGE from that result whether every invariant still holds across the integrated whole` +
     `${finalRun.exitCode === 0 ? '' : ' (it is RED — identify which leaf/area most likely regressed)'}.\n${INV}` +
-    (GIT ? `\nAlso summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`) and confirm no out-of-scope file changed since baseline.` : '') +
-    `\nPURPOSE (①, Beck): the tests are green (the PROMPT) — but does the work actually WORK for the user (the ` +
-    `PURPOSE)? If effectful behavior was exercised only via fakes/mocks, set \`purposeGap\` naming exactly what ` +
-    `real-world behavior remains UNVERIFIED and how to close it (live test / human action). Never present fake-green as "it works".`,
+    (GIT ? `\nAlso summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`) and confirm no out-of-scope file changed since baseline.` : ''),
     { phase: 'Integrate', schema: VERDICT })) as Verdict | null
   if (!integration) {
     log('integration agent unavailable (API error) — one retry')
