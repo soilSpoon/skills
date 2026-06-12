@@ -117,6 +117,16 @@ var R_COORD = "You are the Coordinator — the ONLY agent with global context. I
 
 // src/main.ts
 async function __main() {
+  const agentSafe = async (prompt, opts) => {
+    try {
+      return await agent(prompt, opts);
+    } catch (e) {
+      const m = String(e && e.message || e);
+      if (/budget|ceiling/i.test(m)) throw e;
+      log(`agent threw (treated as null): ${m.slice(0, 140)}`);
+      return null;
+    }
+  };
   const A = typeof args === "string" ? JSON.parse(args) : args || {};
   if (!A.task) {
     log("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
@@ -136,7 +146,7 @@ async function __main() {
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
   const SH = { type: "object", required: ["exitCode"], properties: { stdout: { type: "string" }, exitCode: { type: "integer" } } };
-  const sh = async (cmd, label) => await agent(
+  const sh = async (cmd, label) => await agentSafe(
     `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
 
 ${cmd}`,
@@ -144,7 +154,7 @@ ${cmd}`,
   ) || { stdout: "", exitCode: 1 };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
-  const baseline = await agent(
+  const baseline = await agentSafe(
     `${R_BASELINE}
 
 Repo: ${REPO}
@@ -219,14 +229,14 @@ Task: ${node.task}
 Reported: ${reported}
 ${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNote || ""}`;
     if (node.kind === "tidy") {
-      return await agent(
+      return await agentSafe(
         `${base}
 This is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
         { phase: "Work", label: `verify:${lbl}·tidy`, schema: VERDICT }
       ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
     }
     if (tier === "light") {
-      return await agent(
+      return await agentSafe(
         `${R_VERIFY_LIGHT}
 
 Repo: ${repo}
@@ -241,7 +251,7 @@ ${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNot
       const votes = [];
       for (let li = 0; li < lenses.length; li++) {
         const L = lenses[li];
-        const v = await agent(
+        const v = await agentSafe(
           `${base}
 LENS: judge specifically through "${L}".`,
           { phase: "Work", label: `verify:${lbl}·${L.slice(0, 9)}`, ...li === 0 ? { model: "opus" } : {}, schema: VERDICT }
@@ -263,7 +273,7 @@ LENS: judge specifically through "${L}".`,
         // I4: lens follow-ups feed the batch
       };
     }
-    return await agent(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
+    return await agentSafe(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
   };
   let t0redStreak = 0;
   const ABORTS = [];
@@ -282,7 +292,7 @@ LENS: judge specifically through "${L}".`,
       if (node.atomic) {
         action = "execute";
       } else {
-        a = await agent(
+        a = await agentSafe(
           `${R_ASSESS}
 
 Repo: ${repo}
@@ -297,7 +307,7 @@ Classify and emit the next action.`,
         if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
       }
       if (action === "slice") {
-        const sl = await agent(
+        const sl = await agentSafe(
           `${R_SLICE}
 
 Repo: ${repo}
@@ -309,7 +319,7 @@ ${INV}`,
         );
         let slices = sl && sl.slices || [];
         if (slices.length > 1) {
-          const crit = await agent(
+          const crit = await agentSafe(
             `${R_CRITIC}
 
 Repo: ${repo}
@@ -335,7 +345,7 @@ ${INV}`,
         }
       }
       if (action === "spike") {
-        const learn = await agent(
+        const learn = await agentSafe(
           `You are the Spiker (Beck: concrete hypotheses — make the uncertainty small, falsifiable, and cheap).
 Repo: ${repo}
 De-risk this hard-but-small task with the smallest experiment / minimal reproduction (remove extraneous detail; learn, don't build): ${node.task}
@@ -370,7 +380,7 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
 REPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ${JSON.stringify((verdict && verdict.issues && verdict.issues.length ? verdict.issues : [verdict && verdict.reason]).slice(0, 6).map((s) => String(s).slice(0, 300)))}. ` + (verdict && verdict.prescription ? `
 REVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}
 ` : "") + (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : "") + `then fix exactly those objections. In git mode add a fresh commit.`;
-        res = await agent(
+        res = await agentSafe(
           `${R_EXEC}
 
 Repo: ${repo}
@@ -465,7 +475,7 @@ If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a tes
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
   if (goParallel) {
-    const a0 = await agent(
+    const a0 = await agentSafe(
       `${R_ASSESS}
 
 Repo: ${REPO}
@@ -476,7 +486,7 @@ Classify and emit the next action.`,
       { phase: "Plan", model: "sonnet", schema: ASSESSMENT }
     );
     if (a0 && a0.action === "slice") {
-      const sl = await agent(
+      const sl = await agentSafe(
         `${R_SLICE}
 
 Repo: ${REPO}
@@ -537,7 +547,7 @@ Interface: ${s.interface}`, repo, 1, idx, true, s.kind, buildNoteFor(repo));
       const m = await sh(`git -C ${REPO} merge --no-ff --no-edit rs/g${i}`, `merge:${i}`);
       if (m.exitCode !== 0) {
         conflicts++;
-        await agent(
+        await agentSafe(
           `${R_COORD}
 
 Repo: ${REPO}
@@ -548,7 +558,7 @@ ${INV}`,
       }
     }
     const mergeRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "merge-fullsuite");
-    merge = await agent(
+    merge = await agentSafe(
       `${R_VERIFY}
 
 Repo: ${REPO}
@@ -591,7 +601,7 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
       finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite-retry");
     }
     if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`);
-    integration = await agent(
+    integration = await agentSafe(
       `${R_VERIFY}
 
 Repo: ${REPO}
@@ -603,7 +613,7 @@ PURPOSE (①, Beck): the tests are green (the PROMPT) — but does the work actu
     );
     if (!integration) {
       log("integration agent unavailable (API error) — one retry");
-      integration = await agent(
+      integration = await agentSafe(
         `${R_VERIFY}
 
 Repo: ${REPO}
@@ -632,7 +642,7 @@ ${INV}`,
           const counter = names.map((n) => `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join("; ");
           refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, "wiring-count")).stdout || "").trim();
         }
-        const w = await agent(
+        const w = await agentSafe(
           `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} (extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):
 ${symbols}
 
@@ -672,7 +682,7 @@ Judge from those counts — re-grep a symbol yourself ONLY when its count is amb
       refactor: d.refactor ? String(d.refactor).slice(0, 200) : void 0
     }));
     try {
-      briefing = await agent(
+      briefing = await agentSafe(
         `You are the Comprehension Steward. A trust-first workflow just landed VERIFIED code the OWNER has not read — "comprehension debt": speed silently converts into a codebase the owner can no longer debug or steer. Turn this run's ledger into a GUIDED READ (~10-15 min) that repays that debt cheaply.
 Repo: ${REPO}. Baseline ${BASE_SHA ? BASE_SHA.slice(0, 8) : "(no git)"} → HEAD.` + (GIT ? ` First run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` and \`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`, then READ the key files yourself before writing.` : "") + `
 Ledger (per leaf): ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
@@ -686,7 +696,7 @@ Be concrete: real paths, commit SHAs, line pointers where it matters. Match the 
       );
       if (!briefing) {
         log("owner-briefing agent unavailable (API error) — one retry");
-        briefing = await agent(
+        briefing = await agentSafe(
           `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : "") + `
 Ledger: ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
 Match the language the task was written in. Be concrete.`,

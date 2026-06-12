@@ -29,6 +29,20 @@ declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
 
 async function __main(): Promise<EngineResult> {
+// Runtime-throw containment: agent() can THROW rather than return null (observed live:
+// "subagent completed without calling StructuredOutput" killed a 50-agent, 5-hour run that
+// the null path would have survived — the engine already treats null as distrust/retry at
+// every call site). Convert throws to null; budget/ceiling throws stay fatal — they mean
+// STOP, and the Integrate try/catch owns that cleanup path.
+const agentSafe: typeof agent = async (prompt, opts) => {
+  try { return await agent(prompt, opts) }
+  catch (e: any) {
+    const m = String((e && e.message) || e)
+    if (/budget|ceiling/i.test(m)) throw e
+    log(`agent threw (treated as null): ${m.slice(0, 140)}`)
+    return null
+  }
+}
 // ---- args: { task, repo, maxDepth?, parallel? } -----------------------------
 const A = ((typeof args === 'string') ? JSON.parse(args) : (args || {})) as EngineArgs   // tolerate stringified args
 // I7: refuse to run without a task — a resume that forgot the original args once ran a full
@@ -64,7 +78,7 @@ const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection �
 // MECHANICAL git (no judgment) so it is not left to a non-deterministic LLM. The sandbox has
 // no real exec(); this is the closest approximation — deterministic command, LLM as transport.
 const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { type: 'string' }, exitCode: { type: 'integer' } } }
-const sh = async (cmd: string, label?: string): Promise<ShResult> => ((await agent(
+const sh = async (cmd: string, label?: string): Promise<ShResult> => ((await agentSafe(
   `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
   `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
   { label: label || 'sh', model: 'sonnet', schema: SH })) as ShResult | null) || { stdout: '', exitCode: 1 }
@@ -72,7 +86,7 @@ const sh = async (cmd: string, label?: string): Promise<ShResult> => ((await age
 // =============================================================================
 phase('Baseline')
 log(`Task: ${TASK}${PARALLEL ? ' [parallel mode]' : ''}`)
-const baseline: Baseline | null = await agent(
+const baseline: Baseline | null = await agentSafe(
   `${R_BASELINE}\n\nRepo: ${REPO}\nUpcoming work: "${TASK}"\nEstablish the trust invariant BEFORE any change. ` +
   `Find the measurement command, run it once, and distill the project card.`,
   { phase: 'Baseline', model: 'sonnet', schema: BASELINE })
@@ -175,7 +189,7 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
   const base = `${R_VERIFY}\n\nRepo: ${repo}\nAdversarially verify this finished leaf.\nTask: ${node.task}\n` +
     `Reported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ''}${buildNote || ''}`
   if (node.kind === 'tidy') {   // ③ a tidy leaf must be BEHAVIOR-PRESERVING — verify THAT, not new-feature trust
-    return (await agent(
+    return (await agentSafe(
       `${base}\nThis is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing ` +
       `suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO ` +
       `observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
@@ -183,7 +197,7 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
       || { trustworthy: false, reason: 'verification unavailable — untrusted' }
   }
   if (tier === 'light') {
-    return (await agent(
+    return (await agentSafe(
       `${R_VERIFY_LIGHT}\n\nRepo: ${repo}\nLow-risk leaf: ${node.task}\nReported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ''}${buildNote || ''}`,
       { phase: 'Work', label: `verify:${lbl}·light`, model: 'sonnet', schema: VERDICT }))
       || { trustworthy: false, reason: 'verification unavailable — untrusted' }
@@ -196,7 +210,7 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
       // C: the correctness lens runs on a DIFFERENT model — homogeneous consensus re-confirms shared
       // blind spots rather than producing independent evidence; cross-model diversity is cheap
       // independence, spent only where trust is most fragile (heavy leaves).
-      const v: Verdict | null = await agent(`${base}\nLENS: judge specifically through "${L}".`,
+      const v: Verdict | null = await agentSafe(`${base}\nLENS: judge specifically through "${L}".`,
         { phase: 'Work', label: `verify:${lbl}·${L.slice(0, 9)}`, ...(li === 0 ? { model: 'opus' } : {}), schema: VERDICT })
       votes.push(v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` })
     }                                                            // null lens = distrust: a flaky run can't launder a hard leaf
@@ -211,7 +225,7 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
       followUps: votes.flatMap(v => v.followUps || []),                                        // I4: lens follow-ups feed the batch
     }
   }
-  return (await agent(base, { phase: 'Work', label: `verify:${lbl}`, schema: VERDICT }))
+  return (await agentSafe(base, { phase: 'Work', label: `verify:${lbl}`, schema: VERDICT }))
     || { trustworthy: false, reason: 'verification unavailable — untrusted' }
 }
 
@@ -237,7 +251,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     if (node.atomic) {
       action = 'execute'
     } else {
-      a = (await agent(
+      a = (await agentSafe(
         `${R_ASSESS}\n\nRepo: ${repo}\nTask: ${node.task}\n${node.ctx ? 'Context: ' + node.ctx + '\n' : ''}` +
         `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}\nClassify and emit the next action.`,
         { phase: 'Work', label: `${tag}assess:d${node.depth}`, model: 'sonnet', schema: ASSESSMENT })) as Assessment | null
@@ -247,14 +261,14 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     }
 
     if (action === 'slice') {
-      const sl: { slices?: SliceSpec[] } | null = await agent(
+      const sl: { slices?: SliceSpec[] } | null = await agentSafe(
         `${R_SLICE}\n\nRepo: ${repo}\nSlice into thin, VERTICAL, independently-verifiable slices with a ` +
         `self-contained contract each. ${a && a.difficulty === 'hard' ? 'Isolate the risky seam first.' : 'Group near-identical units; 2-5 slices.'}` +
         `\nTask: ${node.task}\n${node.ctx}\n${INV}`,
         { phase: 'Work', label: `${tag}slice:d${node.depth}`, schema: SLICES })
       let slices: SliceSpec[] = (sl && sl.slices) || []
       if (slices.length > 1) {
-        const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agent(
+        const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agentSafe(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
           slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}`,
           { phase: 'Work', label: `${tag}critic:d${node.depth}`, schema: MISSING })
@@ -275,7 +289,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     }
 
     if (action === 'spike') {
-      const learn: { summary: string } | null = await agent(
+      const learn: { summary: string } | null = await agentSafe(
         `You are the Spiker (Beck: concrete hypotheses — make the uncertainty small, falsifiable, and cheap).\n` +
         `Repo: ${repo}\nDe-risk this hard-but-small task with the smallest experiment / minimal ` +
         `reproduction (remove extraneous detail; learn, don't build): ${node.task}\n${node.ctx}`,
@@ -321,7 +335,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         (verdict && verdict.prescription ? `\nREVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}\n` : '') +
         (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : '') +
         `then fix exactly those objections. In git mode add a fresh commit.`
-      res = await agent(
+      res = await agentSafe(
         `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
       if (!res) break
@@ -456,11 +470,11 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 if (goParallel) {
-  const a0: Assessment | null = await agent(
+  const a0: Assessment | null = await agentSafe(
     `${R_ASSESS}\n\nRepo: ${REPO}\nTask: ${TASK}\nDepth 0/${FLOOR}.\n${INV}\nClassify and emit the next action.`,
     { phase: 'Plan', model: 'sonnet', schema: ASSESSMENT })
   if (a0 && a0.action === 'slice') {
-    const sl: { slices?: SliceSpec[] } | null = await agent(
+    const sl: { slices?: SliceSpec[] } | null = await agentSafe(
       `${R_SLICE}\n\nRepo: ${REPO}\nThis is the PARALLEL PARTITION — NOT fine slicing. Each group you emit becomes ` +
       `its OWN git worktree with its OWN full (cold) build, so every extra group costs a whole build. Therefore ` +
       `produce the FEWEST, COARSEST groups: ONE per LARGEST independent unit (a whole feature/module/file-set that ` +
@@ -527,7 +541,7 @@ if (groups) {
     const m = await sh(`git -C ${REPO} merge --no-ff --no-edit rs/g${i}`, `merge:${i}`)
     if (m.exitCode !== 0) {                                     // conflict/error → LLM judgment for THIS branch only
       conflicts++
-      await agent(
+      await agentSafe(
         `${R_COORD}\n\nRepo: ${REPO}\nThe deterministic \`git -C ${REPO} merge --no-ff rs/g${i}\` FAILED (conflict). ` +
         `Resolve ONLY this branch's conflict (slice "${groups.indep[i].desc}"), honoring both sides' intent, complete ` +
         `the merge commit, then confirm the tree builds.\n${INV}`,
@@ -537,7 +551,7 @@ if (groups) {
   // Deterministic merge net (mirrors the Integrate gate): the engine runs the full measure command
   // via sh() — shell truth — and the LLM JUDGES from that result instead of re-running it.
   const mergeRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'merge-fullsuite')
-  merge = (await agent(
+  merge = (await agentSafe(
     `${R_VERIFY}\n\nRepo: ${REPO}\n${N} parallel branches were merged into the working branch (${conflicts} needed ` +
     `conflict resolution). The FULL measure command was JUST run DETERMINISTICALLY with exit=${mergeRun.exitCode} ` +
     `(${mergeRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run it; JUDGE from that result whether every baseline ` +
@@ -588,7 +602,7 @@ try {
     finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'integrate-fullsuite-retry')
   }
   if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`)
-  integration = (await agent(
+  integration = (await agentSafe(
     `${R_VERIFY}\n\nRepo: ${REPO}\nAll work is done. The FULL baseline measure command was JUST run ` +
     `DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run the whole ` +
     `suite; JUDGE from that result whether every invariant still holds across the integrated whole` +
@@ -600,7 +614,7 @@ try {
     { phase: 'Integrate', schema: VERDICT })) as Verdict | null
   if (!integration) {
     log('integration agent unavailable (API error) — one retry')
-    integration = (await agent(
+    integration = (await agentSafe(
       `${R_VERIFY}\n\nRepo: ${REPO}\nAll work is done. The FULL baseline measure command was JUST run ` +
       `DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run the whole ` +
       `suite; JUDGE from that result whether every invariant still holds across the integrated whole.\n${INV}`,
@@ -639,7 +653,7 @@ if (GIT && trusted.length) {
           `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join('; ')
         refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, 'wiring-count')).stdout || '').trim()
       }
-      const w: { gaps?: string[] } | null = await agent(
+      const w: { gaps?: string[] } | null = await agentSafe(
         `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} ` +
         `(extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):\n${symbols}\n\n` +
         `DETERMINISTIC reference counts (engine-run \`grep -rw\` over production paths; a count of 1-3 ` +
@@ -681,7 +695,7 @@ if (trusted.length) {
     refactor: d.refactor ? String(d.refactor).slice(0, 200) : undefined,
   }))
   try {
-    briefing = (await agent(
+    briefing = (await agentSafe(
       `You are the Comprehension Steward. A trust-first workflow just landed VERIFIED code the OWNER has not ` +
       `read — "comprehension debt": speed silently converts into a codebase the owner can no longer debug or ` +
       `steer. Turn this run's ledger into a GUIDED READ (~10-15 min) that repays that debt cheaply.\n` +
@@ -697,7 +711,7 @@ if (trusted.length) {
       { phase: 'Integrate', label: 'owner-briefing', schema: BRIEFING })) as Briefing | null
     if (!briefing) {
       log('owner-briefing agent unavailable (API error) — one retry')
-      briefing = (await agent(
+      briefing = (await agentSafe(
         `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the ` +
         `owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to ` +
         `verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : '') +
