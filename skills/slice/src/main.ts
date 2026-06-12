@@ -41,6 +41,11 @@ async function __main(): Promise<EngineResult> {
 // ends resumable instead of burning attempts until the harness gives up.
 let QUOTA_HALT = ''
 let NULL_STREAK = 0
+let NULL_STREAK_CLASSES = new Set<string>()  // A6: track call classes in streak; same-class-only loop (e.g. heavy lenses) must not halt
+// A6: extract the call class from opts — the prefix before ':' or '·'. Same-class streaks arise
+// by design (heavy 3-lens loop), so ≥2 different classes are required before treating the
+// streak as a session-instability signal (not just a single role's transient failures).
+const callClass = (opts?: AgentOpts) => ((opts && (opts.label || opts.phase)) || '').replace(/[:·].*/u, '').trim() || 'unknown'
 const quotaHalt = (why: string) => {
   QUOTA_HALT = why
   log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`)
@@ -49,8 +54,10 @@ const agentSafe: typeof agent = async (prompt, opts) => {
   if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
   try {
     const r = await agent(prompt, opts)
-    if (r === null) { if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`) }
-    else NULL_STREAK = 0
+    if (r === null) {
+      NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
+      if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
+    } else { NULL_STREAK = 0; NULL_STREAK_CLASSES = new Set() }
     return r
   }
   catch (e: any) {
@@ -58,7 +65,8 @@ const agentSafe: typeof agent = async (prompt, opts) => {
     if (/budget|ceiling/i.test(m)) throw e
     if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
     log(`agent threw (treated as null): ${m.slice(0, 140)}`)
-    if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
+    NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
+    if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
     return null
   }
 }

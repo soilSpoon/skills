@@ -119,6 +119,8 @@ var R_COORD = "You are the Coordinator — the ONLY agent with global context. I
 async function __main() {
   let QUOTA_HALT = "";
   let NULL_STREAK = 0;
+  let NULL_STREAK_CLASSES = /* @__PURE__ */ new Set();
+  const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
   const quotaHalt = (why) => {
     QUOTA_HALT = why;
     log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`);
@@ -131,8 +133,13 @@ async function __main() {
     try {
       const r = await agent(prompt, opts);
       if (r === null) {
-        if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
-      } else NULL_STREAK = 0;
+        NULL_STREAK++;
+        NULL_STREAK_CLASSES.add(callClass(opts));
+        if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+      } else {
+        NULL_STREAK = 0;
+        NULL_STREAK_CLASSES = /* @__PURE__ */ new Set();
+      }
       return r;
     } catch (e) {
       const m = String(e && e.message || e);
@@ -142,7 +149,9 @@ async function __main() {
         return null;
       }
       log(`agent threw (treated as null): ${m.slice(0, 140)}`);
-      if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+      NULL_STREAK++;
+      NULL_STREAK_CLASSES.add(callClass(opts));
+      if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
       return null;
     }
   };

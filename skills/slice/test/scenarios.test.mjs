@@ -372,3 +372,63 @@ test('wiring-scan sh death skips wiring-audit: SH_UNAVAILABLE sentinel guards th
   // With the sentinel guard in place, the wiring-auditor must NOT have been called with garbage
   assert.equal(wiringAuditCalled, false, 'wiring-audit LLM call must be skipped when wiring-scan sh returns SH_UNAVAILABLE')
 })
+
+// A6 — NULL_STREAK 오발 방지: heavy tier 3-렌즈 연속 null은 설계상 용인 — 같은 클래스만의
+// streak는 QUOTA_HALT를 오발시켜선 안 된다. 서로 다른 클래스 ≥2가 있어야 진짜 신호.
+// Behavioral claim: assess returns {difficulty:'hard',action:'execute'} → heavy tier → all 3
+// lens-verify calls throw transient error → (a) no 'QUOTA HALT' log, (b) leaf verdict is
+// 'heavy verify: 3 lenses, 3 distrusted', (c) run returns normally.
+test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — each null is distrust only', async () => {
+  // Engineer the leaf to be heavy-tier: assess returns difficulty:'hard', action:'execute'
+  const assessHeavy = { difficulty: 'hard', size: 'small', action: 'execute', reason: 'fixture: hard leaf', risk: 'high' }
+  let verifyThrows = 0
+  // exec succeeds; all verify calls (all class=verify) throw — repair loop also re-runs 3 verify
+  // calls (also same class) — streak grows but class set stays {verify} size=1 → no halt.
+  const dispatch = dispatcher((c) => {
+    if (has(c, /assess/)) return assessHeavy
+    // All heavy lens verify calls throw a transient (non-session-limit) error
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      verifyThrows++
+      throw new Error('transport error (transient fixture throw)')
+    }
+  })
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+
+  // (a) No QUOTA HALT log — same-class streak must NOT trigger the halt
+  assert.ok(!logs.some((l) => /QUOTA HALT/.test(l)),
+    `QUOTA HALT must NOT fire when all nulls are from the same verify class; logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
+  // Precondition: heavy verify was invoked at all (3 lens calls per attempt; repair may add more)
+  assert.ok(verifyThrows >= 3, `at least 3 heavy lens verify calls must have thrown; got ${verifyThrows}`)
+  // (b) First-leaf verdict reflects heavy distrust (3 lenses, 3 distrusted)
+  const firstResult = result.results && result.results[0]
+  const verdictReason = firstResult && firstResult.verdict && firstResult.verdict.reason
+  assert.ok(verdictReason && /heavy verify.*3 lenses.*3 distrusted/.test(verdictReason),
+    `leaf verdict must be 'heavy verify: 3 lenses, 3 distrusted'; got: "${verdictReason}"`)
+  // (c) Run returns normally — no result.error
+  assert.equal(result.error, undefined, `run must return normally after same-class verify nulls; got error: "${result.error}"`)
+})
+
+// A6 contrast — cross-class streak must still fire QUOTA_HALT (circuit breaker preserved).
+// Sequence: heavy leaf → all 3 lens-verify calls throw (class=verify, streak=3, size=1 → no halt)
+// → repair exec ALSO throws (class=exec added, streak=4, classes={verify,exec} size=2 ≥3 → HALT).
+// Behavioral claim: mixing verify-nulls + exec-null reaches the ≥2-class threshold → QUOTA_HALT.
+test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QUOTA_HALT (circuit breaker preserved)', async () => {
+  // Heavy leaf: 3 verify lenses throw (streak=3, classes={verify}, size=1 — no halt yet).
+  // Repair exec then throws (streak=4, classes={verify,exec}, size=2, streak>=3 → HALT).
+  const assessHeavy = { difficulty: 'hard', size: 'small', action: 'execute', reason: 'fixture: hard leaf', risk: 'high' }
+  const dispatch = dispatcher((c) => {
+    if (has(c, /assess/)) return assessHeavy
+    // All verify calls throw (class=verify; same class alone never halts with our fix)
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      throw new Error('transport error on verify (transient fixture throw)')
+    }
+    // Repair exec (label ends in .r1) also throws — this adds class=exec → cross-class → HALT
+    if (/^exec:|exec:/.test(c.opts.label || '') && /\.r\d/.test(c.opts.label || '')) {
+      throw new Error('transport error on repair exec (transient fixture throw)')
+    }
+  })
+  const { logs } = await runEngine({ args: ARGS, dispatch })
+  // Cross-class streak (verify class + exec class) MUST trigger the circuit breaker
+  assert.ok(logs.some((l) => /QUOTA HALT/.test(l)),
+    `QUOTA HALT MUST fire for cross-class streak (verify+exec nulls); got logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
+})
