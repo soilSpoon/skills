@@ -117,13 +117,32 @@ var R_COORD = "You are the Coordinator — the ONLY agent with global context. I
 
 // src/main.ts
 async function __main() {
+  let QUOTA_HALT = "";
+  let NULL_STREAK = 0;
+  const quotaHalt = (why) => {
+    QUOTA_HALT = why;
+    log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`);
+  };
   const agentSafe = async (prompt, opts) => {
+    if (QUOTA_HALT) {
+      log(`agent skipped (quota halt): ${opts && (opts.label || opts.phase) || ""}`);
+      return null;
+    }
     try {
-      return await agent(prompt, opts);
+      const r = await agent(prompt, opts);
+      if (r === null) {
+        if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+      } else NULL_STREAK = 0;
+      return r;
     } catch (e) {
       const m = String(e && e.message || e);
       if (/budget|ceiling/i.test(m)) throw e;
+      if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) {
+        quotaHalt(m.slice(0, 120));
+        return null;
+      }
       log(`agent threw (treated as null): ${m.slice(0, 140)}`);
+      if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
       return null;
     }
   };
@@ -357,8 +376,8 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
         log(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`);
         continue;
       }
-      if (budget.total && budget.remaining() < 12e4) {
-        log(`${tag}budget low — stopping after ${done2.length} leaves`);
+      if (QUOTA_HALT || budget.total && budget.remaining() < 12e4) {
+        log(`${tag}${QUOTA_HALT ? "quota halt" : "budget low"} — stopping after ${done2.length} leaves`);
         break;
       }
       const k = keyOf(node.task);
@@ -418,8 +437,8 @@ FIRST confirm from that output that at least one test ACTUALLY EXECUTED under sc
         const issueCount = (verdict.issues || []).length || 1;
         const converging = issueCount < prevIssueCount;
         if (attempt >= MAX_REPAIR && !(converging && attempt < MAX_REPAIR_HARD)) break;
-        if (budget.total && budget.remaining() < 12e4) {
-          log(`${tag}budget low — stopping repairs (leaf ${i} stays untrusted → reverted)`);
+        if (QUOTA_HALT || budget.total && budget.remaining() < 12e4) {
+          log(`${tag}${QUOTA_HALT ? "quota halt" : "budget low"} — stopping repairs (leaf ${i} stays untrusted → reverted)`);
           break;
         }
         prevIssueCount = attempt === 0 && tier === "light" ? Infinity : issueCount;
@@ -594,7 +613,10 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
   phase("Integrate");
   let finalRun = { exitCode: -1, stdout: "" };
   let integration = null;
-  try {
+  if (QUOTA_HALT) {
+    ABORTS.push(`quota-halt: ${QUOTA_HALT} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
+    log("quota halt — skipping integrate/wiring/briefing (resume to run them)");
+  } else try {
     finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite");
     if (finalRun.exitCode === 137) {
       log("integrate full suite timed out (exit 137) — one automatic retry (known flake class)");
@@ -628,7 +650,7 @@ ${INV}`,
   const fullSuiteGreen = finalRun.exitCode === 0;
   const trusted = done.filter((d) => d.verdict && d.verdict.trustworthy);
   let wiringGaps = [];
-  if (GIT && trusted.length) {
+  if (GIT && trusted.length && !QUOTA_HALT) {
     try {
       const newPub = await sh(
         `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | sed -E 's/^\\+\\s*//' | head -40`,

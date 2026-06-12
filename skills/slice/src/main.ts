@@ -34,12 +34,31 @@ async function __main(): Promise<EngineResult> {
 // the null path would have survived — the engine already treats null as distrust/retry at
 // every call site). Convert throws to null; budget/ceiling throws stay fatal — they mean
 // STOP, and the Integrate try/catch owns that cleanup path.
+// Quota circuit breaker: a session/usage-limit death is NOT a one-off null — left alone it
+// kills every subsequent agent serially (observed live: 12 consecutive corpses after one
+// "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
+// cause) flips QUOTA_HALT; from then on agentSafe no-ops, loops stop cleanly, and the run
+// ends resumable instead of burning attempts until the harness gives up.
+let QUOTA_HALT = ''
+let NULL_STREAK = 0
+const quotaHalt = (why: string) => {
+  QUOTA_HALT = why
+  log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`)
+}
 const agentSafe: typeof agent = async (prompt, opts) => {
-  try { return await agent(prompt, opts) }
+  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
+  try {
+    const r = await agent(prompt, opts)
+    if (r === null) { if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`) }
+    else NULL_STREAK = 0
+    return r
+  }
   catch (e: any) {
     const m = String((e && e.message) || e)
     if (/budget|ceiling/i.test(m)) throw e
+    if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
     log(`agent threw (treated as null): ${m.slice(0, 140)}`)
+    if (++NULL_STREAK >= 3) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
     return null
   }
 }
@@ -306,7 +325,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // ---- execute leaf: Canon TDD + tier-0 gate + risk-tiered verify + self-repair ----
     // Reserve enough for ONE more leaf + the integrate net: a leaf (exec+verify) measured ~60-100k tokens,
     // and once spent() hits the hard ceiling agent() THROWS mid-leaf (losing `done` + leaking the lock).
-    if (budget.total && budget.remaining() < 120_000) { log(`${tag}budget low — stopping after ${done.length} leaves`); break }
+    if (QUOTA_HALT || (budget.total && budget.remaining() < 120_000)) { log(`${tag}${QUOTA_HALT ? 'quota halt' : 'budget low'} — stopping after ${done.length} leaves`); break }
     const k = keyOf(node.task)
     if (executedKeys.has(k)) continue
     executedKeys.add(k)
@@ -388,7 +407,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       const issueCount = (verdict.issues || []).length || 1
       const converging = issueCount < prevIssueCount
       if (attempt >= MAX_REPAIR && !(converging && attempt < MAX_REPAIR_HARD)) break
-      if (budget.total && budget.remaining() < 120_000) { log(`${tag}budget low — stopping repairs (leaf ${i} stays untrusted → reverted)`); break }
+      if (QUOTA_HALT || (budget.total && budget.remaining() < 120_000)) { log(`${tag}${QUOTA_HALT ? 'quota halt' : 'budget low'} — stopping repairs (leaf ${i} stays untrusted → reverted)`); break }
       // Cross-tier fairness: a LIGHT attempt-0 verdict (cursory, few issues) vs a STANDARD repair
       // re-verify (thorough, more issues) reads as divergence even when the leaf improved — don't
       // let the thoroughness jump eat the convergence extension; compare from the escalated tier on.
@@ -601,7 +620,10 @@ phase('Integrate')
 // final payload (all `done` results) AND leak the repo lock. exitCode -1 = the net never ran (distinct from RED).
 let finalRun: ShResult = { exitCode: -1, stdout: '' }
 let integration: Verdict | null = null
-try {
+if (QUOTA_HALT) {
+  ABORTS.push(`quota-halt: ${QUOTA_HALT} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`)
+  log('quota halt — skipping integrate/wiring/briefing (resume to run them)')
+} else try {
   finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'integrate-fullsuite')
   if (finalRun.exitCode === 137) {
     // Known fragile-suite timeout class (watchdog kill): one DETERMINISTIC retry — this used to be
@@ -640,7 +662,7 @@ const trusted = done.filter(d => d.verdict && d.verdict.trustworthy)
 // cannot see this). Deterministic extraction (diff → new exported symbols) + one agent judging call
 // sites. ADVISORY: surfaces in the payload/log, never gates the run.
 let wiringGaps: string[] = []
-if (GIT && trusted.length) {
+if (GIT && trusted.length && !QUOTA_HALT) {
   try {
     const newPub = await sh(
       `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | ` +
