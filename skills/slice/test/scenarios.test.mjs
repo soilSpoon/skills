@@ -29,22 +29,53 @@ test('repair loop: first verify distrusts, repair re-executes, second verify tru
   assert.ok(result.trustedLeaves >= 1, 'leaf ends trusted after repair')
 })
 
-test('quota circuit breaker: one session-limit death stops ALL subsequent agent spawns', async () => {
+// Scenario 3 intent change (MUST PRESERVE): the old assertion required zero calls of ANY kind
+// after a quota death, but that prevented the lock from being cleared — the user's guided resume
+// would immediately hit a stale lock (self-defeating). After A2/A3: shForce is the ONE mechanical
+// cleanup path that bypasses QUOTA_HALT. After quota death the ONLY allowed subsequent call is a
+// shForce lock-clear (isSh class, rm -f <lockfile> prompt). Non-sh agents stay zero.
+test('quota circuit breaker: after quota death only shForce lock-clear fires (non-sh=0, lock cleared, no false restored log)', async () => {
+  // Engineer LOCKFILE to be set: override rev-parse --absolute-git-dir to return a real path.
+  // Without this, LOCKFILE stays '' and lock-clear never fires — the fixture would prove nothing.
   let tripped = -1
+  const FAKE_GIT_DIR = '/tmp/rs-fixture/.git'
   const dispatch = dispatcher((c) => {
+    // Make lock-dir return a real abs path so LOCKFILE is set and the lock-clear path is exercised
+    if (isSh(c) && /rev-parse --absolute-git-dir/.test(c.prompt)) {
+      return { exitCode: 0, stdout: FAKE_GIT_DIR + '\n' }
+    }
+    // Confirm no lock held (so the engine proceeds past lock-check)
+    if (isSh(c) && /rs-lock/.test(c.prompt) && /cat /.test(c.prompt)) {
+      return { exitCode: 1, stdout: '' }
+    }
+    // Trip quota at the first verify call
     if (/verify/.test(c.opts.label || '') && tripped === -1) {
       tripped = c.i
       throw new Error("You've hit your session limit · resets 12:20am (Asia/Seoul)")
     }
   })
   const { result, calls, logs } = await runEngine({ args: ARGS, dispatch })
+
   assert.ok(tripped >= 0, 'the quota throw fired')
   const after = calls.filter((c) => c.i > tripped)
-  assert.equal(after.length, 0,
-    `no agent (not even sh) may be spawned after a quota death; got ${after.length}: ${after.map((c) => c.opts.label).join(', ')}`)
+
+  // Only isSh (shForce) calls are allowed after quota death — zero non-sh agents
+  const nonShAfter = after.filter((c) => !isSh(c))
+  assert.equal(nonShAfter.length, 0,
+    `no non-sh agent may be spawned after a quota death; got ${nonShAfter.length}: ${nonShAfter.map((c) => c.opts.label).join(', ')}`)
+
+  // The lock-clear shForce call must actually fire (rm -f <lockfile> prompt)
+  const lockClearCalls = after.filter((c) => isSh(c) && /rm -f/.test(c.prompt) && /rs-lock/.test(c.prompt))
+  assert.ok(lockClearCalls.length >= 1,
+    `shForce lock-clear (rm -f <lockfile>) must fire after quota death; sh calls after trip: ${after.filter(isSh).map((c) => c.prompt.slice(0, 80)).join(' | ')}`)
+
   assert.ok(logs.some((l) => /QUOTA HALT/.test(l)), 'halt announced')
   assert.ok((result.aborts || []).some((a) => /quota-halt:/.test(a)), 'aborts carries the resume instruction entry')
   assert.notEqual(result.fullSuiteGreen, true, 'integrate must not report green when it never ran')
+
+  // A3: restore() must NOT log 'restored to' when it was actually skipped (quota halt no-ops sh)
+  assert.ok(!logs.some((l) => /restored to/.test(l)),
+    `'restored to' must not appear in logs when restore() is a no-op during quota halt; got: ${logs.filter((l) => /restored to/.test(l)).join(' | ')}`)
 })
 
 test('untrusted streak: persistently distrusted leaves halt the unit, run still returns', async () => {

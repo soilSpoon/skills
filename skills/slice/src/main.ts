@@ -111,6 +111,24 @@ const sh = async (cmd: string, label?: string): Promise<ShResult> => {
     { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null
   return r ?? SH_UNAVAILABLE
 }
+// A2: shForce — mechanical cleanup path that bypasses QUOTA_HALT. Use ONLY for lock-clear (rm -f
+// <lockfile>) — a purely deterministic, file-system-only operation that touches no user work and
+// must run even after quota death so the stale lock doesn't block the user's guided resume. NEVER
+// use for reset/merge/checkout or any command that could mutate user work: agentSafe is the gate
+// for those so QUOTA_HALT correctly prevents runaway mutations; shForce is the narrow exception
+// where NOT running would leave the repo in a permanently broken state (stale lock).
+const shForce = async (cmd: string, label?: string): Promise<ShResult> => {
+  try {
+    const r = (await agent(
+      `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
+      `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
+      { label: label || 'sh-force', model: 'haiku', schema: SH })) as ShResult | null
+    return r ?? SH_UNAVAILABLE
+  } catch (e: any) {
+    log(`shForce failed (${label || 'sh-force'}): ${String((e && e.message) || e).slice(0, 120)}`)
+    return SH_UNAVAILABLE
+  }
+}
 
 // =============================================================================
 phase('Baseline')
@@ -375,10 +393,15 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // advancing it from the LLM-reported res.commits risked drift → reset --hard could destroy a trusted
     // sibling's commits, and a SAFE advance needs a real rev-parse anyway, so it saved nothing. — review)
     const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || '').match(/[0-9a-f]{40}/i) || [''])[0] : ''
-    const restore = async () => {
-      if (!GIT || !cleanOK || !leafStart) return
-      await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`)
+    // A3: restore() returns true only when it actually ran the revert (GIT+cleanOK+leafStart all
+    // set AND sh calls were dispatched). During QUOTA_HALT the inner sh() calls no-op, so we check
+    // the exitCode of the first sh to decide: QUOTA_HALT makes sh return SH_UNAVAILABLE (-2) which
+    // means the restore was a no-op — callers must not log 'restored to' in that case.
+    const restore = async (): Promise<boolean> => {
+      if (!GIT || !cleanOK || !leafStart) return false
+      const r = await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`)
       await sh(`git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch`, `clean:${lbl}`)   // drop untracked files the leaf created (never the shared build dir)
+      return r.exitCode !== -2   // -2 = SH_UNAVAILABLE = sh no-op'd (quota halt or proxy dead)
     }
 
     let res: ExecResult | null = null, verdict: Verdict | null = null, attempt = 0, prevIssueCount = Infinity
@@ -462,8 +485,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
 
     // An untrusted leaf (incl. a RED/tier-0 leaf with only uncommitted edits) must leave NOTHING behind.
     if (GIT && !verdict!.trustworthy) {
-      await restore()
-      log(`${tag}leaf ${i} untrusted → ${(cleanOK && leafStart) ? `restored to ${leafStart.slice(0, 8)}` : (!leafStart ? 'NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)' : 'NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)')}`)
+      // A3: only log 'restored to' when restore() ACTUALLY ran the revert (exitCode !== -2).
+      // During QUOTA_HALT the inner sh() calls no-op (SH_UNAVAILABLE), so restored=false here —
+      // avoid the false 'restored to' log that would mislead the user into thinking state was reset.
+      const restored = await restore()
+      log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : (!cleanOK ? 'NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)' : !leafStart ? 'NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)' : 'NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)')}`)
     }
 
     // A: run-level no-progress detection — leaf-level guards (convergence, repair caps) bound ONE leaf,
@@ -785,7 +811,10 @@ if (trusted.length) {
   } catch (e) { log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`) }
 }
 
-if (LOCKFILE) { try { await sh(`rm -f ${LOCKFILE}`, 'lock-clear') } catch (e) { log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`) } }
+// A2: shForce so lock-clear runs even after QUOTA_HALT — without this, a quota death leaves a
+// stale lock that blocks the user's guided resume (self-defeating: the engine announces "relaunch
+// with resumeFromRunId" but the next run immediately hits "working tree locked by another run").
+if (LOCKFILE) { try { await shForce(`rm -f ${LOCKFILE}`, 'lock-clear') } catch (e) { log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`) } }
 if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(' | ')}`)
 log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? (merge.trustworthy ? 'OK' : 'ISSUES') : 'n/a'} | full-suite ${finalRun.exitCode === -1 ? 'NOT RUN' : (fullSuiteGreen ? 'GREEN' : 'RED')} | integration ${integration && integration.trustworthy ? 'OK' : (integration ? 'FAILED' : 'UNKNOWN')}`)
 if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`)

@@ -176,6 +176,20 @@ ${cmd}`,
     );
     return r ?? SH_UNAVAILABLE;
   };
+  const shForce = async (cmd, label) => {
+    try {
+      const r = await agent(
+        `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
+
+${cmd}`,
+        { label: label || "sh-force", model: "haiku", schema: SH }
+      );
+      return r ?? SH_UNAVAILABLE;
+    } catch (e) {
+      log(`shForce failed (${label || "sh-force"}): ${String(e && e.message || e).slice(0, 120)}`);
+      return SH_UNAVAILABLE;
+    }
+  };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
@@ -410,9 +424,10 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
       const TIDY = node.kind === "tidy" ? "\nTIDY-FIRST leaf (Beck — make the change easy): a behavior-PRESERVING structural change ONLY (rename/extract/generalize/move). Do NOT add or change any test; do NOT change observable behavior — the EXISTING suite must stay green UNCHANGED. EXCEPTIONS for this tidy leaf: its proof IS the existing suite, so run the FULL existing suite once (this overrides the never-full-suite speed rule); and commit as ONE refactor commit (this replaces the two-hats behavior+refactor commit pair — a tidy leaf has no behavior step)." : "";
       const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || "").match(/[0-9a-f]{40}/i) || [""])[0] : "";
       const restore = async () => {
-        if (!GIT || !cleanOK || !leafStart) return;
-        await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`);
+        if (!GIT || !cleanOK || !leafStart) return false;
+        const r = await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`);
         await sh(`git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch`, `clean:${lbl}`);
+        return r.exitCode !== -2;
       };
       let res = null, verdict = null, attempt = 0, prevIssueCount = Infinity;
       while (true) {
@@ -480,8 +495,8 @@ FIRST confirm from that output that at least one test ACTUALLY EXECUTED under sc
       done2.push({ task: node.task, ...res, verdict });
       log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
       if (GIT && !verdict.trustworthy) {
-        await restore();
-        log(`${tag}leaf ${i} untrusted → ${cleanOK && leafStart ? `restored to ${leafStart.slice(0, 8)}` : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)"}`);
+        const restored = await restore();
+        log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
       }
       untrustedStreak = verdict.trustworthy ? 0 : untrustedStreak + 1;
       if (untrustedStreak >= MAX_UNTRUSTED_STREAK) {
@@ -752,7 +767,7 @@ Match the language the task was written in. Be concrete.`,
   }
   if (LOCKFILE) {
     try {
-      await sh(`rm -f ${LOCKFILE}`, "lock-clear");
+      await shForce(`rm -f ${LOCKFILE}`, "lock-clear");
     } catch (e) {
       log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`);
     }
