@@ -7,3 +7,5 @@
 - [x] **tidy 결정적 검증** — 구현 완료 (B1): tidy leaf는 engine이 `measureCommand` (full suite) 를 `sh()`로 결정적 실행 → exit-code 0이면 engineT0를 verifier에 주입해 재실행 없이 아티팩트만 심사(LLM verifier 1회로 축소). 스코프 위반(exit ≠ 0)은 즉시 t0red→repair. `node.kind === 'tidy'` 가드로 분기.
 - [x] **worktreeSetup arg** — 구현 완료 (E): `baseline.worktreeSetupCommand` 필드 추가; 코디네이터가 `git worktree add` 직후 `sh(\`cd ${wt} && ${cmd}\`)` 1회 실행. 픽스처 시나리오 GROUP E(sub-case A/B)로 검증 완료. JS 모노레포 parallel 파티션에서 npm ci 비용 해소.
 - [ ] **skills CLI deleted-skills 경고** — `Failed to check for deleted skills`: 비인증 GitHub API 한도 추정. `GITHUB_TOKEN=$(gh auth token)` env로 재현 확인.
+- [ ] **artifact 신선도 canary** — 테스트는 아티팩트를 실행하므로 src만 고치고 빌드를 안 돌리면 옛 아티팩트에 green이 뜬다(브리핑 buried body). scenarios 실행 전 build-engine.sh를 강제하거나, 테스트 셋업에서 src mtime > artifact mtime이면 fail하는 가드 1개.
+- [ ] **shUnavailable shape-match 폴백** — 센티널이 참조 동일성 의존(main.ts) — structuredClone/직렬화 개입 시 조용히 무력화. `exitCode===-2 && stdout 매직 프리픽스` 폴백 추가 (verifier follow-up 미반영분).
