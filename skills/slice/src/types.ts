@@ -26,9 +26,8 @@ export interface Baseline {
 }
 export interface Assessment {
   difficulty: 'easy' | 'hard'
-  size: 'small' | 'big'
+  size?: 'small' | 'big'
   action: 'execute' | 'slice' | 'spike'
-  risk?: string
   reason: string
 }
 export interface SliceSpec {
@@ -46,7 +45,6 @@ export interface ExecResult {
   summary: string
   passed: boolean
   evidence: string
-  diff?: string
   filesChanged?: string[]
   refactor?: string
   funList?: string[]
@@ -58,7 +56,6 @@ export interface ExecResult {
 export interface Verdict {
   trustworthy: boolean
   issues?: string[]
-  silentErrorRisk?: string
   reason: string
   purposeGap?: string
   prescription?: string

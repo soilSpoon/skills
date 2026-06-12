@@ -717,3 +717,86 @@ test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QU
   assert.ok(logs.some((l) => /QUOTA HALT/.test(l)),
     `QUOTA HALT MUST fire for cross-class streak (verify+exec nulls); got logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
 })
+
+// C1-C4 — schema tax cleanup: engine must not emit serialization-tax fields to agents.
+// (a) RESULT schema used in exec opts must have no 'diff' key; ASSESSMENT schema must have
+//     no 'risk' key; VERDICT schema must have no 'silentErrorRisk' key.
+// (b) When assessSlice drives decomposition and slices carry a concrete interface (not TBD),
+//     each leaf exec prompt must contain 'Interface (FIXED):' with that value. A slice whose
+//     interface is 'TBD/exploratory' must NOT inject the Interface line.
+test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prompt (not TBD)', async () => {
+  // Behavioral claim: exec opts.schema must have no 'diff' key (serialization tax removed);
+  // assess opts.schema must have no 'risk' key; verify opts.schema must have no 'silentErrorRisk' key;
+  // and leaf exec prompts receive 'Interface (FIXED): <interface>' only for non-TBD slices.
+  const execSchemas = []
+  const assessSchemas = []
+  const verdictSchemas = []
+  const execPrompts = []
+
+  const concreteInterface = 'parse(s: string): Ast'
+  const mixedSlices = {
+    slices: [
+      { desc: 'concrete iface slice', interface: concreteInterface,
+        contract: 'implement parse', independent: true,
+        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'standard', testScope: 'S0' },
+      { desc: 'exploratory slice', interface: 'TBD/exploratory',
+        contract: 'explore', independent: true,
+        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'standard', testScope: 'S1' },
+    ],
+  }
+
+  const dispatch = dispatcher((c) => {
+    // Collect assess schema
+    if (has(c, /assess/)) {
+      if (c.opts.schema) assessSchemas.push(c.opts.schema)
+      return FIX.assessSlice
+    }
+    // Return our mixed slices
+    if (has(c, /slice:/)) return mixedSlices
+    // Collect exec schema + prompt
+    if (/^exec:|exec:/.test(c.opts.label || '') && !/\.r/.test(c.opts.label || '')) {
+      if (c.opts.schema) execSchemas.push(c.opts.schema)
+      execPrompts.push(c.prompt)
+    }
+    // Collect verdict schemas from verify calls
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      if (c.opts.schema) verdictSchemas.push(c.opts.schema)
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  // Fixture precondition: exec and verify must have been invoked
+  assert.ok(execSchemas.length > 0, 'exec must have been called (fixture precondition)')
+  assert.ok(verdictSchemas.length > 0, 'verify must have been called (fixture precondition)')
+
+  // (a) RESULT schema: no 'diff' key
+  for (const s of execSchemas) {
+    assert.ok(!s.properties || !('diff' in s.properties),
+      `exec opts.schema must NOT have 'diff' property (serialization tax); found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
+  }
+
+  // (a) ASSESSMENT schema: no 'risk' key
+  for (const s of assessSchemas) {
+    assert.ok(!s.properties || !('risk' in s.properties),
+      `assess opts.schema must NOT have 'risk' property; found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
+  }
+
+  // (a) VERDICT schema: no 'silentErrorRisk' key
+  for (const s of verdictSchemas) {
+    assert.ok(!s.properties || !('silentErrorRisk' in s.properties),
+      `verify opts.schema must NOT have 'silentErrorRisk' property; found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
+  }
+
+  // (b) Exec prompts: concrete-iface slice must contain 'Interface (FIXED): parse('
+  const concretePrompts = execPrompts.filter((p) => /concrete iface slice|parse\(s: string\)/.test(p) ||
+    execPrompts.indexOf(p) === 0)  // first slice is concrete
+  assert.ok(execPrompts.some((p) => /Interface \(FIXED\): parse\(/.test(p)),
+    `at least one exec prompt must contain 'Interface (FIXED): parse(' for the concrete-iface slice; got:\n${execPrompts.map(p => p.slice(0, 300)).join('\n---\n')}`)
+
+  // (b) Exec prompts: TBD/exploratory slice must NOT inject 'Interface (FIXED):'
+  // The TBD slice is the second one — find its exec prompt by matching 'exploratory slice' in task
+  const tbdPrompts = execPrompts.filter((p) => /exploratory slice/.test(p))
+  assert.ok(tbdPrompts.length === 0 || !tbdPrompts.some((p) => /Interface \(FIXED\):/.test(p)),
+    `exec prompt for TBD/exploratory interface slice must NOT contain 'Interface (FIXED):'; found in: ${tbdPrompts.filter(p => /Interface \(FIXED\):/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
+})

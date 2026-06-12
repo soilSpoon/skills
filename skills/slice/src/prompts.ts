@@ -81,7 +81,9 @@ export const R_EXEC =
   'remaining list); do NOT write all tests then run once. For test-only additions to ALREADY-STABLE code, ' +
   'batching is fine (the rework risk is ~0 when the impl is frozen). ' +
   'PURPOSE: set `purposeVerified` — did you verify against REAL or RECORDED-REAL behavior (the purpose), or only ' +
-  'hand-written fakes/mocks (the prompt)? Prefer recorded-real bytes over hand-fakes — a fake passing proves the prompt, not the feature.'
+  'hand-written fakes/mocks (the prompt)? Prefer recorded-real bytes over hand-fakes — a fake passing proves the prompt, not the feature. ' +
+  '`evidence`: the shell command you ran and the output tail that proves it — concrete, copy-pasteable. ' +
+  '`funList`: tangents you noticed but did NOT chase — list them so the owner is aware; do NOT act on them here.'
 export const R_VERIFY =
   'You are the Verifier / trust auditor. Try to DESTROY trust; assume wrong until proven. Default ' +
   'trustworthy=false. Re-run the relevant measurement YOURSELF (do not trust reported output). Hunt FALSE ' +

@@ -1,6 +1,6 @@
 // JSON-Schemas forcing machine-usable decisions out of each role (Workflow agent() schema opt).
 // ---- schemas: force machine-usable decisions out of each role ---------------
-export const BASELINE = { type: 'object', required: ['summary', 'invariants', 'measureCommand'], properties: {
+export const BASELINE = { type: 'object', required: ['invariants', 'measureCommand'], properties: {
   summary: { type: 'string' },
   invariants: { type: 'array', items: { type: 'string' } },   // falsifiable things that must stay true
   measureCommand: { type: 'string' },                          // exact green/red command
@@ -11,11 +11,11 @@ export const BASELINE = { type: 'object', required: ['summary', 'invariants', 'm
   purposeCheck: { type: 'string' },                            // ① how to verify the work ACTUALLY works for the user (PURPOSE) beyond unit tests — e.g. a live integration test / a human action
   inProcessVerifiable: { type: 'boolean' },                    // ① can that purpose be verified deterministically in-process (pure logic / recorded-real bytes), or does it need a real env / human?
 } }
-export const ASSESSMENT = { type: 'object', required: ['difficulty', 'size', 'action', 'reason'], properties: {
+export const ASSESSMENT = { type: 'object', required: ['difficulty', 'action', 'reason'], properties: {
   difficulty: { type: 'string', enum: ['easy', 'hard'] },
   size: { type: 'string', enum: ['small', 'big'] },
   action: { type: 'string', enum: ['execute', 'slice', 'spike'] },
-  risk: { type: 'string' }, reason: { type: 'string' },
+  reason: { type: 'string' },
 } }
 export const SLICES = { type: 'object', required: ['slices'], properties: {
   slices: { type: 'array', items: { type: 'object', required: ['desc', 'interface', 'contract'], properties: {
@@ -35,10 +35,10 @@ export const LEARNING = { type: 'object', required: ['summary'], properties: {
 } }
 export const RESULT = { type: 'object', required: ['summary', 'passed', 'evidence'], properties: {
   summary: { type: 'string' }, passed: { type: 'boolean' },   // passed = DETERMINISTIC shell result (build+tests), the tier-0 gate
-  evidence: { type: 'string' }, diff: { type: 'string' },
+  evidence: { type: 'string' },                                // what you ran and what you observed — the shell command + output tail that proves green/red
   filesChanged: { type: 'array', items: { type: 'string' } },
   refactor: { type: 'string' },                                // structure hat: what was tidied after green, or why none needed
-  funList: { type: 'array', items: { type: 'string' } },       // tangents noticed, NOT chased
+  funList: { type: 'array', items: { type: 'string' } },       // tangents noticed, NOT chased (do not act on these — just list them)
   discovered: { type: 'array', items: { type: 'string' } },    // NEW test-list scenarios found mid-work → fed back (Canon TDD)
   commits: { type: 'array', items: { type: 'string' } },       // git mode: SHAs created (behavior commit, then refactor commit)
   interfaceConcern: { type: 'string' },                        // if the FIXED interface seemed wrong — reported up, NOT changed
@@ -47,7 +47,7 @@ export const RESULT = { type: 'object', required: ['summary', 'passed', 'evidenc
 export const VERDICT = { type: 'object', required: ['trustworthy', 'reason'], properties: {
   trustworthy: { type: 'boolean' },
   issues: { type: 'array', items: { type: 'string' } },
-  silentErrorRisk: { type: 'string' }, reason: { type: 'string' },
+  reason: { type: 'string' },
   purposeGap: { type: 'string' },                              // ① real-user behavior the tests do NOT verify (e.g. only fakes used) — prompt satisfied ≠ purpose served
   prescription: { type: 'string' },                            // I3: when untrustworthy and the fix is VISIBLE — the exact minimal fix (file:line + change); a precise prescription is what makes repair converge (proven live)
   followUps: { type: 'array', items: { type: 'string' } },     // I4: concrete, independently-testable defects worth a follow-up leaf even when trustworthy=true (NOT style nits) — fed into the discovered batch

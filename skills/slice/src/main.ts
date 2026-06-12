@@ -303,7 +303,6 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
       trustworthy: distrust.length === 0,                       // UNANIMOUS across ALL 3 lenses (null counts against)
       reason: `heavy verify: ${votes.length} lenses, ${distrust.length} distrusted`,
       issues: votes.flatMap(v => v.issues || []),
-      silentErrorRisk: (distrust[0] || {}).silentErrorRisk,
       purposeGap: votes.map(v => v.purposeGap).filter(Boolean).join('; ') || undefined,   // ① don't drop a hard-leaf purpose gap
       prescription: votes.map(v => v.prescription).filter(Boolean).join(' | ') || undefined,   // I3: lens prescriptions feed repair
       followUps: votes.flatMap(v => v.followUps || []),                                        // I4: lens follow-ups feed the batch
@@ -366,8 +365,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         action = 'execute'
       } else {
         log(`${tag}slice [d${node.depth}] → ${slices.length}`)
-        for (let j = slices.length - 1; j >= 0; j--)
-          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, depth: node.depth + 1, spikes: 0 })
+        for (let j = slices.length - 1; j >= 0; j--) {
+          const iface = slices[j].interface
+          const ifaceCtx = (iface && !/^TBD/i.test(iface.trim())) ? `\nInterface (FIXED): ${iface}` : ''
+          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, depth: node.depth + 1, spikes: 0 })
+        }
         continue
       }
     }
