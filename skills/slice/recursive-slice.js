@@ -609,7 +609,11 @@ ${INV}`,
       if (r.exitCode === 0) {
         paths[i] = wtPaths[i];
         if (baseline.worktreeSetupCommand) {
-          await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`);
+          const setupR = await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`);
+          if (setupR.exitCode !== 0) {
+            log(`worktree g${i} setup command failed (exit ${setupR.exitCode}) — skipping group (no worktree/setup failed)`);
+            delete paths[i];
+          }
         }
       } else log(`worktree g${i} setup failed (exit ${r.exitCode})`);
     }

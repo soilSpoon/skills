@@ -879,6 +879,75 @@ test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prom
     `exec prompt for TBD/exploratory interface slice must NOT contain 'Interface (FIXED):'; found in: ${tbdPrompts.filter(p => /Interface \(FIXED\):/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
 })
 
+// GROUP E (negation) — worktreeSetupCommand empty string: falsy guard already handles this, zero
+// wt-setup calls must fire (contrast to absent; ensures empty='' behaves identically to absent).
+// Behavioral claim: worktreeSetupCommand='' is falsy → the if-guard skips the sh call → zero
+// wt-setup prompts. This is a pure contrast assertion — no production change needed.
+test('GROUP E (negation): empty-string worktreeSetupCommand → zero wt-setup sh calls (same as absent)', async () => {
+  // Behavioral claim: baseline.worktreeSetupCommand='' (empty string) is falsy — the if-guard
+  // (`if (baseline.worktreeSetupCommand)`) must not fire the wt-setup sh call.
+  const baselineWithEmptySetup = { ...FIX.baseline, worktreeSetupCommand: '' }
+  const wtSetupCalls = []
+
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Baseline') return baselineWithEmptySetup
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
+      wtSetupCalls.push(c)
+    }
+  })
+
+  const { result } = await runEngine({ args: ARGS_PARALLEL, dispatch })
+  assert.equal(result.error, undefined, `engine must not error with empty worktreeSetupCommand; got: "${result.error}"`)
+  assert.equal(wtSetupCalls.length, 0,
+    `wt-setup must NOT fire when worktreeSetupCommand is '' (empty string); got ${wtSetupCalls.length} calls`)
+})
+
+// GROUP E (failure path) — wt-setup exitCode !== 0: the setup command failed in the fresh checkout.
+// Behavioral claim: when wt-setup sh returns exitCode !== 0, the engine must NOT silently continue
+// using that worktree (the checkout has no deps installed — running measure there cold-thrashes,
+// exactly the mode this feature was designed to prevent). The group must be marked as failed: its
+// leaf must NOT appear as trusted in the final result. The engine must log a setup-failed message.
+test('GROUP E (failure): wt-setup exitCode!==0 → group leaf NOT trusted (setup-failed mark, no silent cold-thrash)', async () => {
+  // Behavioral claim: when the wt-setup sh call fails (exitCode=1) for group g0, that group's leaf
+  // must not be trusted in result.trustedLeaves. The engine must skip execution or mark the result
+  // as not-trusted — running measure in a broken checkout and trusting the result is forbidden.
+  const SETUP_CMD = 'npm ci --fixture'
+  const baselineWithSetup = { ...FIX.baseline, worktreeSetupCommand: SETUP_CMD }
+
+  const setupFailedCalls = []
+  const execCalls = []
+
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Baseline') return baselineWithSetup
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
+      // ALL worktrees' setup fails
+      setupFailedCalls.push(c)
+      return { exitCode: 1, stdout: 'npm ERR! missing deps (fixture)' }
+    }
+    // Track exec calls (if exec fires, the broken worktree was silently used)
+    if (!isSh(c) && has(c, /exec:/)) {
+      execCalls.push(c)
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS_PARALLEL, dispatch })
+
+  // Fixture precondition: at least one wt-setup must have fired and returned failure
+  assert.ok(setupFailedCalls.length >= 1,
+    `fixture precondition: wt-setup must have fired and been intercepted; got ${setupFailedCalls.length}`)
+
+  // Core assertion: no group leaf from a failed-setup worktree may be trusted
+  // (the group is either skipped entirely or marked passed=false / trustworthy=false)
+  assert.equal(result.trustedLeaves, 0,
+    `no leaf must be trusted when all worktree setups fail; got trustedLeaves=${result.trustedLeaves}`)
+
+  // Engine must log a setup-failed notice (not silently proceed)
+  assert.ok(logs.some(l => /setup.?fail|wt-setup.*fail|setup.*exit|failed.*setup/i.test(l)),
+    `engine must log a setup-failed message when wt-setup sh fails; logs: ${logs.join(' | ')}`)
+})
+
 // GROUP E — BASELINE.worktreeSetupCommand: parallel worktree setup command fires exactly once per
 // worktree, immediately after wt-add, carrying the worktree path and the setup command.
 // Behavioral claim: when baseline.worktreeSetupCommand is set and parallel mode is active, the

@@ -644,8 +644,16 @@ if (groups) {
       paths[i] = wtPaths[i]
       // E: run worktreeSetupCommand exactly once in each fresh worktree (e.g. 'npm ci') so leaves
       // start with deps installed and never fail with a fake RED due to a missing-deps error.
+      // E-error: if setup fails (exitCode !== 0), unregister the worktree path so the group
+      // falls into the !repo branch (→ trustworthy:false/'no worktree/setup failed') instead of
+      // silently running measure in a broken checkout and cold-thrashing (the very mode this
+      // feature was designed to prevent).
       if (baseline.worktreeSetupCommand) {
-        await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`)
+        const setupR = await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`)
+        if (setupR.exitCode !== 0) {
+          log(`worktree g${i} setup command failed (exit ${setupR.exitCode}) — skipping group (no worktree/setup failed)`)
+          delete paths[i]
+        }
       }
     } else log(`worktree g${i} setup failed (exit ${r.exitCode})`)
   }
