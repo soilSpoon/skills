@@ -92,6 +92,12 @@ silent surprise.
      `git stash` any unverified in-flight edits (never trust uncommitted debris), then relaunch
      with `Workflow({ scriptPath: <persisted script>, resumeFromRunId: <run id> })` — completed
      agents replay from the journal cache; only the stalled leaf re-runs live.
+   - **Quota-halt auto-resume**: if the run returns with an `aborts` entry starting `quota-halt:`
+     (the engine's circuit breaker tripped on a session/usage limit), do NOT hand it back to the
+     owner to babysit: parse the reset time from the quoted error when present (e.g. "resets
+     12:20am"), `ScheduleWakeup` for a few minutes past it (fallback ~60min if unknown), and on
+     wake relaunch with the SAME args + `resumeFromRunId` — cached leaves replay free. The
+     quiesce rules still apply first: stash crash debris, remove a stale `rs-lock`.
    - **After killing a run, also kill its ORPHANED test processes**: stopping a workflow does
      NOT kill the test runner its executor had in flight (whatever the stack spawns:
      `swift-test`/`swiftpm-testing-helper`, jest/vitest workers, `cargo test` runners…). The orphan keeps the build/test lock forever (its parent is dead), and the NEXT test

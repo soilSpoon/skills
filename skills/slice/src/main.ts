@@ -100,7 +100,7 @@ const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { typ
 const sh = async (cmd: string, label?: string): Promise<ShResult> => ((await agentSafe(
   `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
   `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
-  { label: label || 'sh', model: 'sonnet', schema: SH })) as ShResult | null) || { stdout: '', exitCode: 1 }
+  { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null) || { stdout: '', exitCode: 1 }
 
 // =============================================================================
 phase('Baseline')
@@ -216,7 +216,7 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
       `${base}\nThis is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing ` +
       `suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO ` +
       `observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
-      { phase: 'Work', label: `verify:${lbl}·tidy`, schema: VERDICT }))
+      { phase: 'Work', label: `verify:${lbl}·tidy`, model: 'sonnet', schema: VERDICT }))
       || { trustworthy: false, reason: 'verification unavailable — untrusted' }
   }
   if (tier === 'light') {

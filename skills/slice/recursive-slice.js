@@ -169,7 +169,7 @@ async function __main() {
     `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
 
 ${cmd}`,
-    { label: label || "sh", model: "sonnet", schema: SH }
+    { label: label || "sh", model: "haiku", schema: SH }
   ) || { stdout: "", exitCode: 1 };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
@@ -251,7 +251,7 @@ ${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNot
       return await agentSafe(
         `${base}
 This is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
-        { phase: "Work", label: `verify:${lbl}·tidy`, schema: VERDICT }
+        { phase: "Work", label: `verify:${lbl}·tidy`, model: "sonnet", schema: VERDICT }
       ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
     }
     if (tier === "light") {
