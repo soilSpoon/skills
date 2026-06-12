@@ -25,6 +25,15 @@ silent surprise.
    with ≥2 genuinely separate leaves, an unknown decomposition, or a risky seam needing
    adversarial verification. A full lane spends 100k-700k tokens on ceremony that a 10-line
    wiring fix does not need.
+   **This rule applies PER GROUP, not per task.** When the spec already carries the
+   decomposition with file:line evidence and KNOWN remedies (typical after an audit), do those
+   groups YOURSELF inline — same discipline, no agent ceremony: failing test → known fix →
+   filtered suite → one commit per fix — and lane ONLY the genuinely risky seams (unknown
+   APIs, cross-cutting plumbing, security gates). Measured on a live remediation lane: a
+   known-fix leaf costs ~5 agents (~25min) through the engine vs ~10min inline; running
+   audit-prescribed groups through the full engine roughly DOUBLED the lane's wall-clock for
+   no trust gain (the audit was the verification). Mixed task → split it: inline the known,
+   lane the risky.
 
 3. **Write the task as a LANE SPEC, not a wish.** Runs given precise specs went 11/11–12/12
    trusted; vague specs produced verifier rejections and repair loops. Include, in the task string:
