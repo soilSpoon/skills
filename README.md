@@ -21,6 +21,30 @@ npx skills add soilSpoon/skills@tailor-resume
 **Bundled scripts:**
 - `scripts/groupby-api.mjs` — Groupby resume analysis API client (no browser needed)
 
+### slice
+
+Trust-first recursive decomposition of a development task — Kent Beck's *Mastering Programming* heuristics (Slicing, Baseline Measurement, One-thing-at-a-time) as an executable workflow.
+
+```bash
+npx skills add soilSpoon/skills@slice
+```
+
+**What it does:**
+- Pins a deterministic baseline (tests + invariants at a git SHA) before any work begins
+- Recursively classifies the task (easy/hard × small/big) into thin vertical slices
+- Executes each atomic leaf with Canon TDD (call-your-shot, one test at a time, two hats)
+- Adversarially verifies every leaf (executor ≠ verifier, deterministic gates before model judgment, risk-tiered lenses)
+- Self-repairs while issues strictly converge; halts the approach on an untrusted streak
+- Lands one git commit per trusted leaf; deterministic full-suite gate at integrate
+- Ends with an Owner's Briefing — a guided read to repay comprehension debt
+- Optional parallel mode: isolated git worktrees per independent slice group (+ shared build scratch for compile-bound repos)
+
+**Bundled:**
+- `recursive-slice.js` — the workflow engine (run via the Workflow tool's `scriptPath`)
+- `agents/slice-*.md` — the 5 roles (baseliner/assessor/slicer/executor/verifier) as standalone subagents
+- `references/` — architecture, philosophy, and 11 battle-tested lessons (deadlocks, orphaned test runners, false greens)
+- `scripts/` — live run viewer, no-focus window capture for visual UI verification (macOS)
+
 ### fact-check
 
 Fact-check articles, newsletters, and written content by dispatching 6 parallel verification agents.
