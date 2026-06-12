@@ -25,18 +25,34 @@
       ]
     },
     {
-      "name": "soilspoon-toolkit",
-      "description": "Productivity skills: resume tailoring, job applications, fact-checking, browser automation, frontend fundamentals, build-config drift, issue root-cause workflow.",
+      "name": "dev-toolkit",
+      "description": "Engineering diagnostics & guides: frontend fundamentals (가독성/응집도/결합도), build-config drift detection, issue root-cause workflow.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/toss-frontend-fundamentals",
+        "./skills/build-config-drift",
+        "./skills/issue-rootcause-workflow"
+      ]
+    },
+    {
+      "name": "job-hunt",
+      "description": "Job application automation: resume tailoring with fit evaluation, Wishket application workflow.",
       "source": "./",
       "strict": false,
       "skills": [
         "./skills/tailor-resume",
+        "./skills/apply-wishket"
+      ]
+    },
+    {
+      "name": "research-tools",
+      "description": "Verification & web research: 6-agent parallel fact-checking, human-like browser automation.",
+      "source": "./",
+      "strict": false,
+      "skills": [
         "./skills/fact-check",
-        "./skills/apply-wishket",
-        "./skills/human-like-browser",
-        "./skills/toss-frontend-fundamentals",
-        "./skills/build-config-drift",
-        "./skills/issue-rootcause-workflow"
+        "./skills/human-like-browser"
       ]
     }
   ]

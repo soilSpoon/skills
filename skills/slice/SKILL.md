@@ -148,9 +148,15 @@ silent surprise.
   plain skill install does not. If `slice-*` agents are missing from the agent registry and this
   skill's base directory has an `agents/` folder, copy those files to `~/.claude/agents/` (tell
   the user you did) — idempotent, skip if already present.
-- **No Workflow tool in this harness?** (opencode, Codex CLI, subagent-only setups): don't give
-  up the discipline — read `references/portable-orchestration.md` and drive the same algorithm
-  yourself with subagents. The four invariants survive any port: executor ≠ verifier, shell
-  truth before model judgment, one commit per trusted leaf, full suite only at integrate.
+- **No Workflow tool in this harness?**
+  - **opencode**: first-class adapter available — copy `adapters/opencode/slice-engine.ts` to
+    `~/.config/opencode/tools/` and the `slice-engine` tool runs the SAME engine artifact
+    (AsyncFunction-hosted PORT; `agent()` = `opencode run` subprocess on the user's own plan).
+    Verify install with `node adapters/opencode/host-smoke.mjs`. v1 degradations are documented
+    in the adapter header (no per-call model overrides, no resume journal, unlimited budget).
+  - **Anything else** (Codex CLI, subagent-only setups): don't give up the discipline — read
+    `references/portable-orchestration.md` and drive the same algorithm yourself with subagents.
+    The four invariants survive any port: executor ≠ verifier, shell truth before model
+    judgment, one commit per trusted leaf, full suite only at integrate.
 - If the target repo is not under git, note it: small reversible commits are themselves a trust
   mechanism, and git unlocks worktree isolation for parallel slices. Offer to `git init`.

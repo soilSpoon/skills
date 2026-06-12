@@ -1,5 +1,9 @@
 # Portable orchestration — running slice WITHOUT the Workflow tool
 
+**opencode users: skip manual mode** — `adapters/opencode/slice-engine.ts` hosts the engine's
+PORT as a custom tool, running the same artifact with full automation (verified live). Manual
+mode below is for harnesses with no adapter yet.
+
 The bundled engine (`recursive-slice.js`) needs Claude Code's Workflow runtime (a sandboxed JS
 interpreter providing `agent()`/`pipeline()`/`phase()` plus journaling and resume). On harnesses
 without it — opencode, Codex CLI, plain subagent-only setups — the front-door agent executes the
