@@ -379,7 +379,13 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agentSafe(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
           slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}`,
-          { phase: 'Work', label: `${tag}critic:d${node.depth}`, schema: MISSING })
+          // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
+          // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
+          // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
+          // NOT for verifier/lens (they MUST keep Bash to re-run — Bash-less verify silently
+          // defeats the fabricated-green catch, main.ts fabricated-green lesson) nor baseliner
+          // (Explore skips CLAUDE.md, which the baseliner must read to build the project card).
+          { phase: 'Work', label: `${tag}critic:d${node.depth}`, agentType: 'Explore', schema: MISSING })
         if (crit && crit.missing && crit.missing.length) {
           slices = slices.concat(crit.missing.map(m => ({ ...m, kind: 'behavior' })))   // critic items are always behavior scenarios
           log(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`)

@@ -26,3 +26,11 @@
 - **leaf 간**: leafConcurrency(위 기존 항목) — 단, **funnel 레인은 본질적으로 직렬**. 모든 leaf가 같은 레지스트리(client-tools.ts의 단일 객체 리터럴·route.ts)에 키를 추가하면 동일 hunk 충돌이라 어떤 오케스트레이터도 안전 병렬화 불가 — parallel-first + Coordinator로 가능하나 leaf당 충돌 해소 비용이 이득을 상쇄. **진짜 disjoint(capabilities 4파일·i18n·config·eval)** 레인에서만 leafConcurrency가 명확히 이김 → 프론트도어가 그런 그룹엔 parallel:true를 더 적극 선택해야 함(과거 capabilities 그룹 under-parallelize 자인).
 - **exec(N+1) ∥ verify(N) 파이프라인**: N 거부→reset 시 N+1 무효라 위험 — disjoint일 때만 안전한데 그건 leafConcurrency와 동일 집합으로 수렴. 별도 가치 없음.
 - **정직한 천장**: verifier의 *독립 재발견 자체*는 못 없앤다 — inline 가능한 건 객관 증거(diff/diffstat/t0)뿐. executor의 결론을 신뢰해 inspect를 더 줄이는 순간 조작된 green 적발 능력이 붕괴(main.ts:459에서 실제로 그렇게 잡힘).
+
+## 프레임워크+프롬프트 감사 (2026-06-13, wf_d93914e1) — 순증 가치는 2건뿐 (정직)
+
+> 결론: 진짜 레버는 전부 이미 위 효율 감사에 등재됨. 이 감사의 순증은 (1) "캐시 순서 재정렬은 가짜 레버"라는 negative 확인, (2) agentType 부분 채택(critic).
+
+- [x] **critic→agentType:'Explore' (적용 1.2.3)** — completeness critic은 read-only·additive-only(트러스트 게이트 0, 입력 inline)라 Explore recon 에이전트에 완벽 적합. Workflow 도구 계약이 `opts.agentType`('Explore' 예시)을 보증 — CONFIRMED. main.ts:382 호출부에 `agentType:'Explore'` + do-not-do 주석.
+- [ ] **[가짜 레버·하지 마라 단독] 캐시-인지 프롬프트 재정렬** — executor 입력 99.7% cache-read라 비용은 이미 바닥, auto-prefix matcher는 선언 순서 무관하게 최장 prefix 매칭 → 재정렬해도 캐시되던 바이트가 더 안 캐시됨(경계만 이동). cross-leaf 이득은 harness가 subagent _간_ prefix-cache를 하는지 미확정에 게이트(소스 증거 0). **단독 PR 가치 측정 이하** — diff-inline 레버 PR에서 prefix 위생만 덤으로(공짜). 흉터 주의: R_EXEC:85 "see LEAF TEST DISCIPLINE **below**"·R_VERIFY:102 "block **in this prompt**" — R_EXEC/R_VERIFY를 head 최상단 유지해야 포인터가 truthful, LEAF_TEST(scope)·TIDY는 per-leaf 변수라 variable-tail.
+- **agentType 채택 맵 (나머지)**: assessor→Explore는 **조건부** — `model:'sonnet'` 의도 지정(R_ASSESS "confident wrong call is costliest")이라 Explore가 sonnet 유지 가능한지 확인 전 금지(Haiku 강등 시 slice/execute 결정 회귀). **baseline→Explore 절대 금지** — Explore는 CLAUDE.md를 스킵, 베이스라이너의 직무가 그걸 읽어 projectCard 만드는 것(매핑 시 모든 downstream convention 컨텍스트 증발). **verifier/lens→Explore 절대 금지** — Bash 없는 verifier는 독립 재실행 불가 = 조작 green 적발(main.ts fabricated-green 흉터) silent 무력화.

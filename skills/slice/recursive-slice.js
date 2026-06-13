@@ -402,7 +402,13 @@ Task: ${node.task}
 Proposed list:
 ` + slices.map((s, j) => `${j + 1}. ${s.desc}`).join("\n") + `
 ${INV}`,
-            { phase: "Work", label: `${tag}critic:d${node.depth}`, schema: MISSING }
+            // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
+            // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
+            // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
+            // NOT for verifier/lens (they MUST keep Bash to re-run — Bash-less verify silently
+            // defeats the fabricated-green catch, main.ts fabricated-green lesson) nor baseliner
+            // (Explore skips CLAUDE.md, which the baseliner must read to build the project card).
+            { phase: "Work", label: `${tag}critic:d${node.depth}`, agentType: "Explore", schema: MISSING }
           );
           if (crit && crit.missing && crit.missing.length) {
             slices = slices.concat(crit.missing.map((m) => ({ ...m, kind: "behavior" })));
