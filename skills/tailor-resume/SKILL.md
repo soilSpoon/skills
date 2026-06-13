@@ -1,6 +1,6 @@
 ---
 name: tailor-resume
-description: Tailor resume and career description for a specific job posting. Analyze requirements, research the company, filter relevant experience from master.yaml, generate a variant, build PDFs, and evaluate via groupby. Triggers on job URL + resume request ("이 공고에 맞게 이력서 만들어줘", "tailor my resume for this job", "이 포지션에 지원하려는데").
+description: Tailor a resume and career description to a specific job posting — analyze the posting's requirements, research the company, filter the most relevant experience from a master resume, generate a tailored variant, build the PDF, and score it via the groupby evaluator. Use whenever someone wants their resume/CV adapted, customized, or optimized for a particular role, company, or job URL — "이 공고에 맞게 이력서 만들어줘", "tailor my resume for this job", "이 포지션에 지원하려는데", "맞춤 이력서", "지원서용 이력서", a pasted job posting + "내 이력서 맞춰줘", or a request to improve a resume's fit/pass-rate for a specific opening. PRECONDITION: needs a master resume data source (a `cv/master.yaml`-style structured resume). Without one, this is NOT the skill — that's generic resume writing from scratch; this skill specializes the existing master into a job-specific variant.
 ---
 
 # Tailor Resume
