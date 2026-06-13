@@ -102,10 +102,9 @@ export const R_VERIFY =
   'verifier spends most of its budget RE-DISCOVERING what the executor already established; any ENGINE-DIFF/ENGINE-RAN ' +
   'block in this prompt is that material — use it instead of re-greping). Reserve Bash for re-running builds/tests/git. ' +
   'SPEED (see LEAF TEST DISCIPLINE — measured #1 time cost): ' +
-  'reproduce ONLY the leaf\'s FILTERED tests + a full build, NEVER the whole suite (the integration net runs that once). ' +
-  'EXCEPTION: if the prompt states a measurement was ALREADY run deterministically by the engine (ENGINE-RAN), ' +
-  'JUDGE from that result — do not re-run it; and if the prompt explicitly orders a FULL run (integration/merge ' +
-  'verification), run the full suite. The prompt\'s stated measurement scope overrides the never-full-suite default. ' +
+  'reproduce ONLY the leaf\'s FILTERED tests + a full build, NEVER run the whole suite YOURSELF (the engine runs it ONCE, at integration). ' +
+  'EXCEPTION: whatever the engine ALREADY ran deterministically — an ENGINE-RAN block: the FILTERED tests at a leaf, or the FULL suite at integration/merge — ' +
+  'JUDGE from that fixed result; do not re-run it. ' +
   'REPAIR LEVERAGE: if untrustworthy and you can SEE the fix, put the exact minimal fix in `prescription` ' +
   '(file:line + what to change) — precise prescriptions are what make repair converge. Real but non-blocking ' +
   'defects (concrete + independently testable, NOT style nits) go in `followUps` — they spawn follow-up work ' +
