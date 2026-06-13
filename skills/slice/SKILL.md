@@ -11,6 +11,24 @@ heuristics (Slicing, One-thing-at-a-time, Baseline Measurement, Concrete hypothe
 service of the *Trust Factory* objective: every step leaves verifiable evidence and avoids
 silent surprise.
 
+## Trust Factory sets the ceremony — read first
+
+Priority: **Trust Factory first**, then **TDD + Tidy First** as its mechanisms — never the
+reverse. The test is never "did I run the full ceremony?" but "did I manufacture the trust this
+change actually lacked, and no more?" Trust you already hold is free — a clean compile, a green
+filtered test, a diff you can read whole and revert in one commit. Spend the costly ceremony
+(executor≠verifier, adversarial verify, baseline/slice/integrate rounds, parallel worktrees) only
+on the trust **deficit**. Uniform max-ceremony lowers trust-per-hour; a 10-minute change that
+takes an hour is a tier error, not rigor.
+
+**Ceremony ladder — pick the LOWEST tier that still guarantees the baseline floor:**
+- **T0 deterministic** — a compiler / type-check / filtered test already proves it → just run it. No agent, no engine.
+- **T1 legible** — one change you can read whole + a filtered test → do it inline yourself: failing test → fix → filtered suite → one commit. Two hats (behavior, then structure), one head. **Default for simple work — most tasks exit here, no engine.**
+- **T2 manufactured** — ≥2 independent risky leaves, an unknown interface/API, cross-cutting plumbing, a security gate, or an irreversible seam → the engine earns its 100k–700k tokens: executor≠verifier, adversarial verify, and independent leaves run in **parallel** (worktree groups + coordinator) by default — serial buys no extra trust, only wall-clock.
+
+The floor (baseline invariants, per-leaf reversibility, evidence) is non-negotiable at *every*
+tier; only the ceremony *above* it scales with risk. Step 2 below is the per-group mechanics.
+
 ## What to do
 
 1. **Resolve the task and repo.**

@@ -41,6 +41,21 @@ TDD/SDD cover the top two lines. **Trust usually dies on the bottom two** — wh
 trust-first system must bake in non-surprise (loud, contained failures) and honest reporting,
 not just verification.
 
+### The complement: ceremony scales with the trust *deficit*
+
+The asymmetry says never trade the floor away for speed. It does **not** say maximize ceremony.
+Trust you already hold is *free*: a clean compile, a green filtered test, a diff small enough to
+read whole and revert in one commit manufacture trust **deterministically**, at zero agent cost.
+Spend the expensive trust-manufacturing — separate executor≠verifier, adversarial verification,
+parallel-worktree lanes — only on the **deficit**: the seams where you cannot yet *see* it is
+right. Beck says this three ways: *Scope Management 101* ("excessive quality for your purpose is
+waste"), *First Principles First* ("the simplest tool that reveals the flaw"), *The Documentation
+Tradeoff* ("justify every document"). Uniform max-ceremony is not rigor — it lowers **trust per
+hour**, and a tool that turns a ten-minute change into an hour teaches its owner to distrust it,
+which is itself a trust loss. **Guarantee the floor at every tier; let the ceremony above the
+floor scale with the deficit.** The operational ladder (T0 deterministic / T1 legible-inline /
+T2 manufactured-parallel) lives in [SKILL.md](../SKILL.md).
+
 ## 2. Mastering Programming — the decomposition discipline
 
 Beck's master-vs-journeyman heuristics are all about **"scaling your brain" by solving fewer
@@ -75,6 +90,12 @@ Beck's canonical five steps:
 Corrections Beck stresses: the **test list is the step everyone skips**; **one test at a
 time** (speculative tests cause rework); **refactor after green, not during** ("don't wear two
 hats"); interface design happens when writing the test, implementation design when refactoring.
+
+The skill of turning a behavior *into* that test list — decomposing a large behavior into pieces
+whose **combination** validates the whole, discovered piecemeal rather than known up front — is
+what Beck calls **behavioral composition** (*TDD's Missing Skill*). It is the same move as slicing
+a leaf, one altitude down: the Slicer composes behavior across leaves; Canon TDD composes it
+*within* a leaf.
 
 ## 4. Design in TDD — where design lives
 
