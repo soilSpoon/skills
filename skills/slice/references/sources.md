@@ -99,6 +99,20 @@ maps to the engine.
   fix-vs-regression-precision caveat Avi cites).
 - **[Loop Engineering (Cobus Greyling)](https://cobusgreyling.substack.com/p/loop-engineering)** —
   builder time shifts from prompt-wrangling to *designing the self-repair loop itself*.
+- **[Addy Osmani — Loop Engineering](https://addyosmani.com/blog/loop-engineering/)** — distinguishes
+  *harness* engineering (one agent's environment — what slice IS) from *loop* engineering (a scheduled
+  system that DISCOVERS work and dispatches harnesses); five pieces (automations, worktrees, skills, MCP
+  connectors, sub-agent verifiers) + on-disk state + a separate small model for the stop condition. →
+  slice is the harness; the outer scheduled loop is a layer we have the pieces for but haven't assembled.
+
+## IV. Patterns adopted (scope axis)
+
+- **[Ponytail — the "lazy senior dev" plugin](https://github.com/DietrichGebert/ponytail)** — a scope-
+  minimalism ruleset (does it need to exist → stdlib → native → installed dep → one line → minimum),
+  output-capped, deliberate simplifications marked with their ceiling + upgrade path; honest self-critical
+  benchmarks (its own v1 was *slower* — it deliberated about what not to build). → the **scope axis** of
+  our proportional-trust principle: `code-fundamentals` §0 (the scope floor) and slice SKILL.md's two
+  reflexes derive from it, re-anchored on **trust** (absent code = nothing to surprise/verify/rot), not laziness.
 
 ---
 

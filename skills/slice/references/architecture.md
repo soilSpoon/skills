@@ -174,11 +174,12 @@ Worktree setup/cleanup are **deterministic and unconditional** (JS-owned paths +
 - *Build-cost gate (deterministic):* the Baseliner reports `coldBuildCost`; for a **compile-bound**
   project (Swift/Rust/C++…) each worktree's cold build thrashes the machine and is *slower than
   sequential-warm*, so the engine **auto-falls-back to sequential** (override: `forceParallel`).
-  The proper lift is `sharedScratch: true`: every worktree builds into ONE shared `--scratch-path`,
-  so dependency artifacts compile once and builds serialize on the build lock — model-work still
-  overlaps while compilation queues (the only shareable build cache SwiftPM offers today; APFS-cloning
-  `.build` fails because the llbuild database keys on absolute paths, and content-addressed compile
-  caching is still experimental in the toolchain).
+  The proper lift is `sharedScratch: true`: every worktree builds into ONE shared build dir — the
+  toolchain's shared-build-dir mechanism (SwiftPM `--scratch-path`, Cargo `CARGO_TARGET_DIR`, …) — so
+  dependency artifacts compile once and builds serialize on the build lock while model-work still
+  overlaps. (Per-toolchain ceiling — e.g. SwiftPM: `--scratch-path` is the only shareable cache today;
+  APFS-cloning `.build` fails (llbuild keys on absolute paths) and content-addressed caching is still
+  experimental — other toolchains have their own limits.)
   Parallel-worktree's real win is **fast-build or I/O/network-bound** work — because a build tool
   serializes on its cache lock, you cannot have both warm *and* parallel builds. Parallel also
   requires a **clean main tree** (the branches merge into it).

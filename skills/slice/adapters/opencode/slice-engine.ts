@@ -119,7 +119,7 @@ export default tool({
     task: tool.schema.string().describe("the lane spec (precise: evidence file:line, MUST PRESERVE, purpose, wiring clause)"),
     repo: tool.schema.string().describe("absolute path to the target repo"),
     maxDepth: tool.schema.number().optional().describe("recursion cap (default 3; 2 for contained tasks)"),
-    parallel: tool.schema.boolean().optional().describe("opt-in: run independent top-level slices in parallel git worktrees"),
+    parallel: tool.schema.boolean().optional().describe("DEFAULT ON (pass false to force sequential): run independent top-level slices in parallel git worktrees; auto-falls-back to sequential when unsafe (no git / dirty tree / compile-bound / <2 independent groups)"),
     forceParallel: tool.schema.boolean().optional().describe("override compile-bound auto-fallback to sequential (brute-force parallel even for expensive cold builds)"),
     sharedScratch: tool.schema.boolean().optional().describe("compile-bound parallel WITHOUT per-worktree cold builds: worktrees share ONE build dir (--scratch-path); serializes builds but avoids thrash"),
     skills: tool.schema.array(tool.schema.string()).optional().describe("paths to SKILL.md-style domain-guidance files forwarded to every leaf/verifier (up to 8)"),

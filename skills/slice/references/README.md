@@ -29,16 +29,18 @@ Watch it: `/workflows`, or `watch -n3 'python3 scripts/slice-watch.py latest <re
 
 1. **[philosophy.md](philosophy.md)** — why trust is the objective function. Kent Beck's
    *Trust Factory*, *Mastering Programming*, *Canon TDD*, *Design in TDD* — synthesized and
-   read critically for the agent context.
+   read critically for the agent context (and the scope axis: minimalism as a trust claim).
 2. **[architecture.md](architecture.md)** — the system: the deterministic-control +
    model-judgment thesis, the roles, the phases, and every mechanism (risk-tiered
    verification, self-repair, project card, git mode, parallel worktrees + coordinator).
 3. **[pitfalls-and-lessons.md](pitfalls-and-lessons.md)** — the failure modes and their
    mitigations, plus the hard lessons from real runs (the crash, the verifier catching a
    fabrication, the silent git-off bug, the adversarial review finding a trust hole).
-4. **[goose.md](goose.md)** — deep analysis of `aaif-goose/goose`: what it validates about
-   our design, what to borrow (with source citations), and the "goose-as-leaf-executor"
-   reframe and when it's worth adopting.
+4. **[portable-orchestration.md](portable-orchestration.md)** — running the same algorithm by
+   hand on a harness with no Workflow tool (opencode / Codex CLI / subagent-only): the four
+   invariants that survive any port, and the accepted degradations.
+5. **[sources.md](sources.md)** — annotated bibliography: the Beck lineage + the contemporary
+   agent-systems sources, each mapped to the engine.
 
 ## The one-sentence thesis
 
