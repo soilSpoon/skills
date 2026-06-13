@@ -234,6 +234,9 @@ Executors apply them; verifiers treat clear violations as issues (a skipped non-
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const LEAF_TEST = (scope) => `
 LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test suite/class you add so this exact token matches it (the engine re-runs this filter as a deterministic gate; a name mismatch = zero tests matched = an untrusted leaf). ` : `Filter to the test suite/file you add or touch (project-card filter syntax). `) + `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`;
+  const engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
+ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
+${duty}`;
   const headR = await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, "git-sha");
   if (shUnavailable(headR)) {
     log("FATAL: shell-proxy agent returned no result for git-sha capture — cannot determine git state; aborting.");
@@ -502,9 +505,12 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
             } else {
               t0redStreak = 0;
               gateLevel = "deterministic-filtered";
-              engineT0 = `
-ENGINE-RAN: \`${t0cmd}\` exited 0. Output tail: ${String(t0.stdout || "").slice(-300)}
-FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`;
+              engineT0 = engineRanBlock({
+                cmd: t0cmd,
+                exitCode: 0,
+                tail: String(t0.stdout || "").slice(-300),
+                duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
+              });
             }
           }
           if (!t0red && node.kind === "tidy" && baseline.measureCommand) {
@@ -513,9 +519,13 @@ FIRST confirm from that output that at least one test ACTUALLY EXECUTED under sc
               t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || "").slice(-300)}`] };
             } else {
               gateLevel = "full-suite";
-              engineT0 = `
-ENGINE-RAN: \`${baseline.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. Output tail: ${String(tidyFull.stdout || "").slice(-300)}
-Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`;
+              engineT0 = engineRanBlock({
+                cmd: baseline.measureCommand,
+                note: "(full suite — tidy behavior-preservation gate)",
+                exitCode: 0,
+                tail: String(tidyFull.stdout || "").slice(-300),
+                duty: `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`
+              });
             }
           }
           verdict = t0red || await verifyLeaf(lbl, node, res, attempt === 0 ? tier : tier === "light" ? "standard" : tier, repo, leafStart, engineT0, buildNote);

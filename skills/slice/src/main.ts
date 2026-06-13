@@ -212,6 +212,17 @@ const LEAF_TEST = (scope?: string) =>
   `Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. ` +
   `Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`
 
+// ITEM 8 (KEYSTONE): the engine's deepest idea — run a deterministic shell command, then a model JUDGES from
+// that FIXED result (never re-runs) — was hand-reimplemented at the two leaf gates (filtered tier-0 + tidy
+// full-suite). This is the ONE canonical "shell-truth → ENGINE-RAN → model judges" string builder for those
+// sites: it states the command, its exit, and an output tail, then hands the verifier its `duty` (confirm a
+// real test ran / judge the artifacts) — explicitly WITHOUT re-running. The control flow that decides WHEN each
+// gate runs and how RED is handled legitimately differs per site and stays inline; only this shared STRING is
+// extracted here. (The merge/integrate nets use a different surface form — `exit=N (GREEN/RED)` mid-prose, no
+// ENGINE-RAN prefix / no tail — so they are NOT folded in: that would change the byte-text the verifier sees.)
+const engineRanBlock = ({ cmd, note, exitCode, tail, duty }: { cmd: string; note?: string; exitCode: number; tail: string; duty: string }): string =>
+  `\nENGINE-RAN: \`${cmd}\`${note ? ' ' + note : ''} exited ${exitCode}. Output tail: ${tail}\n${duty}`
+
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
 // didn't, disabling git mode). A fixed `git rev-parse HEAD`, run verbatim, owns this.
 // A1/A7: if the shell proxy is dead, shUnavailable(r) is true; treat that as FATAL — not as
@@ -519,10 +530,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             // Exit 0 is NOT proof tests ran: a typo'd scope can match ZERO tests and still exit 0 —
             // blind "ENGINE-VERIFIED" would LAUNDER a vacuous green while muzzling the verifier. Hand
             // the verifier the output and the zero-tests duty instead of an assertion.
-            engineT0 = `\nENGINE-RAN: \`${t0cmd}\` exited 0. Output tail: ${String(t0.stdout || '').slice(-300)}\n` +
-              `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — ` +
-              `zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. ` +
-              `If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
+            engineT0 = engineRanBlock({
+              cmd: t0cmd, exitCode: 0, tail: String(t0.stdout || '').slice(-300),
+              duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — ` +
+                `zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. ` +
+                `If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).` })
           }
         }
         // B1: tidy leaf behavior-preservation gate — engine runs the FULL measure command deterministically
@@ -535,10 +547,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || '').slice(-300)}`] }
           } else {
             gateLevel = 'full-suite'   // ITEM 1: tidy leaf — engine ran the FULL measure command (its deterministic proof)
-            engineT0 = `\nENGINE-RAN: \`${baseline!.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. ` +
-              `Output tail: ${String(tidyFull.stdout || '').slice(-300)}\n` +
-              `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). ` +
-              `Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`
+            engineT0 = engineRanBlock({
+              cmd: baseline!.measureCommand!, note: '(full suite — tidy behavior-preservation gate)',
+              exitCode: 0, tail: String(tidyFull.stdout || '').slice(-300),
+              duty: `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). ` +
+                `Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.` })
           }
         }
         // A repaired leaf is verified at the SAME tier or stricter — never looser (a leaf that failed the
