@@ -33,6 +33,11 @@ smuggled back in). A care-process that ruminates is slower for zero trust gain.
 - **T1 legible** — one change you can read whole + a filtered test → do it inline yourself: failing test → fix → filtered suite → one commit. Two hats (behavior, then structure), one head. **Default for simple work — most tasks exit here, no engine.**
 - **T2 manufactured** — ≥2 independent risky leaves, an unknown interface/API, cross-cutting plumbing, a security gate, or an irreversible seam → the engine earns its 100k–700k tokens: executor≠verifier, adversarial verify, and independent leaves run in **parallel** (worktree groups + coordinator) by default — serial buys no extra trust, only wall-clock.
 
+> This T0/T1/T2 ladder is the **front-door routing** decision (do nothing / inline yourself /
+> launch the engine). It is ORTHOGONAL to the engine's internal `riskTier: light/standard/heavy`,
+> which — once you are inside a T2 run — sets how hard each *leaf* is verified. Don't conflate
+> them: a T2 lane still has light, standard, and heavy leaves within it.
+
 The floor (baseline invariants, per-leaf reversibility, evidence) is non-negotiable at *every*
 tier; only the ceremony *above* it scales with risk. Step 2 below is the per-group mechanics.
 

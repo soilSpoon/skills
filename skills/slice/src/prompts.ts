@@ -104,7 +104,8 @@ export const R_VERIFY =
   'SPEED (see LEAF TEST DISCIPLINE — measured #1 time cost): ' +
   'reproduce ONLY the leaf\'s FILTERED tests + a full build, NEVER the whole suite (the integration net runs that once). ' +
   'EXCEPTION: if the prompt states a measurement was ALREADY run deterministically by the engine (ENGINE-RAN), ' +
-  'JUDGE from that result — do not re-run it. ' +
+  'JUDGE from that result — do not re-run it; and if the prompt explicitly orders a FULL run (integration/merge ' +
+  'verification), run the full suite. The prompt\'s stated measurement scope overrides the never-full-suite default. ' +
   'REPAIR LEVERAGE: if untrustworthy and you can SEE the fix, put the exact minimal fix in `prescription` ' +
   '(file:line + what to change) — precise prescriptions are what make repair converge. Real but non-blocking ' +
   'defects (concrete + independently testable, NOT style nits) go in `followUps` — they spawn follow-up work ' +
