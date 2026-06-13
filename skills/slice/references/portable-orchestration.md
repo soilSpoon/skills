@@ -5,7 +5,7 @@ PORT as a custom tool, running the same artifact with full automation (verified 
 mode below is for harnesses with no adapter yet.
 
 The bundled engine (`recursive-slice.js`) needs Claude Code's Workflow runtime (a sandboxed JS
-interpreter providing `agent()`/`pipeline()`/`phase()` plus journaling and resume). On harnesses
+interpreter providing `agent()`/`parallel()`/`phase()` plus journaling and resume). On harnesses
 without it — opencode, Codex CLI, plain subagent-only setups — the front-door agent executes the
 SAME algorithm itself. You lose the journal (resume), enforced schemas, and parallel worktrees;
 you keep everything that makes the system trustworthy, because those are disciplines, not APIs:

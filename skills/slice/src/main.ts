@@ -21,10 +21,8 @@ interface AgentOpts {
 }
 declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
 declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
-declare function pipeline(items: unknown[], ...stages: Array<(prev: any, item: any, index: number) => unknown>): Promise<unknown[]>
 declare function phase(title: string): void
 declare function log(message: string): void
-declare function workflow(nameOrRef: string | { scriptPath: string }, args?: unknown): Promise<unknown>
 declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
 
