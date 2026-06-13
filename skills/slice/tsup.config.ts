@@ -30,6 +30,9 @@ export default {
   clean: true,
   banner: { js: META },
   footer: { js: 'return await __main()' },
+  // Pin the output name so the build never depends on whether package.json "type" flips the default
+  // extension (.js under module, .mjs otherwise). build-engine.sh expects exactly build/recursive-slice.mjs.
+  outExtension: () => ({ js: '.mjs' }),
   esbuildOptions(options: { treeShaking?: boolean; charset?: string }) {
     options.treeShaking = false
     options.charset = 'utf8'

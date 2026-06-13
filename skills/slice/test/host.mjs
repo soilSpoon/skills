@@ -12,13 +12,10 @@ const ARTIFACT = join(dirname(fileURLToPath(import.meta.url)), '..', 'recursive-
 
 export async function runEngine({ args, dispatch }) {
   let src = await readFile(ARTIFACT, 'utf8')
-  // `export` is the only token invalid inside an AsyncFunction body (the real harness parses
-  // meta separately) — neutralize it. A flat build has no other export; strip any stray
-  // `export default …` / `export { … }` defensively so the harness loads whatever the bundler emits.
-  src = src
-    .replace(/^export const meta/m, 'const meta')
-    .replace(/^export default [^\n]*$/m, '')
-    .replace(/^export \{[^}]*\};?$/m, '')
+  // `export const meta` is the ONLY export in the artifact (the build asserts this) — neutralize that one
+  // token exactly as the runtime does; everything else is byte-identical. The harness stays FAITHFUL to
+  // the runtime, never more lenient: a stray export would fail the build, not be silently stripped here.
+  src = src.replace(/^export const meta/m, 'const meta')
   const logs = []
   const calls = []
   const agent = async (prompt, opts = {}) => {

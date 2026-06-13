@@ -20,18 +20,18 @@ done
 
 npx -y -p typescript tsc -p tsconfig.json
 npx -y -p tsup -p typescript tsup
-# tsup names the ESM output .js under package.json "type":"module", .mjs otherwise — accept either,
-# so the build does not depend on which the toolchain picks.
-BUILT=$(ls build/recursive-slice.js build/recursive-slice.mjs 2>/dev/null | head -1)
-[ -n "$BUILT" ] || { echo "FATAL: tsup produced no recursive-slice.* in build/"; exit 1; }
-grep -q "export const meta" "$BUILT" || { echo "FATAL: meta export missing"; exit 1; }
-grep -q "return await __main()" "$BUILT" || { echo "FATAL: footer missing"; exit 1; }
-# Reproducibility gate: in a CommonJS context (no nearby package.json "type":"module") esbuild wraps the
-# whole module in __commonJS, nesting __main so the top-level `return await __main()` can never reach it —
-# that artifact runs nowhere (it bit a fresh checkout). The committed skills/slice/package.json pins
-# "type":"module" to keep the build FLAT everywhere; this gate fails loudly if that ever regresses.
-grep -q "__commonJS" "$BUILT" && { echo "FATAL: artifact is __commonJS-wrapped (not flat) — ensure skills/slice/package.json has '\"type\": \"module\"'"; exit 1; }
-mv "$BUILT" recursive-slice.js
+# The artifact is a workflow SCRIPT, not a module: `export const meta` (the runtime parses it as the first
+# statement) is the ONLY top-level export, the rest is the engine, and `return await __main()` is the entry.
+# tsup.config pins the output name; skills/slice/package.json pins "type":"module" so esbuild emits a FLAT
+# bundle (top-level __main) on every machine. ONE assertion proves the whole contract: exactly the meta
+# banner + the entry footer + NO other export — a CommonJS-context build wraps in __commonJS and adds
+# `export default` (2 exports), so it fails here LOUDLY instead of shipping an artifact that runs nowhere.
+ART=build/recursive-slice.mjs
+[ -f "$ART" ]                                || { echo "FATAL: tsup produced no $ART"; exit 1; }
+grep -q "export const meta" "$ART"           || { echo "FATAL: meta banner missing"; exit 1; }
+grep -q "return await __main()" "$ART"       || { echo "FATAL: entry footer missing"; exit 1; }
+[ "$(grep -cE '^export ' "$ART")" -eq 1 ]    || { echo "FATAL: stray top-level export(s) — expected ONLY 'export const meta'. A __commonJS-wrapped (CommonJS-context) build trips this; ensure skills/slice/package.json has '\"type\": \"module\"'."; exit 1; }
+mv "$ART" recursive-slice.js
 # Parse gate: the artifact is NOT a standalone module — the runtime strips the `export const meta`
 # banner and runs the rest as an AsyncFunction body (where top-level `return await __main()` is legal,
 # but illegal in a real module — so `node --check` is the wrong gate). Validate it the way it is loaded.
