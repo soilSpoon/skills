@@ -1,0 +1,27 @@
+name: CI
+# GitHub-HOSTED runner (ubuntu-latest) — no self-hosted runner needed. The whole gate is
+# zero-dependency Node + npx-fetched tsc/tsup; it finishes in well under a minute.
+on:
+  push:
+    branches: [main]
+    paths: ['skills/slice/**', '.github/workflows/ci.yml']
+  pull_request:
+    paths: ['skills/slice/**', '.github/workflows/ci.yml']
+permissions:
+  contents: read
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # matches the dev env; the fixture host uses node:test
+      - name: Build engine from src (tsc --strict → tsup → node --check)
+        working-directory: skills/slice
+        run: bash scripts/build-engine.sh
+      - name: Fixture net (engine scenarios)
+        run: node --test skills/slice/test/scenarios.test.mjs
+      # Follow-up (BACKLOG): a committed-artifact freshness gate (git diff --exit-code on
+      # recursive-slice.js after rebuild) needs build-engine.sh to pin tsup/typescript versions
+      # first, else an unrelated tsup release would false-fail the diff.
