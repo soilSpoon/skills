@@ -118,6 +118,9 @@ const MAX_WORKERS = 4                    // concurrent worktree groups (goose re
 const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection — N consecutive untrusted leaves means
                                          // the APPROACH is failing (bad decomposition / broken env / API trouble);
                                          // halt the unit instead of grinding the budget into more reverts
+const ENGINE_DIFF_CAP = 6000             // ITEM 9: max chars of leaf diff injected as ENGINE-DIFF into a verify
+                                         // prompt; above this, point the verifier back at git (gitVerify) rather
+                                         // than flood the prompt with a giant diff it would not read anyway
 
 // ---- sh(): deterministic shell escape. The COMMAND is computed in JS (deterministic); the
 // agent is reduced to a verbatim `bash -c` proxy with zero latitude. Used for all purely-
@@ -323,8 +326,28 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
   const hats = GIT && res.commits && res.commits.length >= 2
     ? `\nTWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C ${repo} show <sha>\`); a structure/refactor commit must be strictly behavior-preserving (no test or behavior change smuggled in).`
     : ''
+  // ITEM 9: R_VERIFY promises "any ENGINE-DIFF/ENGINE-RAN block in this prompt is that material — use it
+  // instead of re-greping", but the engine only ever emitted ENGINE-RAN — so the verifier re-greped the
+  // leaf's diff via git (its #1 measured hidden cost). Run that scoped diff ONCE deterministically here and
+  // hand it over. This is engine SHELL-TRUTH (a fixed `git diff` over the leaf range, test files excluded the
+  // way the wiring-audit does), NOT a sibling model's claim — so executor!=verifier still holds: the verifier
+  // KEEPS its full duty and ability to re-run / widen the range (gitVerify already tells it how). Skip for
+  // tidy leaves: their behavior-preservation gate has its own flow and a diff fetch only complicates it.
+  // Capped at ENGINE_DIFF_CAP chars — above the cap, point the verifier back at git rather than flood the prompt.
+  let engineDiff = ''
+  if (GIT && leafStart && node.kind !== 'tidy') {
+    const d = await sh(
+      `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+      `verify-diff:${lbl}`)
+    if (!shUnavailable(d)) {
+      const body = String(d.stdout || '')
+      engineDiff = body.length > ENGINE_DIFF_CAP
+        ? `\nENGINE-DIFF: (diff too large — inspect via git yourself)`
+        : `\nENGINE-DIFF: ${body}`
+    }
+  }
   const base = `${R_VERIFY}\n\nRepo: ${repo}\nAdversarially verify this finished leaf.\nTask: ${node.task}\n` +
-    `Reported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ''}${buildNote || ''}`
+    `Reported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineDiff}${engineT0 || ''}${buildNote || ''}`
   if (node.kind === 'tidy') {   // ③ a tidy leaf must be BEHAVIOR-PRESERVING — verify THAT, not new-feature trust
     return (await agentSafe(
       `${base}\nThis is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing ` +

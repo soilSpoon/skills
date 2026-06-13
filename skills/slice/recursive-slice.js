@@ -178,6 +178,7 @@ async function __main() {
   const MAX_REPAIR_HARD = 3;
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
+  const ENGINE_DIFF_CAP = 6e3;
   const SH_UNAVAILABLE = { exitCode: -2, stdout: "\0SH_UNAVAILABLE" };
   const shUnavailable = (r) => r === SH_UNAVAILABLE || !!r && r.exitCode === -2 && String(r.stdout).startsWith("\0SH_UNAVAILABLE");
   const SH = { type: "object", required: ["exitCode"], properties: { stdout: { type: "string" }, exitCode: { type: "integer" } } };
@@ -304,13 +305,26 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
     });
     const hats = GIT && res.commits && res.commits.length >= 2 ? `
 TWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C ${repo} show <sha>\`); a structure/refactor commit must be strictly behavior-preserving (no test or behavior change smuggled in).` : "";
+    let engineDiff = "";
+    if (GIT && leafStart && node.kind !== "tidy") {
+      const d = await sh(
+        `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+        `verify-diff:${lbl}`
+      );
+      if (!shUnavailable(d)) {
+        const body = String(d.stdout || "");
+        engineDiff = body.length > ENGINE_DIFF_CAP ? `
+ENGINE-DIFF: (diff too large — inspect via git yourself)` : `
+ENGINE-DIFF: ${body}`;
+      }
+    }
     const base = `${R_VERIFY}
 
 Repo: ${repo}
 Adversarially verify this finished leaf.
 Task: ${node.task}
 Reported: ${reported}
-${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNote || ""}`;
+${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineDiff}${engineT0 || ""}${buildNote || ""}`;
     if (node.kind === "tidy") {
       return await agentSafe(
         `${base}

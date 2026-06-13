@@ -18,7 +18,9 @@ test('happy path: atomic root → trusted leaf → green integrate → briefing'
 test('repair loop: first verify distrusts, repair re-executes, second verify trusts', async () => {
   let verifies = 0
   const dispatch = dispatcher((c) => {
-    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+    // !isSh: the engine's deterministic ENGINE-DIFF fetch (label 'verify-diff:…') is an sh call, NOT the
+    // LLM verifier — let it fall through to the base dispatcher; intercept only the real verify role here.
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
       verifies++
       return verifies === 1 ? FIX.distrust : FIX.trust
     }
@@ -411,8 +413,9 @@ test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — eac
   // calls (also same class) — streak grows but class set stays {verify} size=1 → no halt.
   const dispatch = dispatcher((c) => {
     if (has(c, /assess/)) return assessHeavy
-    // All heavy lens verify calls throw a transient (non-session-limit) error
-    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+    // All heavy lens verify calls throw a transient (non-session-limit) error. !isSh excludes the engine's
+    // deterministic ENGINE-DIFF fetch (label 'verify-diff:…', an sh call) — it must run, not throw here.
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
       verifyThrows++
       throw new Error('transport error (transient fixture throw)')
     }
@@ -635,8 +638,9 @@ test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF
       t0Cmds.push(c.prompt)
       return { exitCode: 0, stdout: 'ok 1\n# pass 1' }
     }
-    // Capture standard verify prompts (no '·tidy' or '·light' suffix)
-    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
+    // Capture standard verify prompts (no '·tidy' or '·light' suffix). !isSh excludes the engine's
+    // deterministic ENGINE-DIFF fetch (label 'verify-diff:…', an sh call) — that is not the verify role.
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
         !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
       stdVerifyPrompts.push(c.prompt)
       return FIX.trust
@@ -656,6 +660,87 @@ test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF
   // ENGINE-RAN is present — 'is FORBIDDEN here' is unique to LEAF_TEST(scope) appendage (not in R_VERIFY itself).
   assert.ok(!stdVerifyPrompts.some((p) => /is FORBIDDEN here/.test(p)),
     `standard verify prompt must NOT contain LEAF_TEST injection ('is FORBIDDEN here') when ENGINE-RAN is present; found in: ${stdVerifyPrompts.filter(p => /is FORBIDDEN here/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
+})
+
+// ITEM 9 — the engine pre-computes the leaf's scoped diff ONCE (deterministic shell-truth) and injects it
+// as an ENGINE-DIFF block into the verify prompt, so the verifier judges the supplied diff instead of
+// re-greping it (R_VERIFY's #1 measured hidden cost). The diff fetch is an sh() call labeled 'verify-diff:…'
+// over the leaf's own range with test files excluded. Independence is preserved — the diff is deterministic
+// engine shell-truth, not a sibling model's claim — so executor!=verifier still holds.
+test('ITEM 9: standard verify prompt carries an ENGINE-DIFF block — engine runs the leaf-scoped diff once (verify-diff sh), no re-grep', async () => {
+  const stdVerifyPrompts = []
+  let diffFetchCmd = ''            // the exact shell command of the engine's ENGINE-DIFF fetch
+  let diffFetches = 0             // how many verify-diff sh calls fired
+  const LEAF_DIFF = 'diff --git a/src/s0.ts b/src/s0.ts\n+++ fixture leaf change, non-tidy, in scope\n'
+
+  // Force STANDARD-tier atomic leaves (like B4): decompose the root into FIX.slices3, whose slices are
+  // atomic with riskTier:'standard' → standard verify (the base dispatcher's assessExecute is difficulty
+  // 'easy' = LIGHT tier, which would not exercise the standard verify path this test pins).
+  const dispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    // Engine's deterministic ENGINE-DIFF fetch: an sh() call labeled 'verify-diff:…'. Capture its command
+    // and hand back a small (sub-cap) diff body so the engine injects it verbatim into the verify prompt.
+    if (isSh(c) && /verify-diff:/.test(c.opts.label || '')) {
+      diffFetches++
+      diffFetchCmd = c.prompt
+      return { exitCode: 0, stdout: LEAF_DIFF }
+    }
+    // Capture standard verify prompts (the real verifier role — NOT the verify-diff sh call).
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
+        !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
+      stdVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(diffFetches > 0, 'engine must run the leaf-scoped diff once per leaf (verify-diff sh call) — fixture precondition')
+  assert.ok(stdVerifyPrompts.length > 0, 'standard verify must have been invoked (fixture precondition)')
+
+  // (1) The diff fetch must be the leaf-scoped git diff with test files excluded (matches the wiring-audit
+  // exclusion form) — engine shell-truth over the leaf's OWN range, not the whole-run baseline.
+  assert.ok(/git -C \S+ diff \S+\.\.HEAD/.test(diffFetchCmd),
+    `ENGINE-DIFF fetch must be a leaf-scoped 'git diff <leafStart>..HEAD'; got: ${diffFetchCmd.slice(0, 200)}`)
+  assert.ok(/exclude.*[Tt]est/.test(diffFetchCmd),
+    `ENGINE-DIFF fetch must exclude test files (the wiring-audit way); got: ${diffFetchCmd.slice(0, 200)}`)
+
+  // (2) Every standard verify prompt must carry an ENGINE-DIFF block holding the engine-supplied diff body —
+  // this is the material R_VERIFY promises ('use it instead of re-greping').
+  assert.ok(stdVerifyPrompts.every((p) => /ENGINE-DIFF:/.test(p)),
+    `standard verify prompt must contain an 'ENGINE-DIFF:' block; got first 400: ${stdVerifyPrompts[0] && stdVerifyPrompts[0].slice(0, 400)}`)
+  assert.ok(stdVerifyPrompts.every((p) => p.includes('fixture leaf change, non-tidy, in scope')),
+    `the ENGINE-DIFF block must carry the engine-fetched diff body verbatim; got first 400: ${stdVerifyPrompts[0] && stdVerifyPrompts[0].slice(0, 400)}`)
+  // The "too large" fallback must NOT appear when the diff is under the cap.
+  assert.ok(!stdVerifyPrompts.some((p) => /diff too large/.test(p)),
+    `sub-cap diff must be injected in full, never the 'too large' fallback; found in: ${stdVerifyPrompts.filter(p => /diff too large/.test(p)).map(p => p.slice(0, 200)).join(' | ')}`)
+})
+
+// ITEM 9 (cap) — a diff larger than the 6000-char bound must NOT flood the verify prompt; the engine
+// injects a fixed pointer back at git instead, preserving the verifier's ability to inspect the range itself.
+test('ITEM 9 cap: oversized leaf diff → ENGINE-DIFF block is the "too large — inspect via git" pointer, not the giant body', async () => {
+  const stdVerifyPrompts = []
+  const HUGE = 'x'.repeat(7000)   // > ENGINE_DIFF_CAP (6000)
+
+  const dispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice   // standard-tier atomic leaves (see ITEM 9 above)
+    if (isSh(c) && /verify-diff:/.test(c.opts.label || '')) return { exitCode: 0, stdout: HUGE }
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
+        !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
+      stdVerifyPrompts.push(c.prompt)
+      return FIX.trust
+    }
+  })
+
+  await runEngine({ args: ARGS, dispatch })
+
+  assert.ok(stdVerifyPrompts.length > 0, 'standard verify must have been invoked (fixture precondition)')
+  // Above the cap: the pointer, not the body.
+  assert.ok(stdVerifyPrompts.every((p) => /ENGINE-DIFF: \(diff too large — inspect via git yourself\)/.test(p)),
+    `oversized diff must inject the 'too large' pointer; got first 400: ${stdVerifyPrompts[0] && stdVerifyPrompts[0].slice(0, 400)}`)
+  // The 7000-char body must NOT be dumped into the prompt.
+  assert.ok(!stdVerifyPrompts.some((p) => p.includes(HUGE)),
+    'oversized diff body must NEVER be injected verbatim (it would flood the prompt)')
 })
 
 // B2+B5+B6+B7+B8 — 프롬프트 중복·모순 다이어트
