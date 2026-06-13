@@ -25,6 +25,10 @@ declare function phase(title: string): void
 declare function log(message: string): void
 declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
+// ITEM 2: the host runs the emitted engine as a Node AsyncFunction body, so Node's `Buffer` global is
+// always present — declared here (erased at build time, like the rest of the PORT) ONLY to base64-encode
+// the owner-briefing text injection-safely before it is handed to the deterministic `sh` write proxy.
+declare const Buffer: { from(s: string, enc: string): { toString(enc: string): string } }
 
 async function __main(): Promise<EngineResult> {
 // Runtime-throw containment: agent() can THROW rather than return null (observed live:
@@ -943,6 +947,26 @@ if (trusted.length && !QUOTA_HALT) {
         { phase: 'Integrate', label: 'owner-briefing-retry', schema: BRIEFING })) as Briefing | null
     }
   } catch (e) { log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`) }
+  // ITEM 2: best-effort DETERMINISTIC persist of the briefing text to docs/briefings/<ts>.md. The
+  // briefing was previously RELAYED only through the agent (the `briefing` payload field) — a relay the
+  // owner can miss; a file on disk survives the conversation. The write is purely additive (it gates NO
+  // trust) and is wrapped in its OWN try/catch that NEVER aborts the run — a failed persist must not cost
+  // a green run its trusted leaves. <ts>: the run has no clock-timestamp in its context, so use a STABLE
+  // name derived from the pinned baseline SHA (deterministic + collision-resistant across runs), falling
+  // back to a fixed name when git is off. INJECTION-SAFE: the briefing markdown (arbitrary LLM text) is
+  // base64-encoded in JS — the [A-Za-z0-9+/=] alphabet is shell-safe — and decoded by `base64 -d`, so no
+  // user/agent text ever reaches the shell command verbatim (the keep-text-out-of-shell discipline).
+  if (briefing && briefing.briefing) {
+    try {
+      const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : 'briefing'
+      const dir = `${REPO}/docs/briefings`
+      const file = `${dir}/${ts}.md`
+      const b64 = Buffer.from(String(briefing.briefing), 'utf8').toString('base64')
+      const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, 'briefing-persist')
+      if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`)
+      else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`)
+    } catch (e) { log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`) }
+  }
 }
 
 // A2: shForce so lock-clear runs even after QUOTA_HALT — without this, a quota death leaves a
@@ -952,12 +976,42 @@ if (LOCKFILE) { try { await shForce(`rm -f ${LOCKFILE}`, 'lock-clear') } catch (
 if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(' | ')}`)
 log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? (merge.trustworthy ? 'OK' : 'ISSUES') : 'n/a'} | full-suite ${finalRun.exitCode === -1 ? 'NOT RUN' : (fullSuiteGreen ? 'GREEN' : 'RED')} | integration ${integration && integration.trustworthy ? 'OK' : (integration ? 'FAILED' : 'UNKNOWN')}`)
 if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`)
+
+// ITEM 2: ONE overall trust verdict + an owner's headline. The payload already exposes every signal
+// SEPARATELY (results/coordinator/integration/fullSuiteGreen/degradations…) but NO single rollup — so a
+// CATASTROPHIC run (RED suite, distrusted integration, reverted leaves) could still LOOK perfect to a
+// glancing reader who only checks `briefing` or `trustedLeaves`. overallTrust is the AND of every trust
+// dimension; it is purely ADDITIVE (a rollup over existing booleans — it can only ever go FALSE on a
+// dimension that already failed, so it can NEVER manufacture a false green that the individual signals
+// did not already carry). Dimensions, in headline-priority order (first failing one names the verdict):
+const allLeavesTrusted = trusted.length === done.length          // every EXECUTED leaf is trusted
+const mergeOk = !merge || merge.trustworthy                       // no parallel merge, OR the merge is trustworthy
+const integrationOk = !!(integration && integration.trustworthy) // the integrate verifier trusts the whole
+const noDegradations = !degradations || degradations.length === 0 // Item 1's trust-floor downgrades are empty
+const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations
+// ownersHeadline: one human line. When green, the full reassuring summary; when not, NAME the first
+// failing dimension (so the owner sees WHAT broke, not just that something did) in the same priority order
+// the verdict is computed in.
+const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? 'NOT RUN' : (fullSuiteGreen ? 'GREEN' : 'RED')} · integration ${integrationOk ? 'OK' : (integration ? 'DISTRUSTED' : 'UNKNOWN')} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? '' : 's'}${merge ? ` · merge ${mergeOk ? 'OK' : 'ISSUES'}` : ''}`
+const firstFailure =
+  !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted`
+  : !mergeOk        ? 'parallel merge NOT trustworthy'
+  : !fullSuiteGreen ? (finalRun.exitCode === -1 ? 'integrate full-suite DID NOT RUN' : `integrate full-suite RED (exit ${finalRun.exitCode})`)
+  : !integrationOk  ? (integration ? 'integration verdict DISTRUSTED' : 'integration verdict UNKNOWN (never ran)')
+  : !noDegradations ? `${degradations!.length} trust-floor degradation(s)`
+  : ''
+const ownersHeadline = overallTrust
+  ? `TRUSTED — ${headlineCounts}`
+  : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`
+log(`Overall verdict: ${ownersHeadline}`)
+
 return {
   task: TASK, mode: groups ? 'parallel' : 'sequential', baseline,
   results: done, coordinator: merge, integration,
   fullSuiteGreen, integrationExit: finalRun.exitCode,
   trustedLeaves: trusted.length, totalLeaves: done.length,
   purposeGaps, wiringGaps, aborts: ABORTS, degradations,
+  overallTrust, ownersHeadline,   // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
   briefing: (briefing && briefing.briefing) || undefined,   // B: the owner's guided read — RELAY this, don't bury it
 }
 

@@ -837,6 +837,19 @@ Match the language the task was written in. Be concrete.`,
     } catch (e) {
       log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`);
     }
+    if (briefing && briefing.briefing) {
+      try {
+        const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : "briefing";
+        const dir = `${REPO}/docs/briefings`;
+        const file = `${dir}/${ts}.md`;
+        const b64 = Buffer.from(String(briefing.briefing), "utf8").toString("base64");
+        const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
+        if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`);
+        else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
+      } catch (e) {
+        log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
+      }
+    }
   }
   if (LOCKFILE) {
     try {
@@ -848,6 +861,15 @@ Match the language the task was written in. Be concrete.`,
   if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
   log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
   if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
+  const allLeavesTrusted = trusted.length === done.length;
+  const mergeOk = !merge || merge.trustworthy;
+  const integrationOk = !!(integration && integration.trustworthy);
+  const noDegradations = !degradations || degradations.length === 0;
+  const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations;
+  const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} · integration ${integrationOk ? "OK" : integration ? "DISTRUSTED" : "UNKNOWN"} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? "" : "s"}${merge ? ` · merge ${mergeOk ? "OK" : "ISSUES"}` : ""}`;
+  const firstFailure = !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted` : !mergeOk ? "parallel merge NOT trustworthy" : !fullSuiteGreen ? finalRun.exitCode === -1 ? "integrate full-suite DID NOT RUN" : `integrate full-suite RED (exit ${finalRun.exitCode})` : !integrationOk ? integration ? "integration verdict DISTRUSTED" : "integration verdict UNKNOWN (never ran)" : !noDegradations ? `${degradations.length} trust-floor degradation(s)` : "";
+  const ownersHeadline = overallTrust ? `TRUSTED — ${headlineCounts}` : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`;
+  log(`Overall verdict: ${ownersHeadline}`);
   return {
     task: TASK,
     mode: groups ? "parallel" : "sequential",
@@ -863,6 +885,9 @@ Match the language the task was written in. Be concrete.`,
     wiringGaps,
     aborts: ABORTS,
     degradations,
+    overallTrust,
+    ownersHeadline,
+    // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
     briefing: briefing && briefing.briefing || void 0
     // B: the owner's guided read — RELAY this, don't bury it
   };

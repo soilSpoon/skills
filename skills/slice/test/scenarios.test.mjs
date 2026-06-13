@@ -1177,3 +1177,81 @@ test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degrad
   assert.ok(!healthy.logs.some((l) => /WARN: leaf \d+ .*gate=llm-only/.test(l)),
     'a healthy run must emit NO llm-only WARN')
 })
+
+// ITEM 2 — single rollup verdict + owner headline + deterministic briefing persist.
+// The payload exposed every trust signal SEPARATELY but no single verdict, so a catastrophic run could
+// look perfect. Claims pinned here:
+//   (a) the returned payload ALWAYS carries overallTrust:boolean + ownersHeadline:string — on a GREEN
+//       run AND on a deliberately-failing (integration-distrust) run (the payload contract);
+//   (b) a clean GREEN run computes overallTrust:true and the all-green headline ('N/M … 0 degradations');
+//   (c) an integration-distrust run computes overallTrust:false and NAMES integration as the first failure
+//       (a rollup can never manufacture a false green — it goes false on a dimension that already failed);
+//   (d) the briefing is DETERMINISTICALLY persisted to docs/briefings/<ts>.md via the sh proxy (base64 →
+//       base64 -d, injection-safe), and that write NEVER aborts the run even if it fails.
+test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (green + failing); briefing persisted deterministically', async () => {
+  // --- GREEN run: slice path → leaves carry testScope → deterministic-filtered gate → 0 degradations.
+  const greenDispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+  })
+  const green = await runEngine({ args: ARGS, dispatch: greenDispatch })
+
+  // (a) payload contract — types present and correct on the GREEN run.
+  assert.equal(green.result.error, undefined, `green run errored: ${green.result.error}`)
+  assert.equal(typeof green.result.overallTrust, 'boolean',
+    `green payload must carry overallTrust:boolean; got ${typeof green.result.overallTrust}`)
+  assert.equal(typeof green.result.ownersHeadline, 'string',
+    `green payload must carry ownersHeadline:string; got ${typeof green.result.ownersHeadline}`)
+  assert.ok(green.result.ownersHeadline.length > 0, 'ownersHeadline must not be empty on a green run')
+
+  // (b) a clean green run is TRUSTED and the headline reports the all-green dimensions.
+  assert.equal(green.result.overallTrust, true,
+    `a clean green run (all leaves trusted, full-suite GREEN, integration OK, 0 degradations) must be overallTrust:true; headline="${green.result.ownersHeadline}", degradations=${JSON.stringify(green.result.degradations)}`)
+  assert.match(green.result.ownersHeadline, /leaves trusted/, 'headline must report the leaf trust count')
+  assert.match(green.result.ownersHeadline, /full-suite GREEN/, 'green headline must report full-suite GREEN')
+  assert.match(green.result.ownersHeadline, /integration OK/, 'green headline must report integration OK')
+  assert.match(green.result.ownersHeadline, /0 degradations/, 'green headline must report 0 degradations')
+
+  // (d) the briefing was persisted DETERMINISTICALLY via an sh write (NOT through an agent): a
+  //     base64-decode write to docs/briefings/<ts>.md, labeled 'briefing-persist'.
+  const persistCalls = green.calls.filter((c) => isSh(c) && /briefing-persist/.test(c.opts.label || ''))
+  assert.equal(persistCalls.length, 1,
+    `exactly one deterministic briefing-persist sh write must fire on a run with a briefing; got ${persistCalls.length}`)
+  assert.match(persistCalls[0].prompt, /docs\/briefings\/.*\.md/,
+    `the persist must target docs/briefings/<ts>.md; got: ${persistCalls[0].prompt}`)
+  assert.match(persistCalls[0].prompt, /base64 -d/,
+    `the persist must decode base64 (injection-safe, no raw briefing text in the shell command); got: ${persistCalls[0].prompt}`)
+  // INJECTION-SAFETY: the literal 'fixture briefing' text must NEVER appear verbatim in the shell command.
+  assert.ok(!/fixture briefing/.test(persistCalls[0].prompt),
+    `briefing markdown must be base64-encoded, never injected verbatim into the shell command; got: ${persistCalls[0].prompt}`)
+  assert.ok(green.logs.some((l) => /briefing persisted →/.test(l)),
+    `a successful persist must log 'owner briefing persisted'; logs: ${green.logs.filter((l) => /briefing/.test(l)).join(' | ')}`)
+
+  // --- FAILING run: integration verdict distrusts → catastrophe the rollup must catch.
+  const failDispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/integration/.test(c.opts.label || '')) return FIX.distrust
+  })
+  const fail = await runEngine({ args: ARGS, dispatch: failDispatch })
+
+  // (a) payload contract — types STILL present and correct on the failing run.
+  assert.equal(fail.result.error, undefined, `failing run errored unexpectedly: ${fail.result.error}`)
+  assert.equal(typeof fail.result.overallTrust, 'boolean',
+    `failing payload must STILL carry overallTrust:boolean; got ${typeof fail.result.overallTrust}`)
+  assert.equal(typeof fail.result.ownersHeadline, 'string',
+    `failing payload must STILL carry ownersHeadline:string; got ${typeof fail.result.ownersHeadline}`)
+
+  // (c) the rollup goes FALSE and names integration as the failing dimension (no false green).
+  assert.equal(fail.result.overallTrust, false,
+    `an integration-distrust run must be overallTrust:false (the leaves were trusted but the whole is not); headline="${fail.result.ownersHeadline}"`)
+  assert.match(fail.result.ownersHeadline, /NOT TRUSTED/,
+    `a failing headline must say NOT TRUSTED; got: "${fail.result.ownersHeadline}"`)
+  assert.match(fail.result.ownersHeadline, /integration/i,
+    `the failing headline must name integration as the (first) failing dimension; got: "${fail.result.ownersHeadline}"`)
+
+  // The rollup is ADDITIVE: it never overrides a separate signal — integration is still distrusted in the
+  // payload, the leaves are still individually trusted; overallTrust is strictly the AND of those.
+  assert.equal(fail.result.integration && fail.result.integration.trustworthy, false,
+    'integration signal stays separately distrusted (rollup did not mask it)')
+  assert.equal(fail.result.trustedLeaves, fail.result.totalLeaves,
+    'leaves are individually trusted — proving overallTrust:false came from the integration dimension, not the leaves')
+})

@@ -106,5 +106,7 @@ export interface EngineResult {
   wiringGaps?: string[]
   aborts?: string[]
   degradations?: string[]
+  overallTrust?: boolean   // ITEM 2: single rollup verdict — true IFF every trust dimension held (additive; never a false green)
+  ownersHeadline?: string  // ITEM 2: one human line — the green summary, or the first failing dimension named
   briefing?: string
 }
