@@ -1067,3 +1067,26 @@ test('artifact freshness: recursive-slice.js is not older than src/*.ts', async 
       `src/${f} is newer than recursive-slice.js — rebuild: cd skills/slice && bash scripts/build-engine.sh`)
   }
 })
+
+// Model-access infra failure (observed live wf_01e123a1): the session model was not
+// subagent-spawnable; VERIFY/INTEGRATE/BRIEFING inherit it and threw "issue with the selected
+// model … may not have access". WITHOUT the halt-regex branch this fell through to distrust →
+// 3 untrusted verify-class leaves → untrusted-streak HALT (infra misread as "approach failed",
+// briefing lost). WITH it, the FIRST such error trips a resumable QUOTA HALT, not a grind.
+test('model-access error on verify → resumable QUOTA HALT (not an untrusted-streak grind)', async () => {
+  let tripped = -1
+  const dispatch = dispatcher((c) => {
+    if (/verify/.test(c.opts.label || '') && tripped === -1) {
+      tripped = c.i
+      throw new Error("There's an issue with the selected model (claude-fable-5). It may not exist or you may not have access to it. Run /model to pick a different model.")
+    }
+  })
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(tripped >= 0, 'the model-access throw fired')
+  assert.ok(logs.some((l) => /QUOTA HALT/.test(l)), 'first model-access error trips a halt (not a 3-streak grind)')
+  assert.ok(logs.some((l) => /model unavailable to subagents/.test(l)), 'halt reason names the model-inheritance cause')
+  assert.ok((result.aborts || []).some((a) => /quota-halt:/.test(a)), 'aborts carries the resumable instruction')
+  // must NOT have reached the "consecutive untrusted leaves" streak halt — that would mean it ground 3 leaves
+  assert.ok(!(result.aborts || []).some((a) => /consecutive untrusted/.test(a)),
+    `infra failure must not be misread as untrusted-streak; aborts=${JSON.stringify(result.aborts)}`)
+})

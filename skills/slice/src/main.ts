@@ -48,7 +48,7 @@ let NULL_STREAK_CLASSES = new Set<string>()  // A6: track call classes in streak
 const callClass = (opts?: AgentOpts) => ((opts && (opts.label || opts.phase)) || '').replace(/[:·].*/u, '').trim() || 'unknown'
 const quotaHalt = (why: string) => {
   QUOTA_HALT = why
-  log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`)
+  log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`)
 }
 // A6: shared bump used in both null-return and catch paths — keeps the class-gate condition DRY.
 const bumpNullStreak = (opts?: AgentOpts) => {
@@ -67,6 +67,17 @@ const agentSafe: typeof agent = async (prompt, opts) => {
     const m = String((e && e.message) || e)
     if (/budget|ceiling/i.test(m)) throw e
     if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
+    // Model-access failure = INFRA, not a work verdict. Observed live: the session model
+    // (claude-fable-5) was not subagent-spawnable; the VERIFY/INTEGRATE/BRIEFING roles INHERIT
+    // the session model, so they died with "issue with the selected model … may not have access".
+    // Without this branch the null fell through to distrust → 3 untrusted verify-class leaves →
+    // untrusted-streak HALT, misreading an infra outage as "the approach failed" (and losing the
+    // briefing). Treat it like quota: an immediate resumable pause, not a grind. Resume after the
+    // transient clears OR after switching the session model to a subagent-spawnable one.
+    if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) {
+      quotaHalt(`model unavailable to subagents (verify/integrate/briefing inherit the session model): ${m.slice(0, 90)}`)
+      return null
+    }
     log(`agent threw (treated as null): ${m.slice(0, 140)}`)
     bumpNullStreak(opts)
     return null

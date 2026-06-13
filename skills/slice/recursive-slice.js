@@ -123,7 +123,7 @@ async function __main() {
   const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
   const quotaHalt = (why) => {
     QUOTA_HALT = why;
-    log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the limit resets (cached leaves replay free).`);
+    log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`);
   };
   const bumpNullStreak = (opts) => {
     NULL_STREAK++;
@@ -149,6 +149,10 @@ async function __main() {
       if (/budget|ceiling/i.test(m)) throw e;
       if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) {
         quotaHalt(m.slice(0, 120));
+        return null;
+      }
+      if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) {
+        quotaHalt(`model unavailable to subagents (verify/integrate/briefing inherit the session model): ${m.slice(0, 90)}`);
         return null;
       }
       log(`agent threw (treated as null): ${m.slice(0, 140)}`);
