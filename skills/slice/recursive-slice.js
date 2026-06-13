@@ -1,6 +1,6 @@
 export const meta = {
   name: 'recursive-slice',
-  description: 'Trust-first recursive decomposition: baseline → plan → recursive slice/execute with Canon-TDD discipline, risk-tiered adversarial verification, self-repair, per-leaf git commits → (opt-in) parallel worktree groups + coordinator merge → integrate. Generic over any repo+task via args.',
+  description: 'Trust-first recursive decomposition: baseline → plan → recursive slice/execute with Canon-TDD discipline, risk-tiered adversarial verification, self-repair, per-leaf git commits → parallel worktree groups (default) + coordinator merge → integrate. Generic over any repo+task via args.',
   phases: [
     { title: 'Baseline', detail: 'capture the invariant + project card to preserve' },
     { title: 'Plan', detail: 'classify root; (parallel mode) slice into independent groups' },

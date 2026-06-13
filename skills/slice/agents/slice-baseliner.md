@@ -18,10 +18,10 @@ step proves it did not break trust.
 2. Determine the measurement command (the test/build command that yields a green/red signal).
 3. Run it once to capture the current state. Record pass/fail counts and any already-failing
    tests (so they are not blamed on later work).
-4. **Pin to git when possible.** If the repo is under git you MUST record `gitSha` =
-   `git rev-parse HEAD` and whether the tree is clean — this pins the baseline as a
-   content-addressed snapshot so concurrent edits are *detectable*, and it gates per-leaf
-   commits + reversibility. Leave `gitSha` empty ONLY if there is no `.git`.
+4. **Do NOT spend effort on git state.** The engine captures the git SHA / clean-tree state
+   deterministically itself (it runs `git rev-parse HEAD` and `git status` directly) — your
+   output schema has no field for it. Report only invariants, the measure command, and the
+   project card.
 5. **Distill a `projectCard`** — the STATIC facts every downstream worker needs so none has to
    re-read AGENTS.md: the exact build/test commands (record the *fastest safe* form — filter
    syntax + a parallel flag if supported), test framework, key conventions, and hard
