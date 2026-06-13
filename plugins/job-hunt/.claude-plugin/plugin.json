@@ -1,7 +1,7 @@
 {
   "name": "job-hunt",
   "description": "Job application automation: resume tailoring with fit evaluation, Wishket application workflow.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "Daehee Lee",
     "email": "lee111dae11@proton.me"

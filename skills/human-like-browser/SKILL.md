@@ -1,19 +1,24 @@
 ---
 name: human-like-browser
-description: "Human-like browser automation that bypasses bot detection. Wraps Playwright MCP tools to simulate realistic human behavior: Bezier-curve mouse movements with micro-tremor, log-normal typing delays with digraph timing and typos (~600 chars/min), smooth inertia scrolling, CDP artifact cleanup, and comprehensive anti-fingerprinting stealth (hardware, WebGL, plugins, connection). Passes FCaptcha keystroke biometrics. Use this skill whenever the user mentions bot detection, anti-scraping bypass, human-like browsing, stealth automation, Cloudflare bypass, DataDome, PerimeterX, Akamai, scraping protected sites, or needs to interact with websites that detect and block bots. Also trigger when the user says 'act like a human', 'natural browsing', 'avoid detection', 'scrape without getting blocked', 'fill form like a person', or any Playwright/browser task where detection evasion matters. Korean QWERTY layout supported (no IME simulation)."
+description: "Human-like browser automation that bypasses bot detection. Wraps Playwright (MCP, or any Playwright binding) to simulate realistic human behavior: Bezier-curve mouse movements with micro-tremor, log-normal typing delays with digraph timing and typos (~600 chars/min), smooth inertia scrolling, CDP artifact cleanup, and comprehensive anti-fingerprinting stealth (hardware, WebGL, plugins, connection). Passes FCaptcha keystroke biometrics. Use this skill whenever the user mentions bot detection, anti-scraping bypass, human-like browsing, stealth automation, Cloudflare bypass, DataDome, PerimeterX, Akamai, scraping protected sites, or needs to interact with websites that detect and block bots. Also trigger when the user says 'act like a human', 'natural browsing', 'avoid detection', 'scrape without getting blocked', 'fill form like a person', or any Playwright/browser task where detection evasion matters. Korean QWERTY layout supported (no IME simulation)."
 ---
 
 # Human-Like Browser Automation v2
 
 Make Playwright automation indistinguishable from real human browsing. Bypasses bot detection systems (Cloudflare, DataDome, PerimeterX, Akamai, FCaptcha) by simulating realistic behavioral biometrics and browser fingerprints.
 
+## Harness notes (포팅)
+
+이 스킬은 harness-중립으로 쓰였다. 아래 능력은 클라이언트별 메커니즘으로 구현한다:
+- **브라우저 자동화 (Playwright run-code / `page.evaluate`)**: Claude Code = Playwright MCP의 `browser_run_code` 툴 (`mcp__plugin_playwright_playwright__browser_run_code`); opencode·Codex CLI·SDK = 해당 클라이언트의 Playwright run-code 메커니즘, 또는 Playwright 바인딩에서 `page.evaluate(...)` / `async (page) => {...}` 함수 직접 실행. 어느 쪽이든 `page` 객체와 `page.__human`이 호출 간 유지되어야 한다.
+
 ## Quick Start
 
 ### Step 1: Initialize (once per session)
 
-> **Constraints**: `browser_run_code` runs in a sandbox — no `require()`, no `setTimeout()` (use `page.waitForTimeout()`). The `page` object and `page.__human` persist across calls.
+> **Constraints**: the run-code sandbox (Claude Code: `browser_run_code`) allows no `require()`, no `setTimeout()` (use `page.waitForTimeout()`). The `page` object and `page.__human` persist across calls.
 
-Read `scripts/human-behavior.js` and paste the entire initialization block into `mcp__plugin_playwright_playwright__browser_run_code`. This defines all functions on `page.__human` and applies stealth patches.
+Read `scripts/human-behavior.js` and run the entire initialization block through your Playwright run-code / `page.evaluate` mechanism (Claude Code: the Playwright MCP `browser_run_code` tool — see Harness notes). This defines all functions on `page.__human` and applies stealth patches.
 
 ### Step 2: Use
 

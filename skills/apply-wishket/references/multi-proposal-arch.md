@@ -28,7 +28,7 @@ N개 에이전트가 독립 실행하면 범용성 높은 경험(HR, SIM)만 반
 
 ### Wave 1: 생성 — N개 병렬
 
-단일 메시지에 N개 Agent 호출, `run_in_background: true`.
+N개 sub-agent를 병렬 디스패치한다 (각 프로젝트 1개). 디스패치 메커니즘은 클라이언트별: Claude Code = 단일 메시지에 N개 Agent/Task 호출 + `run_in_background: true`; opencode·Codex CLI·SDK = 각 클라이언트의 병렬 sub-agent 실행 API.
 
 각 에이전트에 전달:
 - 프로젝트 ID

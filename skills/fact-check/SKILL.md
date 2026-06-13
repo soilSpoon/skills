@@ -1,17 +1,22 @@
 ---
 name: fact-check
-description: Fact-check articles, newsletters, and written content by dispatching 6 parallel verification agents. Use this skill whenever the user asks to fact-check, verify claims, check accuracy of an article, validate sources, or review content for hallucinations. Triggers on phrases like "fact-check this", "verify this article", "check if this is accurate", "validate the claims", or any request to review written content for factual correctness. Also use when the user provides a URL or file and asks to check its accuracy.
+description: Fact-check articles, newsletters, and written content by dispatching 6 parallel verification agents. Use this skill when the user asks to fact-check, verify claims, check accuracy of an article, validate sources, or review content for hallucinations. Triggers on phrases like "fact-check this", "verify this article", "check if this is accurate", "validate the claims", or any request to review written content for factual correctness. Also use when the user provides a URL or file and asks to check its accuracy.
 ---
 
 # Fact-Check Skill
 
 Verify factual claims in written content using 6 parallel verification agents with a tiered source credibility system.
 
+## Harness notes (포팅)
+
+이 스킬은 harness-중립으로 쓰였다. 아래 능력은 클라이언트별 메커니즘으로 구현한다:
+- **병렬 sub-agent dispatch**: Claude Code = Agent tool (`subagent_type: "general-purpose"`, 한 메시지에 여러 개를 띄워 병렬화); opencode·Codex CLI·SDK = 그 런타임의 병렬 sub-task/worker 메커니즘 (없으면 메인 세션에서 순차 실행).
+
 ## Input Handling
 
 The user provides content in one of three ways:
 
-1. **Direct text** after `/fact-check` - use the pasted content as-is
+1. **Direct text** - use the pasted content as-is
 2. **File path** - read the file with the Read tool
 3. **URL** - fetch the page content with WebFetch
 
@@ -60,7 +65,7 @@ Found N claims (X high-risk, Y medium-risk, Z low-risk). Proceeding with verific
 
 ### Step 2: Dispatch 6 Verification Agents
 
-Launch all 6 agents in parallel using the Agent tool. Each agent gets:
+Dispatch all 6 verification agents in parallel (Harness notes 참조). Each agent gets:
 - The full original text
 - The extracted claims list with risk levels
 - Any source URLs found in the text
@@ -78,7 +83,7 @@ For each agent, read the corresponding prompt file and include it in the agent's
 
 Read each agent's prompt file from the skill directory before dispatching. The skill directory path is: the directory containing this SKILL.md file.
 
-**Important**: Use `subagent_type: "general-purpose"` for each agent. Launch all 6 in a single message to maximize parallelism.
+**Important**: Dispatch all 6 in a single parallel batch to maximize parallelism (Claude Code: one message with 6 Agent calls, each `subagent_type: "general-purpose"` — see Harness notes).
 
 **Input scoping**: To reduce token cost, scope each agent's input to what it needs:
 - **Link Check**: Only the URLs found in the text, not the full content

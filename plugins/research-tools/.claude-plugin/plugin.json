@@ -1,7 +1,7 @@
 {
   "name": "research-tools",
   "description": "Verification & web research: 6-agent parallel fact-checking, human-like browser automation.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "Daehee Lee",
     "email": "lee111dae11@proton.me"

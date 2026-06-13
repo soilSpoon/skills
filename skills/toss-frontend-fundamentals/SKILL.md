@@ -28,7 +28,14 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 > 관점**(접근성·React 런타임·디자인 토큰·라이브러리 저자 패턴·토스 평가/문화/플랫폼
 > 철학)을 얹는다. L1/L2 lane의 references는 code-fundamentals 쪽 파일을 가리킨다.
 
-> ⚠️ **로드 규율** — `references/*.md`와 외부 URL은 **on-demand**로만 로드한다. 스킬 활성화 시점에 preload 하지 않는다. 트리거 맵에서 해당 패턴이 매칭됐을 때, 또는 리뷰·작성 중 특정 축의 근거가 필요해진 순간에 1-2개씩만 연다. SKILL.md 본문 + 트리거 맵으로 충분한 리뷰가 대부분이다.
+> ⚠️ **로드 규율** — `references/*.md`와 외부 URL은 **필요할 때만** 1-2개씩 연다 (클라이언트가 references를 어떻게 로드하든 무방 — 한꺼번에 다 끌어오려 하지 말라는 의미). 트리거 맵에서 해당 패턴이 매칭됐을 때, 또는 리뷰·작성 중 특정 축의 근거가 필요해진 순간에 연다. SKILL.md 본문 + 트리거 맵으로 충분한 리뷰가 대부분이다.
+
+## Harness notes (포팅)
+
+이 스킬은 harness-중립으로 쓰였다. 아래 능력은 클라이언트별 메커니즘으로 구현한다:
+
+- **lane 병렬 dispatch (워크플로 C)**: Claude Code = `Task`(sub-agent) 도구로 각 lane을 동시에 띄움; opencode·Codex CLI·SDK = 각자의 병렬 sub-agent/태스크 호출, 미가용 시 직렬 다회 호출로 폴백.
+- **사용자 커스텀 규칙 위치 / 다른 모델로 rescue (워크플로 C-5)**: Claude Code = config는 `~/.claude/review-extensions/`, rescue는 `codex:rescue`; opencode·Codex CLI·SDK = 클라이언트별 config 디렉터리와 별도 모델 호출 메커니즘으로 동일하게 구현.
 
 ## 토스가 실제로 평가하는 것 (채용 기술과제·라이브 코딩)
 
@@ -219,12 +226,12 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | `*.tsx`/`*.jsx` 또는 JSX 마크업 | + L3 |
 | React hook (`use*`) · `package.json` publish 설정 · 디자인 토큰 정의 | + L4 |
 
-**2. Task 도구로 lane 병렬 dispatch (가용 시 권장)**
+**2. lane 병렬 dispatch (가용 시 권장; Harness notes 참조)**
 
-각 활성 lane을 별도 Task로 동시에 띄운다.
+각 활성 lane을 별도 sub-agent/태스크로 동시에 띄운다.
 
 ```
-각 lane Task =
+각 lane sub-agent/task =
   system: "당신은 toss-FF의 {lane} 관점만 본다. 다른 관점은 무시한다."
   context: §Lane 분할의 매핑표가 정해준 references/*.md 만
   input: 동일 diff 또는 변경 파일 전체
@@ -241,14 +248,14 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 - 본문은 §출력 형식의 단일 finding 포맷으로 통일
 - lane 간 disagreement(같은 코드를 두 lane이 정반대로 평가)는 별도 섹션으로 표기 — 자동 머지하지 않는다
 
-**4. Task 미가용 환경 fallback**
+**4. 병렬 dispatch 미가용 환경 fallback**
 
 직렬 다회 호출. 1회당 references는 1 lane만 컨텍스트에 두고 같은 diff에 대해 N번 묻는다. 토큰은 N배지만 관점 오염은 막힌다. diff가 작으면 워크플로 A로 떨어뜨리는 게 합리적.
 
 **5. 확장 lane (선택, 항상 활성화 X)**
 
-- `~/.claude/review-extensions/*.md` 같은 사용자 커스텀 규칙이 있으면 추가 lane으로 자동 등록
-- `codex:rescue` 가용 시 동일 diff를 Codex에 같은 schema로 요청 — 모델 간 disagree 항목만 별도 표시
+- 클라이언트 config 위치 (Claude Code: `~/.claude/review-extensions/`)에 사용자 커스텀 규칙이 있으면 추가 lane으로 자동 등록
+- 다른 모델로 rescue (가용 시; Claude Code에서는 `codex:rescue`) — 동일 diff를 같은 schema로 요청해 모델 간 disagree 항목만 별도 표시
 
 ## 통합 체크리스트
 
