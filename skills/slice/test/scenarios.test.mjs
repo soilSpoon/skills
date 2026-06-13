@@ -660,6 +660,13 @@ test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF
   // ENGINE-RAN is present — 'is FORBIDDEN here' is unique to LEAF_TEST(scope) appendage (not in R_VERIFY itself).
   assert.ok(!stdVerifyPrompts.some((p) => /is FORBIDDEN here/.test(p)),
     `standard verify prompt must NOT contain LEAF_TEST injection ('is FORBIDDEN here') when ENGINE-RAN is present; found in: ${stdVerifyPrompts.filter(p => /is FORBIDDEN here/.test(p)).map(p => p.slice(0, 300)).join(' | ')}`)
+
+  // (3) KEYSTONE PIN (ITEM 8): byte-pin the extracted `engineRanBlock` helper's exact output structure
+  // — `ENGINE-RAN: `<cmd>` exited <N>. Output tail: …` — not merely the bare literal 'ENGINE-RAN' (which
+  // also lives in R_VERIFY boilerplate, so a corrupted helper passed CI). 'Output tail:' + the
+  // `cmd`/exited/N shape are produced ONLY by engineRanBlock, so this fails if the helper template regresses.
+  assert.ok(stdVerifyPrompts.every((p) => /ENGINE-RAN: `[^`]+` exited \d+\. Output tail:/.test(p)),
+    `standard verify prompt must contain engineRanBlock's exact structure (ENGINE-RAN: \`cmd\` exited N. Output tail:); got first 300: ${stdVerifyPrompts[0] && stdVerifyPrompts[0].slice(0, 300)}`)
 })
 
 // ITEM 9 — the engine pre-computes the leaf's scoped diff ONCE (deterministic shell-truth) and injects it
