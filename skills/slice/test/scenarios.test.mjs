@@ -1103,3 +1103,77 @@ test('parallel is the DEFAULT: args without a `parallel` field enter the paralle
   assert.ok(logs.some((l) => /parallel plan:/.test(l)),
     'args without `parallel` must default to the parallel partition (expected a "parallel plan:" log)')
 })
+
+// ITEM 1 (the BLOCKER): the SILENT tier-0 downgrade must be LOUD + auditable. When the per-leaf
+// deterministic gate cannot run (no filterCommand, or an unsafe/multi-suite scope), the leaf used to
+// fall through to the LLM verifier ALONE with NO log and NO record — the Lesson-3 silent trust-floor
+// downgrade. Now: (a) the leaf is tagged gate='llm-only' and collected into the run-level
+// `degradations` payload, and (b) a WARN naming the leaf appears in the logs. Drive a run whose
+// baseline.filterCommand is EMPTY (so t0cmd is empty for every leaf) and a leaf is still trusted.
+test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degradations names it + WARN logged', async () => {
+  // Two slices so the engine takes the slice path (sliced nodes carry a testScope); even WITH a scope,
+  // an empty filterCommand makes t0cmd empty → the deterministic gate cannot run → llm-only downgrade.
+  const twoSlices = {
+    slices: [0, 1].map((i) => ({
+      desc: `degradation slice ${i}`, interface: 'TBD',
+      contract: `do thing ${i}`, independent: true,
+      dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'standard', testScope: `Scope${i}`,
+    })),
+  }
+  // Baseline with EMPTY filterCommand — no per-leaf filtered tier-0 gate can be built.
+  const noFilterBaseline = { ...FIX.baseline, filterCommand: '' }
+
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Baseline') return noFilterBaseline
+    // Root assess must return 'slice' so the slicer runs (else the root node has no testScope).
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/slice:/.test(c.opts.label || '')) return twoSlices
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+
+  // Engine completed and at least one leaf was trusted (the leaf actually shipped on the LLM verifier alone).
+  assert.equal(result.error, undefined, `engine errored: ${result.error}`)
+  assert.ok(result.trustedLeaves >= 1, 'fixture precondition: at least one leaf trusted on the llm-only floor')
+
+  // (3) The run-level `degradations` array must be present and NAME the degraded leaf.
+  assert.ok(Array.isArray(result.degradations), 'payload must carry a `degradations` array')
+  assert.ok(result.degradations.length >= 1,
+    `degradations must record the llm-only leaf(s); got: ${JSON.stringify(result.degradations)}`)
+  assert.ok(result.degradations.every((d) => /gate=llm-only/.test(d)),
+    `every degradation entry must mark gate=llm-only; got: ${JSON.stringify(result.degradations)}`)
+  assert.ok(result.degradations.some((d) => /degradation slice/.test(d)),
+    `degradations must NAME the leaf (its task text); got: ${JSON.stringify(result.degradations)}`)
+
+  // (2) A WARN naming the leaf and the llm-only reason must appear in the logs.
+  assert.ok(
+    logs.some((l) => /WARN: leaf \d+ .*gate=llm-only \(no filterCommand\/scope\)/.test(l)),
+    `a WARN naming the leaf + 'gate=llm-only (no filterCommand/scope)' must be logged; got logs:\n${logs.join('\n')}`
+  )
+  // The trust rests-on-the-net phrasing must be present (auditable, not just a bare flag).
+  assert.ok(
+    logs.some((l) => /trust rests on the LLM verifier \+ the integrate net/.test(l)),
+    `the WARN must explain trust now rests on the LLM verifier + the integrate net; got logs:\n${logs.join('\n')}`
+  )
+
+  // (1) The per-leaf gateLevel is recorded on the ledger entry (auditable per-leaf, not just run-level).
+  assert.ok(result.results.some((r) => r.gateLevel === 'llm-only'),
+    `each degraded leaf record must carry gateLevel='llm-only'; got: ${JSON.stringify(result.results.map((r) => r.gateLevel))}`)
+
+  // CONTRAST (no-false-positive, same test to keep the suite at 32): the GREEN path (FIX.baseline's
+  // 'true # {scope}' is a RUNNABLE template) must report NO degradation and tag the leaf
+  // gate='deterministic-filtered' — the audit fires ONLY on the real downgrade, never on a healthy run.
+  const healthyDispatch = dispatcher((c) => {
+    // Only force the slice path; everything else (slice: → FIX.slices3, baseline → FIX.baseline with a
+    // runnable 'true # {scope}' filterCommand) falls through to the green-path defaults.
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+  })
+  const healthy = await runEngine({ args: ARGS, dispatch: healthyDispatch })
+  assert.equal(healthy.result.error, undefined, `healthy run errored: ${healthy.result.error}`)
+  assert.deepEqual(healthy.result.degradations, [],
+    `a healthy run with a runnable filterCommand must report NO degradations; got: ${JSON.stringify(healthy.result.degradations)}`)
+  assert.ok(healthy.result.results.some((r) => r.gateLevel === 'deterministic-filtered'),
+    `a leaf whose filtered t0 ran green must be gateLevel='deterministic-filtered'; got: ${JSON.stringify(healthy.result.results.map((r) => r.gateLevel))}`)
+  assert.ok(!healthy.logs.some((l) => /WARN: leaf \d+ .*gate=llm-only/.test(l)),
+    'a healthy run must emit NO llm-only WARN')
+})

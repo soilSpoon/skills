@@ -3,7 +3,7 @@
 
 import { BASELINE, ASSESSMENT, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
 import { R_BASELINE, R_ASSESS, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
-import type { EngineArgs, Baseline, Assessment, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing } from './types'
+import type { EngineArgs, Baseline, Assessment, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel } from './types'
 
 // ===== Workflow runtime ambient contract (the PORT) ==========================
 // Any host that injects these globals can run the emitted engine unchanged:
@@ -463,6 +463,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     }
 
     let res: ExecResult | null = null, verdict: Verdict | null = null, attempt = 0, prevIssueCount = Infinity
+    // ITEM 1: which deterministic trust-floor gate actually ran THIS leaf. Default 'llm-only' (no
+    // deterministic gate); the gate block below upgrades it to 'deterministic-filtered' or 'full-suite'
+    // when the engine actually ran shell-truth. A leaf that stays 'llm-only' is a LOUD, auditable
+    // trust-floor downgrade (the Lesson-3 class) — logged + recorded + collected run-wide.
+    let gateLevel: GateLevel = 'llm-only'
     while (true) {
       const repair = attempt === 0 ? '' :
         `\nREPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ` +
@@ -487,6 +492,13 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         const scopeSafe = node.testScope && /^[A-Za-z0-9_.-]+$/.test(String(node.testScope))
         const t0cmd = (node.kind !== 'tidy' && scopeSafe && baseline!.filterCommand && baseline!.filterCommand.includes('{scope}'))
           ? baseline!.filterCommand!.replace('{scope}', String(node.testScope)) : ''
+        // ITEM 1: a NON-tidy leaf with NO runnable filtered gate (missing/disabled filterCommand, or an
+        // unsafe/multi-suite scope) silently fell through to the LLM verifier ALONE — a silent trust-floor
+        // downgrade with no record (the Lesson-3 class). Make it LOUD: name the leaf and the reason. (A tidy
+        // leaf is excluded here — its deterministic gate is the full-suite run below, not a filtered t0.)
+        if (!t0cmd && node.kind !== 'tidy') {
+          log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`)
+        }
         if (t0cmd) {
           // In shared-scratch parallel mode the engine's own filtered run must hit the shared build dir
           // too (assumes the filter template passes appended flags through — documented opt-in).
@@ -499,6 +511,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             if (++t0redStreak >= 2) { baseline!.filterCommand = ''; log(`${tag}engine t0 disagreed with executor-green ${t0redStreak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`) }
           } else {
             t0redStreak = 0
+            gateLevel = 'deterministic-filtered'   // ITEM 1: the engine ran the filtered tier-0 (green) — full trust floor held
             // Exit 0 is NOT proof tests ran: a typo'd scope can match ZERO tests and still exit 0 —
             // blind "ENGINE-VERIFIED" would LAUNDER a vacuous green while muzzling the verifier. Hand
             // the verifier the output and the zero-tests duty instead of an assertion.
@@ -517,6 +530,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
           if (tidyFull.exitCode !== 0) {
             t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || '').slice(-300)}`] }
           } else {
+            gateLevel = 'full-suite'   // ITEM 1: tidy leaf — engine ran the FULL measure command (its deterministic proof)
             engineT0 = `\nENGINE-RAN: \`${baseline!.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. ` +
               `Output tail: ${String(tidyFull.stdout || '').slice(-300)}\n` +
               `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). ` +
@@ -553,8 +567,8 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       }
       continue
     }
-    done.push({ task: node.task, ...res, verdict })
-    log(`${tag}leaf ${i} ${res.passed ? 'green' : 'RED'} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ''} | ${verdict!.trustworthy ? 'trusted' : 'NOT trusted'}: ${node.task.slice(0, 36)}`)
+    done.push({ task: node.task, ...res, verdict, gateLevel })   // ITEM 1: record which deterministic gate actually ran (auditable trust floor)
+    log(`${tag}leaf ${i} ${res.passed ? 'green' : 'RED'} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ''} | gate=${gateLevel} | ${verdict!.trustworthy ? 'trusted' : 'NOT trusted'}: ${node.task.slice(0, 36)}`)
 
     // An untrusted leaf (incl. a RED/tier-0 leaf with only uncommitted edits) must leave NOTHING behind.
     if (GIT && !verdict!.trustworthy) {
@@ -822,6 +836,15 @@ const fullSuiteGreen = finalRun.exitCode === 0
 
 const trusted = done.filter(d => d.verdict && d.verdict.trustworthy)
 
+// ITEM 1: run-level audit of the silent tier-0 downgrade. A TRUSTED leaf that ran gate='llm-only'
+// (no deterministic filtered/full-suite gate could run) shipped on the LLM verifier + integrate net
+// alone — the trust floor was lowered for it. Surface every such leaf LOUDLY in the payload (the
+// Lesson-3 class the engine claims to have killed) so it is never invisible again.
+const degradations = trusted
+  .filter(d => d.gateLevel === 'llm-only')
+  .map(d => `gate=llm-only (no deterministic gate ran): ${String(d.task).slice(0, 80)}`)
+if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`)
+
 // W: "built-tested-unwired" audit — the dominant cross-leaf defect class observed live (4 recurrences:
 // new API lands fully leaf-tested but NO production path calls it; per-leaf verification structurally
 // cannot see this). Deterministic extraction (diff → new exported symbols) + one agent judging call
@@ -934,7 +957,7 @@ return {
   results: done, coordinator: merge, integration,
   fullSuiteGreen, integrationExit: finalRun.exitCode,
   trustedLeaves: trusted.length, totalLeaves: done.length,
-  purposeGaps, wiringGaps, aborts: ABORTS,
+  purposeGaps, wiringGaps, aborts: ABORTS, degradations,
   briefing: (briefing && briefing.briefing) || undefined,   // B: the owner's guided read — RELAY this, don't bury it
 }
 

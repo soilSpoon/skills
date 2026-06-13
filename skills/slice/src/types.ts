@@ -74,10 +74,16 @@ export interface WorkNode {
   riskTier?: RiskTier
   testScope?: string
 }
+/** Which deterministic trust-floor gate actually ran for a leaf before the LLM verifier.
+ *  'deterministic-filtered' = engine ran the filtered tier-0 (green); 'full-suite' = tidy leaf,
+ *  engine ran the full measure command; 'llm-only' = NO deterministic gate ran (silent trust-floor
+ *  downgrade made LOUD + auditable — surfaced in the run-level `degradations`). */
+export type GateLevel = 'deterministic-filtered' | 'full-suite' | 'llm-only'
 /** One executed leaf in the ledger. verdict is null only for an executor that died before verification. */
 export interface LeafRecord extends Partial<ExecResult> {
   task: string
   verdict: Verdict | null
+  gateLevel?: GateLevel
 }
 export interface Groups { indep: SliceSpec[]; seq: SliceSpec[]; all: SliceSpec[] }
 export interface Briefing { briefing: string }
@@ -99,5 +105,6 @@ export interface EngineResult {
   purposeGaps?: string[]
   wiringGaps?: string[]
   aborts?: string[]
+  degradations?: string[]
   briefing?: string
 }

@@ -465,6 +465,7 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
         return r.exitCode !== -2;
       };
       let res = null, verdict = null, attempt = 0, prevIssueCount = Infinity;
+      let gateLevel = "llm-only";
       while (true) {
         const repair = attempt === 0 ? "" : `
 REPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ${JSON.stringify((verdict && verdict.issues && verdict.issues.length ? verdict.issues : [verdict && verdict.reason]).slice(0, 6).map((s) => String(s).slice(0, 300)))}. ` + (verdict && verdict.prescription ? `
@@ -487,6 +488,9 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
           let engineT0 = "", t0red = null;
           const scopeSafe = node.testScope && /^[A-Za-z0-9_.-]+$/.test(String(node.testScope));
           const t0cmd = node.kind !== "tidy" && scopeSafe && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", String(node.testScope)) : "";
+          if (!t0cmd && node.kind !== "tidy") {
+            log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
+          }
           if (t0cmd) {
             const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
             if (t0.exitCode !== 0) {
@@ -497,6 +501,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
               }
             } else {
               t0redStreak = 0;
+              gateLevel = "deterministic-filtered";
               engineT0 = `
 ENGINE-RAN: \`${t0cmd}\` exited 0. Output tail: ${String(t0.stdout || "").slice(-300)}
 FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`;
@@ -507,6 +512,7 @@ FIRST confirm from that output that at least one test ACTUALLY EXECUTED under sc
             if (tidyFull.exitCode !== 0) {
               t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || "").slice(-300)}`] };
             } else {
+              gateLevel = "full-suite";
               engineT0 = `
 ENGINE-RAN: \`${baseline.measureCommand}\` (full suite — tidy behavior-preservation gate) exited 0. Output tail: ${String(tidyFull.stdout || "").slice(-300)}
 Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`;
@@ -537,8 +543,8 @@ Confirm from that output that the existing suite is actually green (zero tests r
         }
         continue;
       }
-      done2.push({ task: node.task, ...res, verdict });
-      log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
+      done2.push({ task: node.task, ...res, verdict, gateLevel });
+      log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
       if (GIT && !verdict.trustworthy) {
         const restored = await restore();
         log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
@@ -750,6 +756,8 @@ ${INV}`,
   }
   const fullSuiteGreen = finalRun.exitCode === 0;
   const trusted = done.filter((d) => d.verdict && d.verdict.trustworthy);
+  const degradations = trusted.filter((d) => d.gateLevel === "llm-only").map((d) => `gate=llm-only (no deterministic gate ran): ${String(d.task).slice(0, 80)}`);
+  if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
   let wiringGaps = [];
   if (GIT && trusted.length && !QUOTA_HALT) {
     try {
@@ -854,6 +862,7 @@ Match the language the task was written in. Be concrete.`,
     purposeGaps,
     wiringGaps,
     aborts: ABORTS,
+    degradations,
     briefing: briefing && briefing.briefing || void 0
     // B: the owner's guided read — RELAY this, don't bury it
   };
