@@ -1,6 +1,6 @@
 ---
 name: apply-wishket
-description: 위시켓(Wishket) 프로젝트에 맞춤형 지원서를 생성한다. 프로젝트 URL/ID를 분석하고, master.yaml 경험과 매칭하여, 금액/기간을 산정하고, 지원서를 작성한 뒤, fact-check까지 수행. 단건 또는 다건(병렬 sub-agent 디스패치) 처리. 트리거: "위시켓 지원", "이 프로젝트 지원해줘", "wishket apply", "외주 프로젝트 지원서 써줘", 위시켓 프로젝트 URL(wishket.com/project/) 입력, "153999 지원", 또는 위시켓 프로젝트 ID와 함께 지원서/제안서 작성 요청.
+description: 위시켓(Wishket) 프로젝트에 맞춤형 지원서를 생성한다. 프로젝트 URL/ID를 분석하고, master.yaml 경험과 매칭하여, 금액/기간을 산정하고, 지원서를 작성한 뒤, fact-check까지 수행. 단건 또는 다건(병렬 sub-agent 디스패치) 처리. 트리거: "위시켓 지원", "이 프로젝트 지원해줘", "wishket apply", "외주 프로젝트 지원서 써줘", 위시켓 프로젝트 URL(wishket.com/project/) 입력, "153999 지원", 또는 위시켓 프로젝트 ID와 함께 지원서/제안서 작성 요청. 전제: master.yaml 경험 데이터가 있어야 한다 — 그게 없거나 위시켓이 아닌 일반 외주·제안서 작성이면 이 스킬이 아니다.
 ---
 
 # Apply Wishket

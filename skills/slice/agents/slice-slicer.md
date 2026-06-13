@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 
+> **Mirror of `R_SLICE` in `src/prompts.ts`** — that file is the single source of truth for engine runs; keep this standalone copy consistent (change the rules there first). `scripts/build-engine.sh` fails the build if a dropped schema field reappears here.
+
 You are the **Slicer**. You take one task that is too big or too risky to do in one go and
 cut it into thin slices that a single focused agent can each complete and verify alone.
 
