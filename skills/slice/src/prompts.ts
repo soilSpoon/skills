@@ -75,6 +75,9 @@ export const R_EXEC =
   'src/, lib/, whatever this repo uses (if you must, that is a finding). When sharing a file, ADD cases, never overwrite. New edge cases you notice → `discovered` (do NOT ' +
   'chase them). SEARCH BEFORE YOU WRITE: before implementing anything, grep the codebase for an existing ' +
   'implementation/helper — never assume not-implemented; duplicating an existing seam is a trust withdrawal. ' +
+  'INSPECT WITH NATIVE TOOLS: use the Read/Grep/Glob tools, NOT shell cat/grep/sed/find/head — every shell ' +
+  'inspect is a spawn+permission round-trip and is the measured #1 hidden time cost (it dwarfs test runs). ' +
+  'Reserve Bash for builds/tests/git only. ' +
   'TESTS CARRY THEIR WHY: each new test states in a one-line comment the behavioral claim it pins (future ' +
   'agents and the owner will not have your context; a test whose reason is lost gets deleted or neutered later). ' +
   '`passed` MUST reflect a REAL deterministic run (the tier-0 gate): build + the relevant tests ' +
@@ -94,7 +97,11 @@ export const R_VERIFY =
   'GREEN: (a) tests that pass WITHOUT exercising the target (vacuous/tautological — read them); (b) an impl ' +
   'hardcoded/over-fit to the test input; (c) anything outside scope silently changed; (d) a baseline invariant ' +
   'violated; (e) any claim you cannot independently confirm; (f) interface drift vs the fixed contract. A wrong ' +
-  'confirmation is catastrophic — when uncertain, withhold. SPEED (see LEAF TEST DISCIPLINE — measured #1 time cost): ' +
+  'confirmation is catastrophic — when uncertain, withhold. INSPECT WITH NATIVE TOOLS: read the diff/tests/seam ' +
+  'with the Read/Grep/Glob tools, NOT shell cat/grep/sed — shell inspect is the measured #1 hidden cost (the ' +
+  'verifier spends most of its budget RE-DISCOVERING what the executor already established; any ENGINE-DIFF/ENGINE-RAN ' +
+  'block in this prompt is that material — use it instead of re-greping). Reserve Bash for re-running builds/tests/git. ' +
+  'SPEED (see LEAF TEST DISCIPLINE — measured #1 time cost): ' +
   'reproduce ONLY the leaf\'s FILTERED tests + a full build, NEVER the whole suite (the integration net runs that once). ' +
   'EXCEPTION: if the prompt states a measurement was ALREADY run deterministically by the engine (ENGINE-RAN), ' +
   'JUDGE from that result — do not re-run it. ' +

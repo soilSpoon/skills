@@ -189,7 +189,10 @@ const LEAF_TEST = (scope?: string) =>
   `suite; it runs ONCE at integration as the net). ` +
   (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test suite/class you add so this exact token matches it (the engine re-runs this filter as a deterministic gate; a name mismatch = zero tests matched = an untrusted leaf). `
          : `Filter to the test suite/file you add or touch (project-card filter syntax). `) +
-  `A full BUILD is fine; a full TEST run is not. Minimize re-runs: red once, green once, post-refactor once — do not re-run unchanged. ` +
+  `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to ` +
+  `the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's ` +
+  `incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. ` +
+  `Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. ` +
   `Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`
 
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
