@@ -21,6 +21,13 @@ filtered test, a diff you can read whole and revert in one commit. Spend the cos
 on the trust **deficit**. Uniform max-ceremony lowers trust-per-hour; a 10-minute change that
 takes an hour is a tier error, not rigor.
 
+**Two reflexes before the tiers (reflexes, not research projects):** (1) *Scope* — the cheapest,
+highest-trust change is the one you don't make: does it need to exist (YAGNI)? stdlib / native /
+one line before fifty? (the scope floor — details in `code-fundamentals`). (2) *Deliberation* —
+don't spend longer deciding what *not* to build than building it would take; if your explanation
+is longer than the change, cut the explanation (prose defending a simplification is complexity
+smuggled back in). A care-process that ruminates is slower for zero trust gain.
+
 **Ceremony ladder — pick the LOWEST tier that still guarantees the baseline floor:**
 - **T0 deterministic** — a compiler / type-check / filtered test already proves it → just run it. No agent, no engine.
 - **T1 legible** — one change you can read whole + a filtered test → do it inline yourself: failing test → fix → filtered suite → one commit. Two hats (behavior, then structure), one head. **Default for simple work — most tasks exit here, no engine.**

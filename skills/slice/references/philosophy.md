@@ -56,6 +56,19 @@ which is itself a trust loss. **Guarantee the floor at every tier; let the cerem
 floor scale with the deficit.** The operational ladder (T0 deterministic / T1 legible-inline /
 T2 manufactured-parallel) lives in [SKILL.md](../SKILL.md).
 
+### The same principle, the scope axis
+
+Ceremony is one axis; **scope** is the other. Absent code is the highest-trust code — nothing to
+surprise the owner, nothing to verify, nothing to rot. So *before* "how much ceremony does this
+code need?" comes "**how little code?**": does it need to exist (YAGNI), does stdlib / a native
+feature / an installed dep already do it, can it be one line — stop at the first rung that holds,
+as a reflex, not a research project (deliberating about what *not* to build is itself a cost that
+buys no trust — a minimalism process that ruminates can run slower than no process at all). Both
+axes serve trust-per-effort and both keep the same floor: validation at trust boundaries, error
+handling that prevents data loss, security, and accessibility are never simplified away.
+(Generalized from the "lazy senior dev" ladder — anchored on trust, not laziness; minimalism here
+is a *trust* claim, not a style. The scope floor's operational home is `code-fundamentals` §0.)
+
 ## 2. Mastering Programming — the decomposition discipline
 
 Beck's master-vs-journeyman heuristics are all about **"scaling your brain" by solving fewer

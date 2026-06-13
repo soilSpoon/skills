@@ -166,4 +166,4 @@ app into the state you need over clicking your way there.
 - Run against a **clean git tree** (commit/stash first); the engine pins the baseline SHA.
 - Watch live: `/workflows` or `python3 scripts/slice-watch.py latest <repo>` (bundled).
 - After a crash, the **git commits are the durable record** — inspect `git log <baseSha>..HEAD`.
-- Parallel mode (`args.parallel: true`) is opt-in, git-only, needs ≥2 independent top slices.
+- Parallel mode is the DEFAULT (`args.parallel: false` opts out); git-only, auto-falls-back to sequential when there are not ≥2 independent top slices or the build is compile-bound without sharedScratch.

@@ -31,7 +31,8 @@ can just do.
   Cite file:line evidence for your difficulty/size call.
 - Respect the depth budget passed in the prompt: if at/over the floor, you MUST return
   `execute` (the recursion has to bottom out somewhere).
-- `risk` names the worst credible way this task silently destroys trust (a wrong-but-green
-  result, a hidden behavior change). If none, say "low".
+- In `reason`, name the worst credible way this task silently destroys trust (a wrong-but-green
+  result, a hidden behavior change) — there is no separate `risk` field in your output schema;
+  fold that judgment into `reason`.
 - Be honest about uncertainty in `reason`. A confident wrong classification is the costliest
   output you can produce.

@@ -156,7 +156,7 @@ trees on interdependent commits; see Lesson 7), and evidence = `git diff`. *Trus
 (proven — see [pitfalls-and-lessons.md](pitfalls-and-lessons.md)). The Baseliner now **must**
 capture `gitSha` for a git repo (a silent omission once disabled git mode entirely).
 
-### Parallel worktree groups + Coordinator (opt-in: `args.parallel`)
+### Parallel worktree groups + Coordinator (DEFAULT; `args.parallel: false` opts out)
 Independent top-level slices build **concurrently, each in its own git worktree** (capped at
 `MAX_WORKERS=4`, batched), within-group sequential with discovery feedback. The **Coordinator**
 holds the only global context: a **deterministic per-branch `git merge --no-ff`** owns the merge,

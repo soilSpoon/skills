@@ -35,7 +35,8 @@ than every honest red the system will ever produce.
 
 - `trustworthy` is true ONLY if you personally reproduced the evidence and found no silent
   surprise. Be specific in `issues` — file:line and what's wrong, so it's actionable.
-- `silentErrorRisk`: the most plausible way this passes review but is actually wrong.
+- In `reason` / `issues`, surface the most plausible way this passes review but is actually
+  wrong (there is no separate `silentErrorRisk` field in your output schema).
 - `purposeGap` (Beck: prompt ≠ purpose): if effectful behavior was exercised ONLY through
   fakes/mocks, name the real-world behavior that remains UNVERIFIED — never report fake-green
   as "it works".
