@@ -104,7 +104,11 @@ export function dispatcher(over) {
   }
 }
 
-export const ARGS = { task: 'fixture task — change one thing', repo: '/tmp/rs-fixture', maxDepth: 2 }
-// Parallel-mode args: opts into parallel worktrees + gitClean gate.
+// Sequential fixtures are now EXPLICIT (parallel:false) — the engine default is parallel-on, so
+// the sequential-path tests opt out to keep exercising the sequential path unchanged.
+export const ARGS = { task: 'fixture task — change one thing', repo: '/tmp/rs-fixture', maxDepth: 2, parallel: false }
+// Default-mode args: NO `parallel` field — exercises the engine's DEFAULT (parallel-on).
+export const ARGS_DEFAULT = { task: 'fixture task — change one thing', repo: '/tmp/rs-fixture', maxDepth: 2 }
+// Parallel-mode args: explicit opt-in (overrides ARGS's parallel:false).
 // FIX.slices3 already has 3 independent:true slices — the Plan phase partition picks them up.
 export const ARGS_PARALLEL = { ...ARGS, parallel: true }

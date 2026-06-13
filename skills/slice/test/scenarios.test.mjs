@@ -2,7 +2,7 @@
 // Run: node --test skills/slice/test/
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runEngine, dispatcher, FIX, ARGS, ARGS_PARALLEL, isSh, has } from './host.mjs'
+import { runEngine, dispatcher, FIX, ARGS, ARGS_DEFAULT, ARGS_PARALLEL, isSh, has } from './host.mjs'
 
 test('happy path: atomic root → trusted leaf → green integrate → briefing', async () => {
   const { result, logs } = await runEngine({ args: ARGS, dispatch: dispatcher() })
@@ -1089,4 +1089,17 @@ test('model-access error on verify → resumable QUOTA HALT (not an untrusted-st
   // must NOT have reached the "consecutive untrusted leaves" streak halt — that would mean it ground 3 leaves
   assert.ok(!(result.aborts || []).some((a) => /consecutive untrusted/.test(a)),
     `infra failure must not be misread as untrusted-streak; aborts=${JSON.stringify(result.aborts)}`)
+})
+
+// Parallel-by-default (engine disposition: parallelize the independent). Args with NO `parallel`
+// field must enter the parallel partition; the downstream guards still auto-fall-back to sequential
+// when unsafe (dirty tree / compile-bound / <2 independent groups).
+test('parallel is the DEFAULT: args without a `parallel` field enter the parallel partition', async () => {
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+  })
+  const { result, logs } = await runEngine({ args: ARGS_DEFAULT, dispatch })
+  assert.equal(result.error, undefined, `default-args run must not error; got: "${result.error}"`)
+  assert.ok(logs.some((l) => /parallel plan:/.test(l)),
+    'args without `parallel` must default to the parallel partition (expected a "parallel plan:" log)')
 })

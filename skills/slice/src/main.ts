@@ -94,7 +94,11 @@ if (!A.task) {
 const TASK = A.task
 const REPO = A.repo || '.'
 const FLOOR = A.maxDepth || 3            // recursion depth cap (anti-explosion)
-const PARALLEL = A.parallel === true     // opt-in: run independent top-level slices in parallel git worktrees
+const PARALLEL = A.parallel !== false    // DEFAULT ON: parallelize independent top-level slices (git worktrees).
+                                         // Explicit `parallel:false` opts out. The decision is cheap to default because the
+                                         // downstream guards (GIT + clean tree + cheap builds + ≥2 INDEPENDENT groups) auto-
+                                         // fall-back to sequential whenever parallel is unsafe or unbeneficial — so default-on
+                                         // means "parallelize where it actually helps," never "force worktrees blindly."
 const FORCE_PARALLEL = A.forceParallel === true   // override the compile-bound auto-fallback to sequential
 const SHARED_SCRATCH = A.sharedScratch === true   // compile-bound parallel WITHOUT per-worktree cold builds: all
                                                   // worktrees share ONE build dir (--scratch-path) so dependency

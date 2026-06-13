@@ -168,7 +168,7 @@ async function __main() {
   const TASK = A.task;
   const REPO = A.repo || ".";
   const FLOOR = A.maxDepth || 3;
-  const PARALLEL = A.parallel === true;
+  const PARALLEL = A.parallel !== false;
   const FORCE_PARALLEL = A.forceParallel === true;
   const SHARED_SCRATCH = A.sharedScratch === true;
   const MAX_LEAVES = 24;

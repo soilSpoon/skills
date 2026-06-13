@@ -69,13 +69,14 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
 4. **Right-size the call.** Tune the workflow args before launching:
    - `maxDepth`: 2 for a contained task, 3–4 for a genuinely large one. Keep it small — the
      floor is the anti-explosion guard.
-   - `parallel: true` — DEFAULT TO IT (with `sharedScratch`) whenever the spec splits into ≥2
-     coarse groups and the owner hasn't constrained burn rate. The partition ENGINEERS
+   - `parallel` — **ON by default** (the engine's native disposition: parallelize the independent).
+     You rarely pass it; pass `parallel: false` only to FORCE sequential. The partition ENGINEERS
      independence (file-disjoint cores in parallel; shared-file wiring as a final sequential
      group), and light overlap is fine — the Coordinator merges branches and resolves conflicts
-     honoring both sides, with the deterministic full-suite net behind it. Sequential remains
-     right only for single-seam work. Requires git + a clean main tree; the engine auto-falls
-     back on compile-bound projects unless `sharedScratch`/`forceParallel` lifts it.
+     honoring both sides, with the deterministic full-suite net behind it. The default is cheap
+     because the engine **auto-falls back to sequential** whenever parallel can't help — no git,
+     dirty main tree, compile-bound builds (unless `sharedScratch`/`forceParallel` lifts it), or
+     <2 independent groups. So single-seam work runs sequentially on its own; you don't opt out.
    - `sharedScratch: true` lifts the compile-bound fallback PROPERLY: all worktrees share one
      build dir (`--scratch-path`), so dependencies compile once and builds serialize on its lock
      (measured on one compile-bound repo: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for
