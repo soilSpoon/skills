@@ -2,6 +2,8 @@
 
 Source: Kent Beck's *tidyfirst* essays — **Trust Factory**, **Mastering Programming**,
 **Canon TDD**, **Design in TDD** — synthesized, then read critically for the *agent* context.
+(Full annotated bibliography — every Beck essay plus the contemporary agent-systems sources,
+each mapped to the engine — in [sources.md](sources.md).)
 
 ## 1. Trust is the goal; TDD/SDD are mechanisms
 
