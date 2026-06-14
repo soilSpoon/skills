@@ -127,18 +127,37 @@ var R_COORD = "You are the Coordinator — the ONLY agent with global context. A
 
 // src/main.ts
 async function __main() {
+  const circuitBreaker = (threshold, classThreshold = 0) => {
+    let streak = 0;
+    const classes = /* @__PURE__ */ new Set();
+    return {
+      record(klass) {
+        streak++;
+        if (klass !== void 0) classes.add(klass);
+        return streak;
+      },
+      get streak() {
+        return streak;
+      },
+      tripped() {
+        return streak >= threshold && classes.size >= classThreshold;
+      },
+      reset() {
+        streak = 0;
+        classes.clear();
+      }
+    };
+  };
   let QUOTA_HALT = "";
-  let NULL_STREAK = 0;
-  let NULL_STREAK_CLASSES = /* @__PURE__ */ new Set();
+  const quotaBreaker = circuitBreaker(3, 2);
   const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
   const quotaHalt = (why) => {
     QUOTA_HALT = why;
     log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`);
   };
   const bumpNullStreak = (opts) => {
-    NULL_STREAK++;
-    NULL_STREAK_CLASSES.add(callClass(opts));
-    if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`);
+    quotaBreaker.record(callClass(opts));
+    if (quotaBreaker.tripped()) quotaHalt(`${quotaBreaker.streak} consecutive agent failures (API/session quota suspected)`);
   };
   const agentSafe = async (prompt, opts) => {
     if (QUOTA_HALT) {
@@ -150,8 +169,7 @@ async function __main() {
       if (r === null) {
         bumpNullStreak(opts);
       } else {
-        NULL_STREAK = 0;
-        NULL_STREAK_CLASSES = /* @__PURE__ */ new Set();
+        quotaBreaker.reset();
       }
       return r;
     } catch (e) {
@@ -434,7 +452,7 @@ LENS: judge specifically through "${L}".`,
     }
     return await agentSafe(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
   };
-  let t0redStreak = 0;
+  const t0redBreaker = circuitBreaker(2);
   const ABORTS = [];
   async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
     buildNote = buildNote || "";
@@ -442,7 +460,8 @@ LENS: judge specifically through "${L}".`,
     const stack = [{ task: rootTask, ctx: "", depth: startDepth, spikes: 0, kind: kind || "behavior" }];
     const done2 = [];
     const executedKeys = /* @__PURE__ */ new Set();
-    let discovered = 0, untrustedStreak = 0;
+    let discovered = 0;
+    const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK);
     const keyOf = (s) => String(s).trim().slice(0, 120);
     while (stack.length && done2.length < MAX_LEAVES) {
       const node = stack.pop();
@@ -570,12 +589,12 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
             const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
             if (t0.exitCode !== 0) {
               t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${String(t0.stdout || "").slice(-300)}`] };
-              if (++t0redStreak >= 2) {
+              if (t0redBreaker.record(), t0redBreaker.tripped()) {
                 baseline.filterCommand = "";
-                log(`${tag}engine t0 disagreed with executor-green ${t0redStreak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
+                log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
               }
             } else {
-              t0redStreak = 0;
+              t0redBreaker.reset();
               gateLevel = "deterministic-filtered";
               engineT0 = engineRanBlock({
                 cmd: t0cmd,
@@ -618,7 +637,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
         log(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`);
         await restore();
         done2.push({ task: node.task, passed: false, summary: "executor returned no result (API/rate-limit)", verdict: { trustworthy: false, reason: "executor failed" } });
-        if (++untrustedStreak >= MAX_UNTRUSTED_STREAK) {
+        if (untrustedBreaker.record(), untrustedBreaker.tripped()) {
           ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
           log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`);
           break;
@@ -632,8 +651,9 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
         const restored = await restore();
         log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
       }
-      untrustedStreak = verdict.trustworthy ? 0 : untrustedStreak + 1;
-      if (untrustedStreak >= MAX_UNTRUSTED_STREAK) {
+      if (verdict.trustworthy) untrustedBreaker.reset();
+      else untrustedBreaker.record();
+      if (untrustedBreaker.tripped()) {
         ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
         log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`);
         break;

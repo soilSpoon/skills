@@ -246,6 +246,48 @@ test('filterCommand {scope} substitutes as file path, t0 fires per-leaf with cor
   )
 })
 
+// ITEM 11a (t0red RUN-scope breaker — threshold=2 pin): the third unified circuit-breaker. A BROKEN
+// filterCommand template false-REDs every leaf run-wide (engine t0 RED while the executor reports green).
+// After exactly 2 consecutive engine-RED-vs-executor-green disagreements the engine must DISTRUST THE
+// TEMPLATE — disable filterCommand (log "2× in a row") and fall back to LLM verify — NOT keep false-REDing
+// every remaining leaf. This pins the t0red breaker's threshold (2), scope (run-global), and action
+// (disable + log), the behavior-preservation guarantee for the circuitBreaker(2) parameterization.
+test('ITEM 11a: t0red breaker disables a broken filterCommand after exactly 2 engine-RED-vs-green (run-scope, threshold=2)', async () => {
+  const t0Labels = []   // every t0: engine-gate sh call (one per leaf WHILE the template is live)
+  let leafGreenExec = 0 // executor reports green on every leaf (so the disagreement is engine-RED-vs-green)
+  // OWN baseline copy: the t0red disable ACTION mutates baseline.filterCommand=''. FIX.baseline is a
+  // shared fixture object — returning it here would corrupt later tests. Clone it so the mutation is local.
+  const ownBaseline = { ...FIX.baseline }
+  const dispatch = dispatcher((c) => {
+    const l = c.opts.label || ''
+    if (c.opts.phase === 'Baseline') return ownBaseline
+    // Root decompose → slice into the 3 fixture children (each has a regex-safe testScope S0/S1/S2),
+    // so the engine builds a real t0cmd from filterCommand='true # {scope}' and runs it per leaf.
+    if (/decompose/.test(l) && /d0/.test(l)) return FIX.decomposeSlice
+    if (!isSh(c) && /^exec:/.test(l)) { leafGreenExec++; return FIX.exec }   // executor green every time
+    // Intercept the engine's t0 gate sh: force it RED (exit 1) → engine-RED vs executor-green disagreement.
+    if (isSh(c) && /t0:/.test(l)) { t0Labels.push(l); return { exitCode: 1, stdout: 'not ok 1\n# fail 1' } }
+    // After the template is disabled, leaf3 falls to LLM verify — let it trust so the untrusted-streak
+    // halt (3) never fires and the run walks all 3 leaves (isolating the t0red threshold, not the streak).
+    if (!isSh(c) && /verify/.test(l) && !/integration/.test(l)) return FIX.trust
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+
+  // Precondition: the executor reported green on each leaf (so each t0 RED is a genuine disagreement).
+  assert.ok(leafGreenExec >= 2, `fixture precondition: executor must report green per leaf; got ${leafGreenExec}`)
+  // ACTION pin: the broken template is disabled and the disable log names the streak count "2×".
+  assert.ok(
+    logs.some((l) => /disagreed with executor-green 2× in a row/.test(l) && /disabling the engine gate/.test(l)),
+    `t0red breaker must disable the template after exactly 2× and log it; t0-related logs: ${logs.filter((l) => /t0|disagreed|engine gate/.test(l)).join(' | ')}`
+  )
+  // THRESHOLD pin: the t0 gate fires for leaf0 and leaf1 only (2 RED → disable); the 3rd leaf finds
+  // filterCommand='' so NO further t0 sh fires (the false-RED grind is stopped, not repeated run-wide).
+  assert.equal(t0Labels.length, 2, `t0 gate must fire exactly twice (disabled after the 2nd RED); fired: ${t0Labels.join(', ')}`)
+  // The run still returns normally (a disabled gate is a degradation, not a crash).
+  assert.equal(result.error, undefined, `run must return normally after the template is disabled; got error: "${result.error}"`)
+})
+
 // A1 lock-write sentinel fatal (same class as lock-dir): if the sh proxy dies writing the lock
 // file, the engine believes it holds the lock when it does not — a second concurrent run can
 // clobber the working tree. Guard: treat lock-write sentinel as fatal, same class as lock-check.

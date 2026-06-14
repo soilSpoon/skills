@@ -36,17 +36,39 @@ async function __main(): Promise<EngineResult> {
 // the null path would have survived — the engine already treats null as distrust/retry at
 // every call site). Convert throws to null; budget/ceiling throws stay fatal — they mean
 // STOP, and the Integrate try/catch owns that cleanup path.
+// ITEM 11a: ONE circuit-breaker abstraction, instantiated three ways (this engine had three ad-hoc
+// counter+constant+comment clusters that are the SAME breaker at different (class, scope)). A breaker
+// counts a consecutive failure streak and, optionally, the DISTINCT call-classes seen during it; it
+// trips when streak ≥ `threshold` AND the distinct-class count ≥ `classThreshold` (default 0 = no
+// class gate — `record()` is called with no class and the gate is vacuously true). The three guards
+// below parameterize it: quota = circuitBreaker(3, 2) at SESSION scope (≥2 distinct classes is part of
+// its trip rule), untrusted = circuitBreaker(MAX_UNTRUSTED_STREAK) at UNIT scope, t0red =
+// circuitBreaker(2) at RUN scope. Behavior-preserving: thresholds, scopes, halt/disable ACTIONS, and
+// resumability are UNCHANGED — only the three counters are replaced by named parameterizations.
+//   • `.record(klass?)` bumps the streak (and adds the class when given), returns the new streak;
+//   • `.streak` exposes the live count (some ACTION log lines embed it verbatim);
+//   • `.tripped()` is the trip predicate (threshold + class gate); `.reset()` clears streak+classes.
+const circuitBreaker = (threshold: number, classThreshold = 0) => {
+  let streak = 0
+  const classes = new Set<string>()
+  return {
+    record(klass?: string) { streak++; if (klass !== undefined) classes.add(klass); return streak },
+    get streak() { return streak },
+    tripped() { return streak >= threshold && classes.size >= classThreshold },
+    reset() { streak = 0; classes.clear() },
+  }
+}
 // Quota circuit breaker: a session/usage-limit death is NOT a one-off null — left alone it
 // kills every subsequent agent serially (observed live: 12 consecutive corpses after one
 // "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
 // cause) flips QUOTA_HALT; from then on agentSafe no-ops, loops stop cleanly, and the run
 // ends resumable instead of burning attempts until the harness gives up.
 let QUOTA_HALT = ''
-let NULL_STREAK = 0
-let NULL_STREAK_CLASSES = new Set<string>()  // A6: track call classes in streak; same-class-only loop (e.g. heavy lenses) must not halt
-// A6: extract the call class from opts — the prefix before ':' or '·'. Same-class streaks arise
-// by design (heavy 3-lens loop), so ≥2 different classes are required before treating the
-// streak as a session-instability signal (not just a single role's transient failures).
+// SESSION-scope breaker: 3 consecutive null/failed agent results spanning ≥2 distinct call-classes.
+// A6: same-class-only streaks arise by design (heavy 3-lens loop), so ≥2 distinct classes are
+// required before treating the streak as a session-instability signal (not one role's transient flake).
+const quotaBreaker = circuitBreaker(3, 2)
+// A6: extract the call class from opts — the prefix before ':' or '·'.
 const callClass = (opts?: AgentOpts) => ((opts && (opts.label || opts.phase)) || '').replace(/[:·].*/u, '').trim() || 'unknown'
 const quotaHalt = (why: string) => {
   QUOTA_HALT = why
@@ -54,15 +76,15 @@ const quotaHalt = (why: string) => {
 }
 // A6: shared bump used in both null-return and catch paths — keeps the class-gate condition DRY.
 const bumpNullStreak = (opts?: AgentOpts) => {
-  NULL_STREAK++; NULL_STREAK_CLASSES.add(callClass(opts))
-  if (NULL_STREAK >= 3 && NULL_STREAK_CLASSES.size >= 2) quotaHalt(`${NULL_STREAK} consecutive agent failures (API/session quota suspected)`)
+  quotaBreaker.record(callClass(opts))
+  if (quotaBreaker.tripped()) quotaHalt(`${quotaBreaker.streak} consecutive agent failures (API/session quota suspected)`)
 }
 const agentSafe: typeof agent = async (prompt, opts) => {
   if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
   try {
     const r = await agent(prompt, opts)
     if (r === null) { bumpNullStreak(opts) }
-    else { NULL_STREAK = 0; NULL_STREAK_CLASSES = new Set() }
+    else { quotaBreaker.reset() }
     return r
   }
   catch (e: any) {
@@ -536,7 +558,10 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
 // ---- runWork: the recursive decomposition+execution loop for ONE work unit, in ONE repo
 // (the main checkout, or a group's worktree). Sequential + Canon-TDD discover-as-you-go.
 // Returns { done } — the list of leaf results. No integration here (that's the caller's job).
-let t0redStreak = 0   // I1 fallback: consecutive engine-RED-vs-executor-green disagreements (run-global, like the template)
+// ITEM 11a: RUN-scope breaker — consecutive engine-RED-vs-executor-green disagreements (run-global, like
+// the template it disables). Trips at 2 (no class gate). I1 fallback: a broken filterCommand template
+// false-REDs every leaf run-wide; after 2 in a row, distrust the TEMPLATE (kill it), not the leaves.
+const t0redBreaker = circuitBreaker(2)
 const ABORTS: string[] = []     // A: units halted by the untrusted-streak guard (surfaced in the final payload)
 async function runWork(rootTask: string, repo: string, startDepth: number, gid?: number | string, cleanOK?: boolean, kind?: SliceKind, buildNote?: string): Promise<{ done: LeafRecord[] }> {
   buildNote = buildNote || ''
@@ -544,7 +569,10 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
   const stack: WorkNode[] = [{ task: rootTask, ctx: '', depth: startDepth, spikes: 0, kind: kind || 'behavior' }]
   const done: LeafRecord[] = []
   const executedKeys = new Set<string>()
-  let discovered = 0, untrustedStreak = 0
+  let discovered = 0
+  // ITEM 11a: UNIT-scope breaker (fresh per runWork invocation) — N consecutive untrusted leaves means
+  // the APPROACH is failing; halt this unit instead of grinding the budget into more reverts. No class gate.
+  const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK)
   const keyOf = (s: unknown) => String(s).trim().slice(0, 120)
 
   while (stack.length && done.length < MAX_LEAVES) {
@@ -686,7 +714,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       // from the leaf-verify line below: this records the EXECUTOR was spawned (executor!=verifier — the
       // two roles are even two trace lines), so the profile shows exec cost separately from verdict. Placed
       // AFTER the `!res` break so a DEAD executor doesn't fire a (successful) trace sh — that would reset the
-      // agentSafe NULL_STREAK and mask a real session-instability halt (observed: A6 mixed-class streak).
+      // agentSafe quotaBreaker and mask a real session-instability halt (observed: A6 mixed-class streak).
       await trace({ phase: 'Work', role: `exec:${lbl}`, model: 'sonnet', leafIndex: i, repairAttempt: attempt })
       // tier-0 deterministic gate: a RED leaf never reaches the LLM verifier (wasted budget + noise).
       if (!res.passed) { verdict = { trustworthy: false, reason: 'tier-0 gate: deterministic build/tests RED' } }
@@ -717,9 +745,9 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             // A BROKEN template (env/wrapper/filter-syntax) false-REDs every leaf run-wide. After 2
             // consecutive engine-RED-vs-executor-green disagreements, distrust the TEMPLATE, not the
             // leaves — kill it and fall back to LLM verification (the pre-gate path).
-            if (++t0redStreak >= 2) { baseline!.filterCommand = ''; log(`${tag}engine t0 disagreed with executor-green ${t0redStreak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`) }
+            if ((t0redBreaker.record(), t0redBreaker.tripped())) { baseline!.filterCommand = ''; log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`) }
           } else {
-            t0redStreak = 0
+            t0redBreaker.reset()
             gateLevel = 'deterministic-filtered'   // ITEM 1: the engine ran the filtered tier-0 (green) — full trust floor held
             // Exit 0 is NOT proof tests ran: a typo'd scope can match ZERO tests and still exit 0 —
             // blind "ENGINE-VERIFIED" would LAUNDER a vacuous green while muzzling the verifier. Hand
@@ -771,7 +799,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       log(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`)
       await restore()   // undo anything the dead executor left
       done.push({ task: node.task, passed: false, summary: 'executor returned no result (API/rate-limit)', verdict: { trustworthy: false, reason: 'executor failed' } })
-      if (++untrustedStreak >= MAX_UNTRUSTED_STREAK) {
+      if ((untrustedBreaker.record(), untrustedBreaker.tripped())) {
         ABORTS.push(`${tag || 'main:'} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`)
         log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`)
         break
@@ -797,8 +825,8 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // A: run-level no-progress detection — leaf-level guards (convergence, repair caps) bound ONE leaf,
     // but nothing detected a run going systemically wrong; N consecutive reverted leaves = stop and
     // surface ("the approach is failing"), don't grind the remaining budget into more reverts.
-    untrustedStreak = verdict!.trustworthy ? 0 : untrustedStreak + 1
-    if (untrustedStreak >= MAX_UNTRUSTED_STREAK) {
+    if (verdict!.trustworthy) untrustedBreaker.reset(); else untrustedBreaker.record()
+    if (untrustedBreaker.tripped()) {
       ABORTS.push(`${tag || 'main:'} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`)
       log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`)
       break
