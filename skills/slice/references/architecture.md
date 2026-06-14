@@ -60,7 +60,18 @@ Baseline → Plan → Work → Coordinate → Integrate
   result* (no redundant re-run) + cumulative `git diff --stat`. Finally the **Owner's Briefing**: one agent
   turns the ledger into a guided read (reading order / decisions made for you / buried bodies / verify by
   hand) — comprehension debt is the one thing the loop can't repay, so the engine at least makes the
-  repayment cheap. It rides in the payload as `briefing`.
+  repayment cheap. It rides in the payload as `briefing`, and is ALSO persisted deterministically to
+  `docs/briefings/<baseSha>.md` (best-effort, base64'd through `sh`, under its own try/catch — a relay through
+  the payload alone is one the owner can miss; a file survives the conversation).
+  - **Returned-payload rollups.** Each leaf's `done` entry now carries a `gateLevel`
+    (`deterministic-filtered` = the engine ran the filtered tier-0 green | `full-suite` = a tidy leaf where the
+    engine ran the full `measureCommand` | `llm-only` = no deterministic gate ran). A run-level `degradations[]`
+    lists every TRUSTED leaf that shipped on `gate=llm-only` (the formerly-silent tier-0 downgrade, now loud +
+    auditable). `overallTrust` (boolean) is the AND of every trust dimension — every executed leaf trusted AND
+    (no merge OR `merge.trustworthy`) AND integrate full-suite GREEN AND integration trustworthy AND
+    `degradations` empty — a purely additive rollup that can only go FALSE on a dimension that already failed (it
+    cannot manufacture a false green). `ownersHeadline` is one human line: the reassuring summary when green,
+    else the first failing dimension named in priority order.
 
 ## Key mechanisms
 
@@ -118,6 +129,59 @@ moving the reproduction cost from tokens to shell. Tidy leaves are exempt (their
 full existing suite). Two self-defenses: 2 consecutive engine-RED-vs-executor-green
 disagreements disable the gate (a broken template must not false-RED the whole run), and the
 scope is whitelisted (`[A-Za-z0-9_.-]`, no `|` — it substitutes unquoted into a shell command).
+
+### `engineRanBlock` — the named "shell-truth → ENGINE-RAN → model judges" string
+The engine's deepest move — run a deterministic shell command, then have a model JUDGE from that FIXED
+result (never re-run) — was hand-reimplemented at the two leaf gates (filtered tier-0 + tidy full-suite). It is
+now ONE helper `engineRanBlock({cmd, note, exitCode, tail, duty})` that emits the canonical `ENGINE-RAN: \`<cmd>\`
+exited N. Output tail: <tail>\n<duty>` block (a test byte-pins its output). Control flow — *when* each gate runs,
+*how* RED is handled — legitimately differs per site and stays inline; only the shared STRING is extracted. The
+merge-net + integrate-net verifiers use a different surface form (`exit=N (GREEN/RED)` mid-prose, no `ENGINE-RAN`
+prefix / no tail) and are left SEPARATE by design — folding them would change the byte-text the verifier sees.
+
+### ENGINE-DIFF — the engine pre-computes the leaf diff for the verifier (`verifyLeaf`)
+The verifier's #1 measured hidden cost was re-greping the leaf's own diff via git. So the engine now runs that
+scoped diff ONCE deterministically (`git diff <leafStart>..HEAD`, test files excluded) and injects an
+`ENGINE-DIFF:` block into the verify prompt (capped at `ENGINE_DIFF_CAP` = 6000 chars; above the cap a "too
+large — inspect via git yourself" note). This is engine SHELL-TRUTH, not a sibling model's claim, so
+executor≠verifier still holds — the verifier KEEPS its full duty and its ability to re-run / widen the range
+(`gitVerify` already tells it how). Tidy leaves are skipped (their behavior-preservation gate has its own flow).
+
+### `circuitBreaker` — one abstraction for the three streak guards
+The three former ad-hoc streak guards now INSTANTIATE one `circuitBreaker(threshold, classThreshold=0)`: it
+counts a consecutive-failure streak (and optionally the distinct call-classes seen) and trips when
+streak ≥ threshold AND distinct-class count ≥ classThreshold. The three: **quota** = `circuitBreaker(3, 2)` at
+SESSION scope (≥2 distinct classes is part of its trip rule — the heavy 3-lens loop makes 3 same-class nulls by
+design), **untrusted** = `circuitBreaker(MAX_UNTRUSTED_STREAK)` at UNIT scope (fresh per `runWork`), **t0red** =
+`circuitBreaker(2)` at RUN scope (disables a broken `filterCommand` template after 2 engine-RED-vs-executor-green
+disagreements). Behavior-preserving: thresholds, scopes, and actions are byte-equivalent — only the counters are
+named. (A shared `mustSucceed()` for the `SH_UNAVAILABLE` abort sites was DEFERRED — those sites have divergent
+fatal/retry semantics.)
+
+### Run-trace — the harness's machine-readable memory of itself (passive)
+An append-only JSONL trace, ONE line per `agent()` call (and per deterministic gate, when known), written to
+`docs/run-traces/<baseSha>.jsonl` recording `{ baseSha, phase, role, model, leafIndex, gateLevel, trustworthy,
+repairAttempt }`. It is a PURE observer — gates NO trust, touches none of the four invariants — and is
+injection-safe the same way the briefing-persist is (the JSON line is base64'd in JS, decoded by `base64 -d`, so
+no agent text reaches the shell verbatim), under a per-append try/catch that NEVER aborts the run. The engine now
+auto-emits its own cost/verdict profile (Lesson 8 once needed a human to reconstruct it from logs) — the
+machine-readable memory that unlocks the outer self-improvement loop.
+
+### Shell batching — the prologue and per-leaf reset in ONE `sh()` per phase
+The ~5-call prologue (git-sha / git-clean / lock-dir / lock-check / lock-write) and the per-leaf reset+clean are
+batched into ONE `sh()` round-trip per phase, each command emitting a `<<RS:NAME:$?>>` exit marker that JS parses
+back into per-command `{code, out}`. Per-command RED detection is byte-for-byte preserved, and batching
+lock-check→write into one script TIGHTENS atomicity (no JS round-trip gap where two runs could interleave). A
+dead proxy makes the whole batch's `shUnavailable` true, so the single FATAL check still covers every decision
+point. Latency: a 3-leaf lane drops ~12 → ~5 serial `sh` spawns.
+
+### Persona generation — drift made impossible, not merely guarded (`scripts/gen-personas.mjs`)
+The 4 standalone `agents/slice-*.md` are GENERATED at build time from the `R_*` persona constants in
+`src/prompts.ts` (the body is the constant verbatim; per-role registration frontmatter is pinned in the script; a
+"GENERATED — do not edit" banner points editors at the single source of truth). `build-engine.sh` runs the
+generator after `tsc` and asserts `git diff --quiet -- agents/`. The former 2-field grep "drift-guard" (which
+could only catch ONE class of drift) is DELETED — generation makes drift IMPOSSIBLE (deterministic, not
+advisory). (ITEM 10: the Assessor was folded into the Slicer, so there is no `slice-assessor.md` anymore.)
 
 ### Self-repair (salvage, don't drop) — convergence-aware
 An untrusted leaf is **re-executed against the verifier's specific objections** (not a blind
@@ -224,6 +288,13 @@ instead of grinding the budget into more reverts. Every cap **logs when hit** (n
   feedback), deterministically merged all branches (182 tests green, "no slice's work lost"), and
   cleaned up every worktree. The build-cost gate correctly *withholds* this path from compile-bound
   projects (where it auto-falls-back to sequential).
+
+## Build reproducibility (the foundation)
+A tracked `skills/slice/package.json` with `{"type":"module"}` makes esbuild emit a FLAT ESM bundle everywhere
+(a fresh clone with no `package.json` got a `__commonJS`-wrapped artifact that loaded nowhere). `tsup.config`
+pins `outExtension` → `.mjs`, and `build-engine.sh` asserts EXACTLY one top-level export (`export const meta`),
+the entry footer, and an AsyncFunction parse-gate — because the artifact is a workflow-script body (the runtime
+strips the `meta` banner and runs the rest as an AsyncFunction), not a standalone module.
 
 ## File map
 - `recursive-slice.js` (skill base dir) — the engine (this document).

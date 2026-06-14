@@ -20,6 +20,8 @@ verification*. Trust — not code — is the optimization target.
 | `agents/slice-*.md` | the role agents (baseliner, slicer, executor, verifier) for standalone use — the slicer also owns the recursion-termination decision (ITEM 10: the former assessor is folded into it) |
 | `skills/slice/SKILL.md` | the `/slice` front door |
 | `scripts/slice-watch.py` | live terminal viewer of a run (decomposition tree + git trust deposits) |
+| `scripts/gen-personas.mjs` | build-time persona generation: regenerates `agents/slice-*.md` from the `R_*` constants in `src/prompts.ts` (run by `build-engine.sh`, which asserts `git diff --quiet -- agents/` — drift is impossible, not merely caught) |
+| `scripts/outer-loop.mjs` | the opt-in, dispatch-only, dry-run-by-default outer driver (reads `docs/BACKLOG.md`, classifies T0/T1/T2, would dispatch slice only for T2 in a branch; never auto-merges) — the loop altitude above a single run |
 | `docs/recursive-slice/` | this knowledge base |
 
 Run it: `/slice "<task>"`, or `Workflow({ scriptPath: '<skill-base-dir>/recursive-slice.js', args: { task, repo, maxDepth, parallel } })`.
@@ -41,6 +43,10 @@ Watch it: `/workflows`, or `watch -n3 'python3 scripts/slice-watch.py latest <re
    invariants that survive any port, and the accepted degradations.
 5. **[sources.md](sources.md)** — annotated bibliography: the Beck lineage + the contemporary
    agent-systems sources, each mapped to the engine.
+6. **[outer-loop.md](outer-loop.md)** — the loop altitude above the single-run harness: the opt-in,
+   dispatch-only, dry-run-by-default outer driver (`scripts/outer-loop.mjs`) that reads a backlog,
+   risk-classifies (T0/T1/T2), and would dispatch slice only for T2 in a branch — the human stays
+   the exception-handler; it never auto-merges.
 
 ## The one-sentence thesis
 

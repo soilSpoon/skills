@@ -163,6 +163,45 @@ the purposeGap loop (pixels, not ledger claims). UI *driving* (clicks) remains t
 do it only with explicit `with timeout`, on an idle display, or not at all; prefer launching the
 app into the state you need over clicking your way there.
 
+### Lesson 12 — A bundle that builds is not a bundle that loads (the no-package.json __commonJS trap)
+
+The artifact is a workflow *script body*, not a module: the runtime parses `export const meta` as
+its first statement, strips it, and runs the rest as an `AsyncFunction` where the footer's top-level
+`return await __main()` is legal. That contract held on the dev machine and broke nowhere — until a
+**fresh clone with no `package.json`** produced an artifact that **loaded nowhere**. Cause: with no
+`{"type":"module"}` to force ESM, esbuild treated the entry as CommonJS, **wrapped the whole engine in
+a `__commonJS(...)` closure** and emitted `export default` — so `__main` was nested *inside* the
+wrapper, the footer's `return await __main()` couldn't reach it (out of scope), and the runtime ran a
+shell with a dead entry point. Every structural check the dev build passed (`node --check`, the
+`/export const meta/` grep) still passed on the broken one — the wrapper is valid JS, it just isn't
+*this* shape. Three fixes, each closing one gap: **(a)** a **tracked `skills/slice/package.json`
+`{"type":"module"}`** so esbuild emits a FLAT ESM bundle (top-level `__main`) on every machine, not
+just where some ambient config happened to say "module"; **(b)** `tsup.config` pins
+`outExtension → .mjs` so the output name never depends on whether `"type"` flips esbuild's default
+extension; **(c)** the build asserts **exactly one top-level export** (`[ "$(grep -cE '^export ' "$ART")" -eq 1 ]`)
+— the `__commonJS` build has *two* (`export const meta` + `export default`), so it now fails **LOUDLY
+at build time** instead of shipping an artifact that runs nowhere — plus an **`AsyncFunction`
+parse-gate** that loads the stripped artifact the exact way the runtime does (`node --check` is the
+wrong gate: top-level `return` is illegal in a real module). Lesson: **"it builds" and even "it parses"
+are not "it loads in the host context" — pin the build inputs (don't inherit ambient config) and assert
+the artifact's SHAPE, not just its syntax.** A bundler's *module-format inference* is a silent
+load-bearing input; make it explicit and gate the one byte-shape (single export) that distinguishes
+the runnable bundle from the wrapped one.
+
+### Lesson 13 — A keystone extraction can stay green while its extracted helper rots (the ENGINE-RAN byte-pin)
+
+Folding the copy-adapted `ENGINE-RAN: …` prose into ONE `engineRanBlock({cmd,note,exitCode,tail,duty})`
+helper (the keystone of "shell-truth → ENGINE-RAN → model judges") shipped with a test that asserted the
+verify prompt matches `/ENGINE-RAN/`. That check was **inert**: the bare literal `ENGINE-RAN` also lives
+in the `R_VERIFY` persona boilerplate, so **mutating the extracted helper left the test green** — the
+exact regression the extraction created (one helper, all call sites) was the one the test couldn't see.
+Closed by byte-pinning the structure the helper *alone* produces:
+`/ENGINE-RAN: `[^`]+` exited \d+\. Output tail:/` — the `cmd`/`exited N`/**`Output tail:`** shape comes
+only from `engineRanBlock`, so corrupting the template now fails CI. Lesson: **when you DRY N copies into
+one helper, pin a byte-string that only the helper emits — not a token that also appears in the
+surrounding prose.** A test whose match string survives in boilerplate is verifying the boilerplate, not
+the extraction.
+
 ## Operational checklist
 - Run against a **clean git tree** (commit/stash first); the engine pins the baseline SHA.
 - Watch live: `/workflows` or `python3 scripts/slice-watch.py latest <repo>` (bundled).
