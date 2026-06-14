@@ -1599,3 +1599,107 @@ test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a l
   assert.equal(failRun.result.overallTrust, true,
     `the run must remain overallTrust:true — a dead trace proxy is not a trust failure; headline="${failRun.result.ownersHeadline}"`)
 })
+
+// seamPointers 1-slice discard: a Slicer that returns exactly 1 slice is non-reducing — the engine
+// falls through to execute the original node directly (the 1-slice child and its seamPointers are
+// silently discarded). This is BY DESIGN: a 1-slice decompose is considered non-reducing (it does
+// not partition work) so the engine short-circuits to execute. The test documents this invariant
+// so future contributors understand why 2+ slices are required for seamPointers to reach an executor.
+test('seamPointers 1-slice discard: a single-slice decompose is non-reducing → engine executes original node (seamPointers on that slice are discarded)', async () => {
+  // Claim: when action:'slice' is returned with exactly ONE slice (non-reducing), the engine logs
+  // "non-reducing slice" and falls through to execute the original node's task — the slice's
+  // seamPointers never reach an exec prompt.
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    // Return exactly 1 slice carrying seamPointers — this is the non-reducing case
+    if (/decompose/.test(c.opts.label || '')) {
+      return {
+        action: 'slice',
+        reason: 'fixture: single-slice (non-reducing)',
+        slices: [{
+          desc: 'sole child with seam pointers',
+          interface: 'function sole(): void',
+          contract: 'implement sole in src/sole.ts',
+          independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+          riskTier: 'standard', testScope: 'SoleSuite',
+          seamPointers: [{ file: 'src/sole.ts', line: 7, symbol: 'sole', currentText: 'export function sole()' }],
+        }],
+      }
+    }
+    // Capture exec prompts so we can verify the seamPointers did NOT thread through
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push(c.prompt)
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+
+  // The non-reducing guard must be logged
+  assert.ok(logs.some((l) => /non-reducing slice/.test(l)),
+    `engine must log "non-reducing slice" when slices.length === 1; logs: ${logs.filter((l) => /slice/.test(l)).join(' | ')}`)
+
+  // The seamPointers on the sole slice must NOT appear in any exec prompt (they were discarded)
+  assert.ok(execPrompts.length >= 1, 'at least one exec prompt must fire (the original node is executed)')
+  assert.ok(!execPrompts.some((p) => /src\/sole\.ts/.test(p)),
+    'seamPointers on the discarded 1-slice child must NOT appear in any exec prompt (non-reducing path executes original node)')
+})
+
+// seamPointers require 2+ slices: this test pins the POSITIVE claim (mirror of the discard test above)
+// that seamPointers ARE threaded to the executor only when slices.length >= 2 (the reducing path).
+// Together with the 1-slice-discard test above, this pair documents the full invariant: the slices.length
+// > 1 guard is the gate that separates "seamPointers reach executor" from "seamPointers are discarded".
+test('seamPointers 2-slice path: seamPointers reach executor only when 2+ slices returned (the reducing guard)', async () => {
+  // Claim: with 2 slices the engine takes the reducing path; the first slice's seamPointers
+  // appear in its exec prompt; the second slice (no seamPointers) produces a clean exec prompt.
+  // This is the minimal confirmation that the "> 1" guard is the gate (contrast with the 1-slice test).
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) {
+      return {
+        action: 'slice',
+        reason: 'fixture: two-slice reducing',
+        slices: [
+          {
+            desc: 'first slice with seam pointer',
+            interface: 'function alpha(): void',
+            contract: 'implement alpha in src/alpha.ts',
+            independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+            riskTier: 'standard', testScope: 'AlphaSuite',
+            seamPointers: [{ file: 'src/alpha.ts', line: 3, symbol: 'alpha' }],
+          },
+          {
+            desc: 'second slice no pointers',
+            interface: 'TBD',
+            contract: 'implement beta in src/beta.ts',
+            independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+            riskTier: 'standard', testScope: 'BetaSuite',
+            // no seamPointers — ensures only the first slice carries pointers
+          },
+        ],
+      }
+    }
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push({ prompt: c.prompt, label: c.opts.label || '' })
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+
+  // Engine must NOT log non-reducing (2 slices is reducing)
+  assert.ok(!logs.some((l) => /non-reducing slice/.test(l)),
+    'engine must NOT log "non-reducing slice" when slices.length === 2')
+
+  // The first slice's seamPointers must appear in its exec prompt
+  const alphaExec = execPrompts.find((e) => /first slice with seam pointer/.test(e.prompt))
+  assert.ok(alphaExec, `an exec prompt for the first (seam-pointer) slice must exist; labels seen: ${execPrompts.map((e) => e.label).join(', ')}`)
+  assert.ok(/src\/alpha\.ts/.test(alphaExec.prompt),
+    `the first slice's exec prompt must contain its seamPointer file 'src/alpha.ts'; got (first 600): ${alphaExec.prompt.slice(0, 600)}`)
+
+  // The second slice must also get an exec prompt but without a seam-pointer section
+  const betaExec = execPrompts.find((e) => /second slice no pointers/.test(e.prompt))
+  assert.ok(betaExec, `an exec prompt for the second (no-pointer) slice must exist`)
+  assert.ok(!/Seam Pointers \(already resolved/.test(betaExec.prompt),
+    'second slice exec prompt must NOT contain a seam-pointer section (no seamPointers on that slice)')
+})
