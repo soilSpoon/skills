@@ -7,18 +7,24 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# Drift guard: the standalone agents/*.md personas are a hand-maintained mirror of the R_*
-# constants in src/prompts.ts. They silently drifted once (telling spawned subagents to emit
-# fields the engine schema had dropped — gitSha/silentErrorRisk). Fail the build if a dropped
-# schema field reappears in a mirror, so the single source of truth (schemas.ts) is enforced
-# structurally instead of by memory. When you intentionally remove a schema field, add it here.
-for dropped in gitSha silentErrorRisk; do
-  if grep -lw "$dropped" agents/*.md >/dev/null 2>&1; then
-    echo "FATAL: agents/*.md still reference the dropped schema field '$dropped' — sync the mirror with src/schemas.ts/prompts.ts"; exit 1
-  fi
-done
-
 npx -y -p typescript tsc -p tsconfig.json
+
+# Personas are a BUILD ARTIFACT, not a hand-mirror. agents/slice-<role>.md = pinned registration
+# frontmatter + the R_* persona constant as the body — generated straight from src/prompts.ts (the
+# single source of truth). This REPLACES the old 2-field grep drift-guard: a grep could only catch ONE
+# class of drift (a dropped schema field reappearing); generation makes ALL drift impossible because the
+# body IS the constant. Run AFTER tsc (so type errors fail first) and assert the regenerated tree is clean
+# — i.e. the generator is idempotent AND the committed .md already match the constants. A dirty tree here
+# means someone hand-edited an .md or changed a constant without committing the regenerated artifact.
+node --experimental-strip-types scripts/gen-personas.mjs
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git diff --quiet -- agents/; then
+    echo "FATAL: generated agents/*.md differ from the committed copy — gen-personas.mjs is not idempotent or the persona constants in src/prompts.ts changed without committing the regenerated .md. Run 'sh scripts/build-engine.sh' and commit the agents/ changes."
+    git --no-pager diff --stat -- agents/
+    exit 1
+  fi
+fi
+
 npx -y -p tsup -p typescript tsup
 # The artifact is a workflow SCRIPT, not a module: `export const meta` (the runtime parses it as the first
 # statement) is the ONLY top-level export, the rest is the engine, and `return await __main()` is the entry.
