@@ -16,7 +16,7 @@ const pexec = promisify(execFile)
 const HERE = dirname(fileURLToPath(import.meta.url))
 const DRIVER = join(HERE, '..', 'scripts', 'outer-loop.mjs')
 
-const { classify, splitItems, plan, isDone } = await import('../scripts/outer-loop.mjs')
+const { classify, splitItems, plan, isDone, parseWorktreePorcelain } = await import('../scripts/outer-loop.mjs')
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // GIT FIXTURE — a throwaway repo on `main` with a couple of feature branches. Every git-touching
@@ -273,4 +273,128 @@ test('ledger: a non-terminal status after a terminal one flips DONE back to NOT-
   // a re-open (e.g. the merge was reverted) appended later wins.
   await run(['ledger', 'item-9', 'reopened'], repo)
   assert.equal((await run(['ledger', '--done?', 'item-9'], repo)).stdout.trim(), 'NOT-DONE', 'last status wins')
+})
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// assert-isolated — PROVE a dispatched run stayed in its worktree and did NOT leak onto the main
+// clone. The fixture reproduces the REAL layout: the engine source lives in a SUBDIR (skills/slice)
+// of the checkout, and a LINKED worktree on a loop/<slug> branch is where the lane is supposed to
+// commit. We exercise BOTH directions non-vacuously: a commit on the MAIN worktree's branch is a LEAK
+// (exit non-zero); commits ONLY on the linked worktree's branch are ISOLATED (exit 0, main unchanged).
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+
+// A main worktree whose engine source sits in skills/slice/, plus a linked worktree on loop/<slug>.
+// Returns { main, link, workSubdir, sha0 } where workSubdir is the linked worktree's skills/slice dir
+// (the EXACT work subdir a correct dispatch passes as `repo`) and sha0 is main's HEAD at setup time.
+async function makeWorktreePair(slug = 'lane') {
+  const main = join(await mkdtemp(join(tmpdir(), 'assert-iso-')), 'main')
+  await mkdir(join(main, 'skills', 'slice'), { recursive: true })
+  g(['init', '-q', '-b', 'main'], main)
+  g(['config', 'user.email', 'loop@test'], main)
+  g(['config', 'user.name', 'loop test'], main)
+  await writeFile(join(main, 'skills', 'slice', 'engine.txt'), 'base\n')
+  g(['add', '-A'], main)
+  g(['commit', '-qm', 'base'], main)
+  const sha0 = g(['rev-parse', 'main'], main)
+  const link = join(main, '..', `link-${slug}`)
+  g(['worktree', 'add', '-q', link, '-b', `loop/${slug}`, 'main'], main)
+  return { main, link, workSubdir: join(link, 'skills', 'slice'), sha0 }
+}
+// Add a commit to <repo>'s currently-checked-out branch that edits the engine source.
+async function commitChange(repo, content, msg) {
+  await writeFile(join(repo, 'skills', 'slice', 'engine.txt'), content)
+  g(['add', '-A'], repo)
+  g(['commit', '-qm', msg], repo)
+}
+
+test('parseWorktreePorcelain: parses path/HEAD/branch records and detached entries', () => {
+  const text = [
+    'worktree /repo/main', 'HEAD aaaa', 'branch refs/heads/main', '',
+    'worktree /repo/link', 'HEAD bbbb', 'branch refs/heads/loop/x', '',
+    'worktree /repo/det', 'HEAD cccc', 'detached', '',
+  ].join('\n')
+  const recs = parseWorktreePorcelain(text)
+  assert.equal(recs.length, 3)
+  assert.deepEqual(recs[0], { path: '/repo/main', head: 'aaaa', branch: 'main', detached: false })
+  assert.equal(recs[1].branch, 'loop/x', 'short branch name (refs/heads/ stripped)')
+  assert.equal(recs[2].detached, true)
+  assert.equal(recs[2].branch, null, 'a detached worktree carries no branch')
+})
+
+test('assert-isolated: ISOLATED (exit 0) when commits land ONLY on the linked worktree branch — main unchanged', async () => {
+  const { main, link, workSubdir, sha0 } = await makeWorktreePair('good')
+  // The lane commits TWICE in the linked worktree's work subdir — main is never touched.
+  await commitChange(link, 'lane work 1\n', 'lane 1')
+  await commitChange(link, 'lane work 2\n', 'lane 2')
+
+  const { stdout } = await run(['assert-isolated', workSubdir, sha0], main)
+  assert.match(stdout, /isolated: 2 commits on loop\/good, main clone unchanged/, 'reports isolated with the advance count + branch')
+  assert.equal(g(['rev-parse', 'main'], main), sha0, 'main HEAD is exactly where it started')
+})
+
+test('assert-isolated: LEAK (exit non-zero) when a commit lands on the MAIN worktree branch', async () => {
+  const { main, link, workSubdir, sha0 } = await makeWorktreePair('leak')
+  // The lane DID advance its own branch (so the only failing assertion is the main-moved leak).
+  await commitChange(link, 'lane work\n', 'lane')
+  // THE BUG: a commit lands on MAIN's branch instead of the worktree — the leak we must catch.
+  await commitChange(main, 'leaked onto main\n', 'LEAK onto main')
+
+  await assert.rejects(run(['assert-isolated', workSubdir, sha0], main), (err) => {
+    assert.notEqual(err.code, 0, 'a leak exits non-zero')
+    assert.match(err.stderr, /LEAK: main clone moved [0-9a-f]+\.\.[0-9a-f]+ — the run committed to main, NOT the worktree/, 'the loud LEAK line names the sha range')
+    return true
+  })
+})
+
+test('assert-isolated: LEAK (exit non-zero) when an UNCOMMITTED change sits in the main checkout', async () => {
+  const { main, link, workSubdir, sha0 } = await makeWorktreePair('dirty')
+  await commitChange(link, 'lane work\n', 'lane') // branch advanced legitimately
+  // A write that landed in the MAIN checkout (not the worktree) but was never committed — still a leak.
+  await writeFile(join(main, 'skills', 'slice', 'engine.txt'), 'dirtied main checkout\n')
+
+  await assert.rejects(run(['assert-isolated', workSubdir, sha0], main), (err) => {
+    assert.notEqual(err.code, 0, 'a dirty main checkout exits non-zero')
+    assert.match(err.stderr, /LEAK: main clone .* has an UNCOMMITTED change/, 'reports the uncommitted leak')
+    return true
+  })
+  assert.equal(g(['rev-parse', 'main'], main), sha0, 'main HEAD itself is unchanged (the leak is uncommitted)')
+})
+
+test('assert-isolated: LEAK (exit non-zero) when the work-dir branch produced NO commit (did not advance)', async () => {
+  const { main, workSubdir, sha0 } = await makeWorktreePair('noadvance')
+  // Nobody committed anywhere: main is unchanged AND the lane branch is still at sha0 -> not isolated,
+  // because a dispatched run that produced no commit in the worktree likely committed nothing useful
+  // (or committed elsewhere). Proving isolation REQUIRES the branch to have advanced.
+  await assert.rejects(run(['assert-isolated', workSubdir, sha0], main), (err) => {
+    assert.notEqual(err.code, 0, 'a non-advanced branch exits non-zero')
+    assert.match(err.stderr, /produced NO commit in the worktree/, 'explains the branch did not advance')
+    return true
+  })
+})
+
+test('assert-isolated: LEAK (exit non-zero) when the work-dir IS the main worktree (the exact bug shape)', async () => {
+  // Reproduce the original bug: `repo` resolved to the MAIN clone (the work-dir IS the main worktree).
+  const main = join(await mkdtemp(join(tmpdir(), 'assert-iso-bug-')), 'main')
+  await mkdir(join(main, 'skills', 'slice'), { recursive: true })
+  g(['init', '-q', '-b', 'main'], main)
+  g(['config', 'user.email', 'loop@test'], main)
+  g(['config', 'user.name', 'loop test'], main)
+  await writeFile(join(main, 'skills', 'slice', 'engine.txt'), 'base\n')
+  g(['add', '-A'], main); g(['commit', '-qm', 'base'], main)
+  const sha0 = g(['rev-parse', 'main'], main)
+
+  await assert.rejects(run(['assert-isolated', join(main, 'skills', 'slice'), sha0], main), (err) => {
+    assert.notEqual(err.code, 0, 'targeting main itself exits non-zero')
+    assert.match(err.stderr, /work-dir .* IS the main worktree/i, 'names the isolation bug')
+    return true
+  })
+})
+
+test('assert-isolated: usage error (exit 2) without both args', async () => {
+  const { main, workSubdir } = await makeWorktreePair('args')
+  await assert.rejects(run(['assert-isolated', workSubdir], main), (err) => {
+    assert.equal(err.code, 2, 'missing expected-main-sha is a usage error')
+    assert.match(err.stderr, /usage: .*assert-isolated/, 'prints usage')
+    return true
+  })
 })

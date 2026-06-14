@@ -109,6 +109,7 @@ it.** Dispatching `slice` needs the Workflow runtime; grading needs a *model*. N
 |---|---|---|
 | `--plan [backlog]` | classify the backlog, print the dispatch plan (the historical dry run) | no |
 | `worktree <slug>` | `git worktree add <root>/.loop/<slug> -b loop/<slug> <main HEAD>`; print the path. Fails clearly if the branch/path exists (no clobber). | no |
+| `assert-isolated <work-subdir> <main-sha0>` | **THE LEAK CHECK** — pure-git proof that a dispatched run stayed in its worktree: main is still at `<main-sha0>` **and** clean, **and** the work-dir branch advanced ≥1 commit. Exit 0 = isolated; non-zero + a loud `LEAK:` otherwise. Called **after every dispatch**; a LEAK **HALTS** the loop. | no (read-only) |
 | `gated-merge <branch>` | **THE SAFETY GATE** — the *only* command that can touch `main`. Triple-gated; see below. | **only on full pass** |
 | `ledger <id> <status> [json]` | append one line to `docs/loop-status.jsonl`. **No clock** — any timestamp is a caller-supplied arg (`{"ts":…}`) or omitted, so the step is deterministic. | no |
 | `ledger --done? <id>` | resume query — prints `DONE` iff the item's *most recent* status is terminal (`done`/`merged`), else `NOT-DONE`. | no |
@@ -122,27 +123,75 @@ it.** Dispatching `slice` needs the Workflow runtime; grading needs a *model*. N
    2. **lane-spec** — if the backlog item is terse, *synthesize* a fuller lane-spec for slice. **MARK
       it synthesized** (e.g. `ledger … {"synthesizedSpec":true}`) — this flag is load-bearing: a
       synthesized spec can **never** auto-merge (safeguard below).
-   3. **`worktree <slug>`** — isolate the lane on `loop/<slug>` off the current `main` HEAD.
+   3. **`worktree <slug>`** — isolate the lane on `loop/<slug>` off the current `main` HEAD. Record the
+      **pre-dispatch main SHA** (`sha0 = git -C <worktree> rev-parse main`) — `assert-isolated` needs it.
    4. **dispatch slice** — the harness runs `slice` **via the Workflow tool**, on the lane-spec, **in
-      that worktree**. Slice does its own decompose → TDD → adversarial verify → per-leaf commits →
-      integrate → owner's briefing, *all on the branch*. (The script does not do this step.)
-   5. **read the result** — `overallTrust`, `ownersHeadline`, `degradations`, and the owner's
+      that worktree**. **Pass the engine `repo` = the worktree's EXACT WORK SUBDIR** — i.e. the path
+      where the engine source actually lives, e.g. `<worktree>/skills/slice`, **NOT the worktree
+      root**. (Root would let the baseliner resolve back to the canonical *main clone* and the
+      executor would commit to **local main**, bypassing the branch — the exact bug; see the Lesson
+      below.) Slice does its own decompose → TDD → adversarial verify → per-leaf commits → integrate →
+      owner's briefing, *all on the branch*. (The script does not do this step.)
+   5. **PROVE ISOLATION (mandatory gate)** — `assert-isolated <worktree>/skills/slice <sha0>`. This is
+      a **pure-git** check that the run actually stayed in the worktree: main is **still at `sha0`** and
+      **clean**, and the work-dir branch **advanced ≥1 commit**. On exit 0 (`isolated: N commits on
+      loop/<slug>, main clone unchanged`) continue. On a **LEAK** (non-zero + `LEAK: main clone moved
+      <sha0>..<sha1> …`): **HALT the loop, ALERT the human, and do NOT mark the item done** — `ledger`
+      it as `leaked` (never `merged`/`done`) and **never** call `gated-merge` for this lane. A leak
+      means the run escaped its isolation; nothing about its result can be trusted to live only on the
+      branch, so it is neither landable nor "done".
+   6. **read the result** — `overallTrust`, `ownersHeadline`, `degradations`, and the owner's
       briefing slice persisted to `docs/briefings/`.
-   6. **grade** — a **SEPARATE-MODEL grader** (maker ≠ checker) reads the briefing + the **ORIGINAL**
+   7. **grade** — a **SEPARATE-MODEL grader** (maker ≠ checker) reads the briefing + the **ORIGINAL**
       backlog item text and judges one question: *does this resolve the original item's intent?* Its
       verdict is **advisory** — it gates auto-merge but never *forces* a merge.
-   7. **land decision** — call `gated-merge loop/<slug>` **only if ALL** of:
+   8. **land decision** — call `gated-merge loop/<slug>` **only if ALL** of:
       - this is a **manual** run (a human is present), **and**
       - `--auto-merge-trusted` was passed (opt-in), **and**
       - the lane-spec is **human-authored** (not synthesized), **and**
       - `overallTrust` is true (slice's own trust held), **and**
       - the grader said **OK**.
       Otherwise **leave the branch** for human review. `gated-merge` itself re-checks the hard
-      invariants (clean main, not scheduled, gate green) and **aborts** on any doubt.
-   8. **`ledger`** the outcome (`merged` / `branch-left` / `graded-no` / `slice-degraded` …, with the
-      branch, trust, and grader verdict in the json).
+      invariants (clean main, not scheduled, gate green) and **aborts** on any doubt. (Unreachable if
+      step 5 found a leak — a leaked lane is HALTED before it can land.)
+   9. **`ledger`** the outcome (`merged` / `branch-left` / `leaked` / `graded-no` / `slice-degraded` …,
+      with the branch, trust, and grader verdict in the json).
 3. **DIGEST** — surface a final digest (every lane: branch, trust, grader verdict, merged-or-left,
    and the briefing link) **for human review**. Unmerged lanes wait on a human reading the briefing.
+
+### Lesson: isolation is not free — *assert* it
+
+> **You only have the isolation you can PROVE with a read. Dispatching "into a worktree" does not
+> guarantee the work *landed* in that worktree.**
+
+**The root cause (from the first real `--execute` run).** A lane was dispatched with the engine `repo`
+set to the **worktree ROOT**, while the engine source actually lives in a **subdir** (`<root>/skills/
+slice`). The baseliner, resolving the work-dir, followed that into the engine and **canonicalised the
+path back to the MAIN CLONE** (`/…/dev/skills/skills/slice`) — a *different* checkout than the
+worktree. The executor then committed there: to **local `main`**, byte-for-byte bypassing the
+branch-only worktree. `origin` stayed safe (the engine never pushes), and the integrate-step
+verification caught the local-main divergence and remediated — but the *isolation invariant* ([b]
+dispatch-only / never-touch-main) had already been silently broken on the local clone.
+
+The bug was invisible because every other gate passed: tests were green, the briefing looked right,
+trust held. **Nothing checked the one thing that mattered — *which checkout the commits actually went
+to*.** Isolation was assumed, never asserted.
+
+**The fix is two-part, both deterministic:**
+
+1. **Dispatch correctly** — `repo` is the worktree's **exact work subdir** (`<worktree>/skills/slice`),
+   never the root. A root path with the source in a subdir is what lets the baseliner resolve to the
+   canonical main clone. *(Step 2.4.)*
+2. **Prove it afterward** — `assert-isolated <work-subdir> <sha0>` is a pure-git assertion run **after
+   every dispatch**: it reads `git worktree list --porcelain`, confirms the **main** worktree is still
+   at the pre-dispatch SHA **and** clean (no leak), and that **this** worktree's branch advanced. On a
+   LEAK it exits non-zero with `LEAK: main clone moved <sha0>..<sha1> …`, the loop **HALTS**, and the
+   item is **never** marked done / never gated-merged. *(Step 2.5.)*
+
+The principle generalises beyond this loop: **a safety property that is only *intended* is a property
+you do not have.** If `main` must not move, *read whether `main` moved* — and fail loud when it did. A
+worktree is a hypothesis about where commits will land; `assert-isolated` is the experiment that
+confirms it.
 
 ### `gated-merge` — the triple gate (the one place that touches `main`)
 
@@ -219,8 +268,10 @@ export OUTER_LOOP_SCHEDULED=1            # makes `gated-merge` refuse — the ha
 # The agent then drives the orchestration procedure above:
 #   node skills/slice/scripts/outer-loop.mjs --plan docs/BACKLOG.md      # classify
 #   for each T2 item (bounded W, up to --max), skipping ledger --done? hits:
-#     node skills/slice/scripts/outer-loop.mjs worktree <slug>           # isolate on loop/<slug>
-#     <dispatch slice via the Workflow tool in that worktree>            # the model step
+#     WT=$(node skills/slice/scripts/outer-loop.mjs worktree <slug>)     # isolate on loop/<slug>; capture path
+#     SHA0=$(git -C "$WT" rev-parse main)                                # pre-dispatch main SHA
+#     <dispatch slice via the Workflow tool, repo="$WT/skills/slice">    # the model step — EXACT work subdir, NOT $WT
+#     node skills/slice/scripts/outer-loop.mjs assert-isolated "$WT/skills/slice" "$SHA0"  # LEAK -> HALT, do NOT mark done
 #     <separate-model grader judges resolves-original-intent?>           # the model step
 #     node skills/slice/scripts/outer-loop.mjs gated-merge loop/<slug>   # REFUSED (scheduled) -> stays a branch
 #     node skills/slice/scripts/outer-loop.mjs ledger <id> branch-left '{"branch":"loop/<slug>", ...}'
