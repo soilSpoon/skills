@@ -34,6 +34,12 @@ export interface Decompose {
   reason: string
   slices?: SliceSpec[]       // for action:'slice' — the thin vertical children
 }
+export interface SeamPointer {
+  file: string          // relative path to the file containing the seam
+  line?: number         // approx line (may be stale — Executor must confirm via Read before trusting)
+  symbol?: string       // function/type/const name at the seam
+  currentText?: string  // short snippet of current text at the seam (for quick visual confirm)
+}
 export interface SliceSpec {
   desc: string
   interface?: string   // absent on completeness-critic additions (never reach the partition path)
@@ -44,6 +50,7 @@ export interface SliceSpec {
   atomic?: boolean
   riskTier?: RiskTier
   testScope?: string
+  seamPointers?: SeamPointer[]  // OPTIONAL: seams the Slicer already resolved — threaded to Executor as anchors
 }
 export interface ExecResult {
   summary: string
@@ -76,6 +83,7 @@ export interface WorkNode {
   atomic?: boolean
   riskTier?: RiskTier
   testScope?: string
+  seamPointers?: SeamPointer[]  // OPTIONAL: seams already resolved by the Slicer — passed through to exec prompt as anchors
 }
 /** Which deterministic trust-floor gate actually ran for a leaf before the LLM verifier.
  *  'deterministic-filtered' = engine ran the filtered tier-0 (green); 'full-suite' = tidy leaf,

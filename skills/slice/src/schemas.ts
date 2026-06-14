@@ -25,6 +25,12 @@ const SLICE_ITEM = { type: 'object', required: ['desc', 'interface', 'contract']
   atomic: { type: 'boolean' },                               // ② true = a single directly-executable unit (the engine bottoms out on it — no further decompose call); false = decompose it again
   riskTier: { type: 'string', enum: ['light', 'standard', 'heavy'] }, // ② per-slice risk judgment → verification tier (used when atomic, so no re-decompose needed)
   testScope: { type: 'string' },                             // ④ the test suite/filter this slice's tests live under → leaf+verifier run FILTERED (not the full suite — the MEASURED #1 time cost)
+  seamPointers: { type: 'array', items: { type: 'object', required: ['file'], properties: {   // OPTIONAL: seams already resolved by the Slicer — threads to the Executor as anchors
+    file: { type: 'string' },                               // relative path to the file containing the seam
+    line: { type: 'integer' },                              // approx line (may be stale — Executor must confirm via Read)
+    symbol: { type: 'string' },                             // function/type/const name at the seam
+    currentText: { type: 'string' },                        // short snippet of current text at the seam (for quick visual confirm)
+  } } },                                                    // OPTIONAL → backward-compatible; existing slices without this field are unchanged
 } }
 // ITEM 10: the Assessor folded INTO the Slicer — ONE 'decompose' decision per node, returned by ONE
 // agent. Either a LEAF decision ({action:'execute'|'spike', riskTier}) or a SLICE decision

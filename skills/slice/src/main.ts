@@ -630,7 +630,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         for (let j = slices.length - 1; j >= 0; j--) {
           const iface = slices[j].interface
           const ifaceCtx = (iface && !/^TBD/i.test(iface.trim())) ? `\nInterface (FIXED): ${iface}` : ''
-          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, depth: node.depth + 1, spikes: 0 })
+          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 })
         }
         continue
       }
@@ -706,8 +706,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         (verdict && verdict.prescription ? `\nREVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}\n` : '') +
         (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : '') +
         `then fix exactly those objections. In git mode add a fresh commit.`
+      const seamCtx = (node.seamPointers && node.seamPointers.length)
+        ? `\nSeam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):\n${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ''}${p.symbol ? ` (${p.symbol})` : ''}${p.currentText ? ` — "${p.currentText}"` : ''}`).join('\n')}`
+        : ''
       res = await agentSafe(
-        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
+        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}${seamCtx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
       if (!res) break
       // ITEM 7: trace the executor call (cost dimension — model:sonnet, which repair attempt). Distinct

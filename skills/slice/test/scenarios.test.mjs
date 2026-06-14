@@ -1452,6 +1452,87 @@ test('ITEM 6: lock-write RACE — a concurrent grab between the two batches abor
   assert.equal(execLabels.length, 0, 'no leaf may execute when a concurrent run grabbed the lock')
 })
 
+// seamPointers wiring: a slice carrying seamPointers threads them into the exec prompt so the
+// Executor uses the Slicer's already-resolved seams as anchors instead of cold re-greping.
+// Claims pinned:
+//   (a) exec prompt for a slice with seamPointers CONTAINS the pointer file + symbol text;
+//   (b) R_EXEC's persona (visible in the exec prompt) instructs the Executor to CONFIRM the
+//       pointer via Read before trusting it (anchor, not gospel — lines may be stale);
+//   (c) seamPointers is OPTIONAL: a slice WITHOUT the field still produces a valid exec prompt
+//       (backward-compatible contract — no regression on existing fixtures).
+test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXEC anchor-guard wording present', async () => {
+  // Slice with seamPointers populated by a "Slicer that already resolved the seams"
+  const sliceWithPointers = {
+    desc: 'fixture slice with seam pointers',
+    interface: 'function foo(): string',
+    contract: 'implement foo in src/foo.ts',
+    independent: true,
+    dependsOn: [],
+    kind: 'behavior',
+    atomic: true,
+    riskTier: 'standard',
+    testScope: 'FooSuite',
+    seamPointers: [
+      { file: 'src/foo.ts', line: 42, symbol: 'foo', currentText: 'export function foo()' },
+      { file: 'src/bar.ts', symbol: 'barHelper' },
+    ],
+  }
+
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    // Force slice path returning our fixture slice with seamPointers
+    if (/decompose/.test(c.opts.label || '')) {
+      return { action: 'slice', reason: 'fixture: decompose', slices: [sliceWithPointers] }
+    }
+    // Capture exec prompts to inspect
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push(c.prompt)
+    }
+  })
+
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+  assert.ok(execPrompts.length >= 1, 'at least one exec prompt must fire')
+
+  // (a) exec prompt contains the seam pointer file and symbol
+  const ep = execPrompts[0]
+  assert.ok(/src\/foo\.ts/.test(ep),
+    `exec prompt must contain the seamPointer file 'src/foo.ts'; got (first 500): ${ep.slice(0, 500)}`)
+  assert.ok(/foo/.test(ep) && /src\/bar\.ts/.test(ep),
+    `exec prompt must contain both seam pointer entries; got (first 600): ${ep.slice(0, 600)}`)
+
+  // (b) R_EXEC anchor-guard wording: Executor must confirm via Read, not treat as gospel
+  // The R_EXEC persona is injected at the top of every exec prompt
+  assert.ok(/confirm.*Read|Read.*confirm/i.test(ep) || /not gospel/i.test(ep) || /anchor/i.test(ep),
+    `exec prompt must instruct Executor to confirm pointer via Read (not gospel); got (first 800): ${ep.slice(0, 800)}`)
+
+  // (c) backward-compatible: a slice WITHOUT seamPointers still works (no crash, valid exec prompt)
+  const plainSlice = {
+    desc: 'fixture plain slice no pointers',
+    interface: 'TBD',
+    contract: 'do plain thing in src/plain.ts',
+    independent: true,
+    dependsOn: [],
+    kind: 'behavior',
+    atomic: true,
+    riskTier: 'standard',
+    testScope: 'PlainSuite',
+    // seamPointers intentionally absent
+  }
+  const plainExecPrompts = []
+  const plainDispatch = dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) {
+      return { action: 'slice', reason: 'fixture: decompose', slices: [plainSlice] }
+    }
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      plainExecPrompts.push(c.prompt)
+    }
+  })
+  const { result: plainResult } = await runEngine({ args: ARGS, dispatch: plainDispatch })
+  assert.equal(plainResult.error, undefined, `plain slice (no seamPointers) must not error; got: "${plainResult.error}"`)
+  assert.ok(plainExecPrompts.length >= 1, 'plain slice must still produce an exec prompt')
+})
+
 // ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk). The engine auto-emits its own
 // cost/verdict profile: ONE JSONL line per agent() call appended to docs/run-traces/<baseSha>.jsonl via the
 // SAME deterministic, injection-safe sh proxy as ITEM 2's briefing-persist (base64 in JS → `base64 -d` →
