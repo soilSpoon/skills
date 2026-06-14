@@ -438,16 +438,15 @@ ${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNot
     }
     if (tier === "heavy") {
       const lenses = ["correctness & reproduce the green", "security: secrets/credentials NEVER logged or leaked", "interface & cross-module drift"];
-      const votes = [];
-      for (let li = 0; li < lenses.length; li++) {
-        const L = lenses[li];
+      const rawVotes = await parallel(lenses.map((L, li) => async () => {
         const v = await agentSafe(
           `${base}
 LENS: judge specifically through "${L}".`,
           { phase: "Work", label: `verify:${lbl}·${L.slice(0, 9)}`, ...li === 0 ? { model: "opus" } : {}, schema: VERDICT }
         );
-        votes.push(v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` });
-      }
+        return v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` };
+      }));
+      const votes = rawVotes.map((v, li) => v ?? { trustworthy: false, reason: `lens "${lenses[li]}" verifier unavailable — counts as distrust` });
       const distrust = votes.filter((v) => !v.trustworthy);
       return {
         trustworthy: distrust.length === 0,
