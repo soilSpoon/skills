@@ -340,6 +340,46 @@ if (GIT) log(`git mode ON — baseline pinned at ${BASE_SHA.slice(0, 8)} (clean=
 else log('git mode OFF (no .git) — sequential only, no per-leaf commits/reversibility/worktrees')
 if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`)
 
+// ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk): the engine's biggest historical
+// win (Lesson 8's filtered-at-leaf cost/verdict profile) needed a HUMAN reading logs the engine never
+// emitted. trace() makes the engine auto-emit its own cost/verdict profile: ONE JSONL line per agent()
+// call (and per deterministic gate, when known) appended to docs/run-traces/<baseSha>.jsonl. This file is
+// machine-readable (JSONL) and survives the conversation, unlocking the OUTER self-improvement loop (a
+// later run / a tool can read the profile the engine produced about itself). It is a PASSIVE observer:
+//   • it gates NO trust and touches NONE of the four invariants — it only records what already happened;
+//   • the append goes through the same deterministic `sh` write proxy as ITEM 2's briefing-persist, and is
+//     INJECTION-SAFE the same way: the JSON line (which can embed arbitrary role/label/model text) is
+//     base64-encoded in JS — the [A-Za-z0-9+/=] alphabet is shell-safe — and decoded by `base64 -d`, so no
+//     LLM/agent text ever reaches the shell command verbatim (the keep-text-out-of-shell discipline);
+//   • <baseSha>: the run has no clock in its context, so the file is named from the pinned baseline SHA
+//     (deterministic + stable across a run), falling back to a fixed name when git is off;
+//   • the whole thing is wrapped in its OWN try/catch that NEVER aborts the run — a failed append (dead
+//     proxy, full disk, sh error) must not cost a green run a single trusted leaf. Best-effort, fire-and-
+//     forget: trace() is awaited only so the test can observe the sh call, never to gate any decision.
+const TRACE_FILE = `${REPO}/docs/run-traces/${BASE_SHA ? BASE_SHA.slice(0, 12) : 'no-git'}.jsonl`
+type TraceRecord = {
+  phase: string
+  role?: string
+  model?: string
+  leafIndex?: number
+  gateLevel?: GateLevel
+  trustworthy?: boolean
+  repairAttempt?: number
+}
+const trace = async (rec: TraceRecord): Promise<void> => {
+  try {
+    // Stamp the baseline SHA on every line; drop undefined fields so the JSONL stays compact + only
+    // carries facts the engine actually knows at this call site (leafIndex/gateLevel/trustworthy/etc.).
+    const line: Record<string, unknown> = { baseSha: BASE_SHA || null }
+    for (const [k, v] of Object.entries(rec)) if (v !== undefined) line[k] = v
+    const json = JSON.stringify(line)
+    const b64 = Buffer.from(json + '\n', 'utf8').toString('base64')
+    // mkdir -p the dir, then base64-decode the line and `>>` APPEND it (one line per call). The b64
+    // alphabet is shell-safe, so the arbitrary role/label/model text never reaches the shell verbatim.
+    await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, 'trace-append')
+  } catch (e) { log(`trace append skipped (${e && (e as Error).message ? (e as Error).message : e}) — observability only, run unaffected`) }
+}
+
 // Inter-run mutual exclusion (Lesson 9): two engine runs mutating the SAME working tree corrupt each
 // other (one run's verifier sees the other's edits as drift; restores clobber foreign leaves). A
 // deterministic lock in the tree's REAL gitdir (resolved via --absolute-git-dir, so each worktree has
@@ -632,6 +672,12 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
       if (!res) break
+      // ITEM 7: trace the executor call (cost dimension — model:sonnet, which repair attempt). Distinct
+      // from the leaf-verify line below: this records the EXECUTOR was spawned (executor!=verifier — the
+      // two roles are even two trace lines), so the profile shows exec cost separately from verdict. Placed
+      // AFTER the `!res` break so a DEAD executor doesn't fire a (successful) trace sh — that would reset the
+      // agentSafe NULL_STREAK and mask a real session-instability halt (observed: A6 mixed-class streak).
+      await trace({ phase: 'Work', role: `exec:${lbl}`, model: 'sonnet', leafIndex: i, repairAttempt: attempt })
       // tier-0 deterministic gate: a RED leaf never reaches the LLM verifier (wasted budget + noise).
       if (!res.passed) { verdict = { trustworthy: false, reason: 'tier-0 gate: deterministic build/tests RED' } }
       else {
@@ -724,6 +770,10 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     }
     done.push({ task: node.task, ...res, verdict, gateLevel })   // ITEM 1: record which deterministic gate actually ran (auditable trust floor)
     log(`${tag}leaf ${i} ${res.passed ? 'green' : 'RED'} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ''} | gate=${gateLevel} | ${verdict!.trustworthy ? 'trusted' : 'NOT trusted'}: ${node.task.slice(0, 36)}`)
+    // ITEM 7: emit the leaf's cost/verdict profile line — the single richest trace record (carries the
+    // leafIndex, the deterministic gateLevel from ITEM 1, the final trust verdict, and how many repairs it
+    // took). This is exactly the per-leaf profile Lesson 8 needed a human to reconstruct from logs.
+    await trace({ phase: 'Work', role: `leaf-verify:${lbl}`, model: 'verify', leafIndex: i, gateLevel, trustworthy: verdict!.trustworthy, repairAttempt: attempt })
 
     // An untrusted leaf (incl. a RED/tier-0 leaf with only uncommitted edits) must leave NOTHING behind.
     if (GIT && !verdict!.trustworthy) {

@@ -288,6 +288,18 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   if (GIT) log(`git mode ON — baseline pinned at ${BASE_SHA.slice(0, 8)} (clean=${gitClean}) [deterministic capture]`);
   else log("git mode OFF (no .git) — sequential only, no per-leaf commits/reversibility/worktrees");
   if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
+  const TRACE_FILE = `${REPO}/docs/run-traces/${BASE_SHA ? BASE_SHA.slice(0, 12) : "no-git"}.jsonl`;
+  const trace = async (rec) => {
+    try {
+      const line = { baseSha: BASE_SHA || null };
+      for (const [k, v] of Object.entries(rec)) if (v !== void 0) line[k] = v;
+      const json = JSON.stringify(line);
+      const b64 = Buffer.from(json + "\n", "utf8").toString("base64");
+      await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
+    } catch (e) {
+      log(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
+    }
+  };
   let LOCKFILE = "";
   if (GIT) {
     const lockDirSeg = prologue.get("lock-dir");
@@ -543,6 +555,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
           { phase: "Work", label: `exec:${lbl}${attempt ? ".r" + attempt : ""}`, model: "sonnet", schema: RESULT }
         );
         if (!res) break;
+        await trace({ phase: "Work", role: `exec:${lbl}`, model: "sonnet", leafIndex: i, repairAttempt: attempt });
         if (!res.passed) {
           verdict = { trustworthy: false, reason: "tier-0 gate: deterministic build/tests RED" };
         } else {
@@ -613,6 +626,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
       }
       done2.push({ task: node.task, ...res, verdict, gateLevel });
       log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
+      await trace({ phase: "Work", role: `leaf-verify:${lbl}`, model: "verify", leafIndex: i, gateLevel, trustworthy: verdict.trustworthy, repairAttempt: attempt });
       if (GIT && !verdict.trustworthy) {
         const restored = await restore();
         log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);

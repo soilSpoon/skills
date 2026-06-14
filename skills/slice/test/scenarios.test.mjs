@@ -1418,3 +1418,75 @@ test('ITEM 6: lock-write RACE — a concurrent grab between the two batches abor
   assert.match(result.error, /lock|concurrent|race/i, `error must name the lock race; got "${result.error}"`)
   assert.equal(execLabels.length, 0, 'no leaf may execute when a concurrent run grabbed the lock')
 })
+
+// ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk). The engine auto-emits its own
+// cost/verdict profile: ONE JSONL line per agent() call appended to docs/run-traces/<baseSha>.jsonl via the
+// SAME deterministic, injection-safe sh proxy as ITEM 2's briefing-persist (base64 in JS → `base64 -d` →
+// `>>` append). This is the per-leaf profile Lesson 8 needed a HUMAN to reconstruct from logs the engine
+// never emitted. Claims pinned here:
+//   (a) the run ATTEMPTS trace appends — labeled 'trace-append', targeting docs/run-traces/<baseSha>.jsonl,
+//       INJECTION-SAFE (base64 → `base64 -d`), and `>>` APPENDING (not truncating);
+//   (b) each appended payload is PARSEABLE JSONL carrying baseSha (the pinned baseline, no clock), and at
+//       least one leaf line carries gateLevel (the ITEM-1 deterministic gate) + trustworthy (the verdict);
+//   (c) a sh-FAILURE on the append (dead trace proxy) does NOT fail the run — the leaves stay trusted, the
+//       payload is intact, no error: the observer is passive and its try/catch never aborts.
+test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a leaf parseable); an append sh-failure does NOT fail the run', async () => {
+  // --- GREEN run: slice path → leaves carry testScope → deterministic-filtered gate (so a leaf line has
+  //     a real gateLevel). Capture every trace-append sh call.
+  const dispatch = dispatcher((c) => { if (/assess/.test(c.opts.label || '')) return FIX.assessSlice })
+  const { result, calls, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `green run must not error; got ${result.error}`)
+
+  // (a) the engine ATTEMPTS trace appends through the sh proxy, labeled 'trace-append'.
+  const traceCalls = calls.filter((c) => isSh(c) && /trace-append/.test(c.opts.label || ''))
+  assert.ok(traceCalls.length >= 2,
+    `the run must attempt at least two trace appends (one exec + one leaf-verify per leaf); got ${traceCalls.length}`)
+  for (const c of traceCalls) {
+    // Each append targets docs/run-traces/<baseSha>.jsonl …
+    assert.match(c.prompt, /docs\/run-traces\/[0-9a-f]+\.jsonl/,
+      `each trace append must target docs/run-traces/<baseSha>.jsonl; got: ${c.prompt}`)
+    // … decodes base64 (injection-safe: no raw role/label/model text in the shell command) …
+    assert.match(c.prompt, /base64 -d/,
+      `each trace append must decode base64 (injection-safe); got: ${c.prompt}`)
+    // … and APPENDS (`>>`), never truncates (`>` alone would clobber prior lines).
+    assert.match(c.prompt, />>\s*\S+\.jsonl/,
+      `each trace append must APPEND (>>) to the jsonl file, not truncate; got: ${c.prompt}`)
+    // INJECTION-SAFETY: the literal role-marker text must NEVER appear verbatim outside the base64 blob.
+    const b64 = (c.prompt.match(/printf %s '([A-Za-z0-9+/=]+)'/) || [])[1]
+    assert.ok(b64, `the append must carry a base64 blob (the JSON line); got: ${c.prompt}`)
+    assert.ok(!/leaf-verify|"phase"|"baseSha"/.test(c.prompt.replace(b64, '')),
+      `the JSON line must be base64-encoded, never injected verbatim into the shell command; got: ${c.prompt}`)
+  }
+
+  // (b) every appended payload is PARSEABLE JSONL; at least one LEAF line carries gateLevel + trustworthy.
+  const records = traceCalls.map((c) => {
+    const b64 = c.prompt.match(/printf %s '([A-Za-z0-9+/=]+)'/)[1]
+    const decoded = Buffer.from(b64, 'base64').toString('utf8').trim()
+    return JSON.parse(decoded)   // throws (failing the test) if the line is not valid JSON
+  })
+  assert.ok(records.every((r) => typeof r.baseSha === 'string' && r.baseSha.length > 0),
+    `every trace line must carry the pinned baseSha (no clock in run context); got: ${JSON.stringify(records.map((r) => r.baseSha))}`)
+  const leafWithGate = records.find((r) => typeof r.leafIndex === 'number' && r.gateLevel)
+  assert.ok(leafWithGate,
+    `at least one trace line must carry a leafIndex + gateLevel (the ITEM-1 deterministic gate); got: ${JSON.stringify(records)}`)
+  assert.equal(leafWithGate.gateLevel, 'deterministic-filtered',
+    `the leaf's gateLevel must be the real ITEM-1 gate, not a placeholder; got: ${leafWithGate.gateLevel}`)
+  assert.equal(typeof leafWithGate.trustworthy, 'boolean',
+    `a leaf-verify trace line must carry the trust verdict (trustworthy:boolean); got: ${typeof leafWithGate.trustworthy}`)
+
+  // --- FAILURE run: the trace-append sh itself FAILS (dead trace proxy). The passive observer's try/catch
+  //     must swallow it — the run stays green, every leaf stays trusted, no error surfaces.
+  const failDispatch = dispatcher((c) => {
+    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (isSh(c) && /trace-append/.test(c.opts.label || '')) throw new Error('trace proxy dead (fixture: append sh-failure)')
+  })
+  const failRun = await runEngine({ args: ARGS, dispatch: failDispatch })
+  assert.equal(failRun.result.error, undefined,
+    `a trace-append sh failure must NOT fail the run (pure observation); got error: ${failRun.result.error}`)
+  assert.equal(failRun.result.trustedLeaves, failRun.result.totalLeaves,
+    `all leaves must stay trusted despite the trace-append failure; got ${failRun.result.trustedLeaves}/${failRun.result.totalLeaves}`)
+  assert.ok(failRun.result.trustedLeaves >= 1,
+    `the run must still have produced trusted leaves (the observer failure was harmless); got ${failRun.result.trustedLeaves}`)
+  assert.equal(failRun.result.overallTrust, true,
+    `the run must remain overallTrust:true — a dead trace proxy is not a trust failure; headline="${failRun.result.ownersHeadline}"`)
+})
