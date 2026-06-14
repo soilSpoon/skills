@@ -935,6 +935,70 @@ test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QU
     `QUOTA HALT MUST fire for cross-class streak (verify+exec nulls); got logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
 })
 
+// A6-PARALLEL — heavy-verify parallel trust invariants.
+// These pin the UNANIMOUS-trust and NULL=DISTRUST contracts under the parallel lens path.
+// They must hold whether lenses run sequentially or in parallel — the change from sequential
+// for-loop to parallel([...]) must not weaken either invariant.
+
+// Behavioral claim: heavy-tier verify with exactly ONE lens returning distrust (security lens)
+// while the other two return trust → the whole heavy-leaf verdict is trustworthy:false
+// (UNANIMOUS required; one dissent is enough to distrust).
+test('A6-parallel (a): one-of-three lenses distrusting makes the whole heavy leaf untrusted (unanimous required)', async () => {
+  // Engineer a heavy-tier leaf via merged decompose decision.
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
+  const dispatch = dispatcher((c) => {
+    if (has(c, /decompose/)) return decomposeHeavy
+    // Security lens (label contains '·security:') returns distrust; the other two (correctness + interface) trust.
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      if (/security:/.test(c.opts.label || '')) return FIX.distrust   // one lens distrusts
+      return FIX.trust                                                  // two lenses trust
+    }
+  })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+
+  const firstResult = result.results && result.results[0]
+  const verdict = firstResult && firstResult.verdict
+  // The leaf must be untrusted: one distrusting lens blocks unanimous approval
+  assert.ok(verdict && verdict.trustworthy === false,
+    `heavy leaf with one distrusting lens must be untrusted; verdict: ${JSON.stringify(verdict)}`)
+  // Reason must report 1 distrusted lens (or more, since repair may run again)
+  assert.ok(verdict.reason && /heavy verify.*lenses.*[1-9] distrusted/.test(verdict.reason),
+    `verdict.reason must report distrusted count; got: "${verdict.reason}"`)
+})
+
+// Behavioral claim: heavy-tier verify where ONE lens returns null (unavailable — throws in agentSafe)
+// while the other two return trust → the whole heavy-leaf verdict is trustworthy:false
+// (null counts as distrust; the null vote must NOT be silently dropped).
+test('A6-parallel (b): one null/unavailable lens counts as distrust — heavy leaf untrusted even if two lenses trust', async () => {
+  // Engineer a heavy-tier leaf via merged decompose decision.
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
+  let nullCount = 0
+  const dispatch = dispatcher((c) => {
+    if (has(c, /decompose/)) return decomposeHeavy
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      // Interface lens (label contains '·interface') throws → agentSafe returns null → must count as distrust.
+      if (/interface/.test(c.opts.label || '')) {
+        nullCount++
+        throw new Error('transport error — interface lens unavailable (fixture)')
+      }
+      return FIX.trust  // correctness + security trust
+    }
+  })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+
+  // Precondition: the null-producing lens was called
+  assert.ok(nullCount >= 1, `interface lens must have been called and thrown; got nullCount=${nullCount}`)
+
+  const firstResult = result.results && result.results[0]
+  const verdict = firstResult && firstResult.verdict
+  // The leaf must be untrusted: the null lens counts as distrust
+  assert.ok(verdict && verdict.trustworthy === false,
+    `heavy leaf with one null lens must be untrusted (null = distrust); verdict: ${JSON.stringify(verdict)}`)
+  // Reason must report at least 1 distrusted lens
+  assert.ok(verdict.reason && /heavy verify.*lenses.*[1-9] distrusted/.test(verdict.reason),
+    `verdict.reason must report distrusted count (null counts); got: "${verdict.reason}"`)
+})
+
 // C1-C4 — schema tax cleanup: engine must not emit serialization-tax fields to agents.
 // (a) RESULT schema used in exec opts must have no 'diff' key; the DECOMPOSE schema (ITEM 10: the merged
 //     decompose decision — formerly the ASSESSMENT schema) must have no 'risk' key; VERDICT schema must
