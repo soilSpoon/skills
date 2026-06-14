@@ -935,6 +935,70 @@ test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QU
     `QUOTA HALT MUST fire for cross-class streak (verify+exec nulls); got logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
 })
 
+// A6-PARALLEL — heavy-verify parallel trust invariants.
+// These pin the UNANIMOUS-trust and NULL=DISTRUST contracts under the parallel lens path.
+// They must hold whether lenses run sequentially or in parallel — the change from sequential
+// for-loop to parallel([...]) must not weaken either invariant.
+
+// Behavioral claim: heavy-tier verify with exactly ONE lens returning distrust (security lens)
+// while the other two return trust → the whole heavy-leaf verdict is trustworthy:false
+// (UNANIMOUS required; one dissent is enough to distrust).
+test('A6-parallel (a): one-of-three lenses distrusting makes the whole heavy leaf untrusted (unanimous required)', async () => {
+  // Engineer a heavy-tier leaf via merged decompose decision.
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
+  const dispatch = dispatcher((c) => {
+    if (has(c, /decompose/)) return decomposeHeavy
+    // Security lens (label contains '·security:') returns distrust; the other two (correctness + interface) trust.
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      if (/security:/.test(c.opts.label || '')) return FIX.distrust   // one lens distrusts
+      return FIX.trust                                                  // two lenses trust
+    }
+  })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+
+  const firstResult = result.results && result.results[0]
+  const verdict = firstResult && firstResult.verdict
+  // The leaf must be untrusted: one distrusting lens blocks unanimous approval
+  assert.ok(verdict && verdict.trustworthy === false,
+    `heavy leaf with one distrusting lens must be untrusted; verdict: ${JSON.stringify(verdict)}`)
+  // Reason must report 1 distrusted lens (or more, since repair may run again)
+  assert.ok(verdict.reason && /heavy verify.*lenses.*[1-9] distrusted/.test(verdict.reason),
+    `verdict.reason must report distrusted count; got: "${verdict.reason}"`)
+})
+
+// Behavioral claim: heavy-tier verify where ONE lens returns null (unavailable — throws in agentSafe)
+// while the other two return trust → the whole heavy-leaf verdict is trustworthy:false
+// (null counts as distrust; the null vote must NOT be silently dropped).
+test('A6-parallel (b): one null/unavailable lens counts as distrust — heavy leaf untrusted even if two lenses trust', async () => {
+  // Engineer a heavy-tier leaf via merged decompose decision.
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
+  let nullCount = 0
+  const dispatch = dispatcher((c) => {
+    if (has(c, /decompose/)) return decomposeHeavy
+    if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
+      // Interface lens (label contains '·interface') throws → agentSafe returns null → must count as distrust.
+      if (/interface/.test(c.opts.label || '')) {
+        nullCount++
+        throw new Error('transport error — interface lens unavailable (fixture)')
+      }
+      return FIX.trust  // correctness + security trust
+    }
+  })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+
+  // Precondition: the null-producing lens was called
+  assert.ok(nullCount >= 1, `interface lens must have been called and thrown; got nullCount=${nullCount}`)
+
+  const firstResult = result.results && result.results[0]
+  const verdict = firstResult && firstResult.verdict
+  // The leaf must be untrusted: the null lens counts as distrust
+  assert.ok(verdict && verdict.trustworthy === false,
+    `heavy leaf with one null lens must be untrusted (null = distrust); verdict: ${JSON.stringify(verdict)}`)
+  // Reason must report at least 1 distrusted lens
+  assert.ok(verdict.reason && /heavy verify.*lenses.*[1-9] distrusted/.test(verdict.reason),
+    `verdict.reason must report distrusted count (null counts); got: "${verdict.reason}"`)
+})
+
 // C1-C4 — schema tax cleanup: engine must not emit serialization-tax fields to agents.
 // (a) RESULT schema used in exec opts must have no 'diff' key; the DECOMPOSE schema (ITEM 10: the merged
 //     decompose decision — formerly the ASSESSMENT schema) must have no 'risk' key; VERDICT schema must
@@ -1452,6 +1516,82 @@ test('ITEM 6: lock-write RACE — a concurrent grab between the two batches abor
   assert.equal(execLabels.length, 0, 'no leaf may execute when a concurrent run grabbed the lock')
 })
 
+// seamPointers wiring: a slice carrying seamPointers threads them into the exec prompt so the
+// Executor uses the Slicer's already-resolved seams as anchors instead of cold re-greping.
+// Claims pinned:
+//   (a) exec prompt for a slice with seamPointers CONTAINS the pointer file + symbol text;
+//   (b) R_EXEC's persona (visible in the exec prompt) instructs the Executor to CONFIRM the
+//       pointer via Read before trusting it (anchor, not gospel — lines may be stale);
+//   (c) seamPointers is OPTIONAL: a slice WITHOUT the field still produces a valid exec prompt
+//       (backward-compatible contract — no regression on existing fixtures).
+test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXEC anchor-guard wording present', async () => {
+  // Two slices so the engine takes the real slice path (slices.length > 1 guard); the first carries
+  // seamPointers so we can assert they thread through to that leaf's exec prompt.
+  const sliceWithPointers = {
+    desc: 'fixture slice with seam pointers',
+    interface: 'function foo(): string',
+    contract: 'implement foo in src/foo.ts',
+    independent: true,
+    dependsOn: [],
+    kind: 'behavior',
+    atomic: true,
+    riskTier: 'standard',
+    testScope: 'FooSuite',
+    seamPointers: [
+      { file: 'src/foo.ts', line: 42, symbol: 'foo', currentText: 'export function foo()' },
+      { file: 'src/bar.ts', symbol: 'barHelper' },
+    ],
+  }
+  const slicePlain = {
+    desc: 'fixture sibling slice no pointers',
+    interface: 'TBD',
+    contract: 'do sibling thing in src/sibling.ts',
+    independent: true,
+    dependsOn: [],
+    kind: 'behavior',
+    atomic: true,
+    riskTier: 'standard',
+    testScope: 'SibSuite',
+    // no seamPointers — sibling without pointers (exercises backward-compat AND the > 1 guard)
+  }
+
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    // Force slice path returning TWO children; first carries seamPointers, second does not
+    if (/decompose/.test(c.opts.label || '')) {
+      return { action: 'slice', reason: 'fixture: decompose', slices: [sliceWithPointers, slicePlain] }
+    }
+    // Capture exec prompts to inspect (keyed by label so we can find the right leaf)
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push({ prompt: c.prompt, label: c.opts.label || '' })
+    }
+  })
+
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+  assert.ok(execPrompts.length >= 1, 'at least one exec prompt must fire')
+
+  // (a) Find the exec prompt for the leaf that had seamPointers (the 'fixture slice with seam pointers' leaf)
+  const epEntry = execPrompts.find((e) => /fixture slice with seam pointers/.test(e.prompt))
+  assert.ok(epEntry, `an exec prompt for the slice carrying seamPointers must exist; labels: ${execPrompts.map((e) => e.label).join(', ')}`)
+  const ep = epEntry.prompt
+  assert.ok(/src\/foo\.ts/.test(ep),
+    `exec prompt for the seam-pointer slice must contain 'src/foo.ts'; got (first 600): ${ep.slice(0, 600)}`)
+  assert.ok(/src\/bar\.ts/.test(ep),
+    `exec prompt must contain second seam pointer 'src/bar.ts'; got (first 800): ${ep.slice(0, 800)}`)
+
+  // (b) R_EXEC anchor-guard wording: Executor must confirm via Read, not treat as gospel
+  // The R_EXEC persona is injected at the top of every exec prompt (the SEAM POINTERS section)
+  assert.ok(/confirm.*Read|Read.*confirm/i.test(ep) || /not gospel/i.test(ep) || /anchor/i.test(ep),
+    `exec prompt must instruct Executor to confirm pointer via Read (not gospel); got (first 2000): ${ep.slice(0, 2000)}`)
+
+  // (c) backward-compatible: the sibling slice WITHOUT seamPointers also produces a valid exec prompt
+  const sibEntry = execPrompts.find((e) => /fixture sibling slice no pointers/.test(e.prompt))
+  assert.ok(sibEntry, `an exec prompt for the plain sibling (no seamPointers) must also exist`)
+  assert.ok(!/Seam Pointers \(already resolved/.test(sibEntry.prompt),
+    `exec prompt for the plain sibling must NOT contain seam-pointer section (no seamPointers on that slice)`)
+})
+
 // ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk). The engine auto-emits its own
 // cost/verdict profile: ONE JSONL line per agent() call appended to docs/run-traces/<baseSha>.jsonl via the
 // SAME deterministic, injection-safe sh proxy as ITEM 2's briefing-persist (base64 in JS → `base64 -d` →
@@ -1522,4 +1662,108 @@ test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a l
     `the run must still have produced trusted leaves (the observer failure was harmless); got ${failRun.result.trustedLeaves}`)
   assert.equal(failRun.result.overallTrust, true,
     `the run must remain overallTrust:true — a dead trace proxy is not a trust failure; headline="${failRun.result.ownersHeadline}"`)
+})
+
+// seamPointers 1-slice discard: a Slicer that returns exactly 1 slice is non-reducing — the engine
+// falls through to execute the original node directly (the 1-slice child and its seamPointers are
+// silently discarded). This is BY DESIGN: a 1-slice decompose is considered non-reducing (it does
+// not partition work) so the engine short-circuits to execute. The test documents this invariant
+// so future contributors understand why 2+ slices are required for seamPointers to reach an executor.
+test('seamPointers 1-slice discard: a single-slice decompose is non-reducing → engine executes original node (seamPointers on that slice are discarded)', async () => {
+  // Claim: when action:'slice' is returned with exactly ONE slice (non-reducing), the engine logs
+  // "non-reducing slice" and falls through to execute the original node's task — the slice's
+  // seamPointers never reach an exec prompt.
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    // Return exactly 1 slice carrying seamPointers — this is the non-reducing case
+    if (/decompose/.test(c.opts.label || '')) {
+      return {
+        action: 'slice',
+        reason: 'fixture: single-slice (non-reducing)',
+        slices: [{
+          desc: 'sole child with seam pointers',
+          interface: 'function sole(): void',
+          contract: 'implement sole in src/sole.ts',
+          independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+          riskTier: 'standard', testScope: 'SoleSuite',
+          seamPointers: [{ file: 'src/sole.ts', line: 7, symbol: 'sole', currentText: 'export function sole()' }],
+        }],
+      }
+    }
+    // Capture exec prompts so we can verify the seamPointers did NOT thread through
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push(c.prompt)
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+
+  // The non-reducing guard must be logged
+  assert.ok(logs.some((l) => /non-reducing slice/.test(l)),
+    `engine must log "non-reducing slice" when slices.length === 1; logs: ${logs.filter((l) => /slice/.test(l)).join(' | ')}`)
+
+  // The seamPointers on the sole slice must NOT appear in any exec prompt (they were discarded)
+  assert.ok(execPrompts.length >= 1, 'at least one exec prompt must fire (the original node is executed)')
+  assert.ok(!execPrompts.some((p) => /src\/sole\.ts/.test(p)),
+    'seamPointers on the discarded 1-slice child must NOT appear in any exec prompt (non-reducing path executes original node)')
+})
+
+// seamPointers require 2+ slices: this test pins the POSITIVE claim (mirror of the discard test above)
+// that seamPointers ARE threaded to the executor only when slices.length >= 2 (the reducing path).
+// Together with the 1-slice-discard test above, this pair documents the full invariant: the slices.length
+// > 1 guard is the gate that separates "seamPointers reach executor" from "seamPointers are discarded".
+test('seamPointers 2-slice path: seamPointers reach executor only when 2+ slices returned (the reducing guard)', async () => {
+  // Claim: with 2 slices the engine takes the reducing path; the first slice's seamPointers
+  // appear in its exec prompt; the second slice (no seamPointers) produces a clean exec prompt.
+  // This is the minimal confirmation that the "> 1" guard is the gate (contrast with the 1-slice test).
+  const execPrompts = []
+  const dispatch = dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) {
+      return {
+        action: 'slice',
+        reason: 'fixture: two-slice reducing',
+        slices: [
+          {
+            desc: 'first slice with seam pointer',
+            interface: 'function alpha(): void',
+            contract: 'implement alpha in src/alpha.ts',
+            independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+            riskTier: 'standard', testScope: 'AlphaSuite',
+            seamPointers: [{ file: 'src/alpha.ts', line: 3, symbol: 'alpha' }],
+          },
+          {
+            desc: 'second slice no pointers',
+            interface: 'TBD',
+            contract: 'implement beta in src/beta.ts',
+            independent: true, dependsOn: [], kind: 'behavior', atomic: true,
+            riskTier: 'standard', testScope: 'BetaSuite',
+            // no seamPointers — ensures only the first slice carries pointers
+          },
+        ],
+      }
+    }
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
+      execPrompts.push({ prompt: c.prompt, label: c.opts.label || '' })
+    }
+  })
+
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
+
+  // Engine must NOT log non-reducing (2 slices is reducing)
+  assert.ok(!logs.some((l) => /non-reducing slice/.test(l)),
+    'engine must NOT log "non-reducing slice" when slices.length === 2')
+
+  // The first slice's seamPointers must appear in its exec prompt
+  const alphaExec = execPrompts.find((e) => /first slice with seam pointer/.test(e.prompt))
+  assert.ok(alphaExec, `an exec prompt for the first (seam-pointer) slice must exist; labels seen: ${execPrompts.map((e) => e.label).join(', ')}`)
+  assert.ok(/src\/alpha\.ts/.test(alphaExec.prompt),
+    `the first slice's exec prompt must contain its seamPointer file 'src/alpha.ts'; got (first 600): ${alphaExec.prompt.slice(0, 600)}`)
+
+  // The second slice must also get an exec prompt but without a seam-pointer section
+  const betaExec = execPrompts.find((e) => /second slice no pointers/.test(e.prompt))
+  assert.ok(betaExec, `an exec prompt for the second (no-pointer) slice must exist`)
+  assert.ok(!/Seam Pointers \(already resolved/.test(betaExec.prompt),
+    'second slice exec prompt must NOT contain a seam-pointer section (no seamPointers on that slice)')
 })

@@ -73,7 +73,14 @@ export const R_SLICE =
   'slice that adds user-reachable capability MUST name, inside its contract, the EXISTING production call site / view / ' +
   'entry point the new code will be invoked from — "wire X into Y at file:line" — and its verify-ALONE step must include ' +
   'checking that call site actually invokes the new code. A slice whose contract cannot name where production calls it ' +
-  'is either library-surface API (say so explicitly) or an unwired slice — restructure it.'
+  'is either library-surface API (say so explicitly) or an unwired slice — restructure it. ' +
+  'SEAM POINTERS: for each slice, populate `seamPointers` with the seams you already resolved while cutting — the ' +
+  'specific files, approx lines, and symbol names where the Executor will work. Keep the prose contract too (it ' +
+  'describes WHAT to achieve; seamPointers describe WHERE in the code). Each pointer: `file` (relative path, ' +
+  'required), `line` (approx — the Executor must confirm via Read; lines shift), `symbol` (function/type/const ' +
+  'name), `currentText` (short snippet for quick visual confirm). Omit seamPointers only when genuinely unknowable ' +
+  'before execution (e.g. a spike result). A wrong/stale pointer is NOT a contract violation — the Executor ' +
+  'verifies before using; an ABSENT pointer forces a cold re-grep, which is the avoidable cost.'
 export const R_EXEC =
   'You are the Executor — where trust is deposited; your inner loop is Canon TDD, ONE test at a time. Follow ' +
   'the repo AGENTS.md / project card literally. The contract\'s `interface` is a FIXED boundary — design only ' +
@@ -88,6 +95,12 @@ export const R_EXEC =
   'INSPECT WITH NATIVE TOOLS: use the Read/Grep/Glob tools, NOT shell cat/grep/sed/find/head — every shell ' +
   'inspect is a spawn+permission round-trip and is the measured #1 hidden time cost (it dwarfs test runs). ' +
   'Reserve Bash for builds/tests/git only. ' +
+  'SEAM POINTERS (when present in the task context as "Seam Pointers:"): the Slicer already resolved these ' +
+  'seams — use them as ANCHORS to skip cold re-grep. BEFORE starting, confirm each pointer via Read at the ' +
+  'named file: if the symbol/text is present near the indicated line it is valid; if not found, the line may ' +
+  'be stale — grep as fallback. Treat seamPointers as ANCHORS, NOT gospel: a stale pointer does not mean ' +
+  'the work is wrong; it means the line shifted and you must find the seam yourself. A wrong/stale seam ' +
+  'pointer cannot launder a bad result — the Verifier independently re-runs and checks evidence. ' +
   'TESTS CARRY THEIR WHY: each new test states in a one-line comment the behavioral claim it pins (future ' +
   'agents and the owner will not have your context; a test whose reason is lost gets deleted or neutered later). ' +
   '`passed` MUST reflect a REAL deterministic run (the tier-0 gate): build + the relevant tests ' +

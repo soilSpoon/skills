@@ -476,7 +476,7 @@ if (GIT) {
 // ---- Risk-tiered verification: spend scrutiny where trust is fragile.
 //   light (easy)    → audit diff/tests, no full re-run (integration is the net)
 //   standard        → one independent reproduction
-//   heavy (hard)    → 3 perspective-diverse skeptics (SEQUENTIAL — avoids nested parallel()); UNANIMOUS trust required
+//   heavy (hard)    → 3 perspective-diverse skeptics (PARALLEL — runtime queues concurrent calls safely); UNANIMOUS trust required
 const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
   // ④ tidy: engine already ran the full suite (ENGINE-RAN); light: diff-audit path — no filter-run;
   // engineT0 non-empty: engine already ran filtered gate — injecting LEAF_TEST is contradictory noise.
@@ -531,16 +531,18 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
   }
   if (tier === 'heavy') {
     const lenses = ['correctness & reproduce the green', 'security: secrets/credentials NEVER logged or leaked', 'interface & cross-module drift']
-    const votes: Verdict[] = []
-    for (let li = 0; li < lenses.length; li++) {                // sequential: safe to nest under parallel groups
-      const L = lenses[li]
-      // C: the correctness lens runs on a DIFFERENT model — homogeneous consensus re-confirms shared
-      // blind spots rather than producing independent evidence; cross-model diversity is cheap
-      // independence, spent only where trust is most fragile (heavy leaves).
+    // C: the correctness lens (index 0) runs on a DIFFERENT model — homogeneous consensus re-confirms
+    // shared blind spots rather than producing independent evidence; cross-model diversity is cheap
+    // independence, spent only where trust is most fragile (heavy leaves).
+    // Run all 3 lenses in parallel: the Workflow runtime queues concurrent calls against its concurrency
+    // cap, so nesting parallel() is safe — ~3× faster heavy-leaf verification vs. sequential.
+    const rawVotes = await parallel(lenses.map((L, li) => async () => {
       const v: Verdict | null = await agentSafe(`${base}\nLENS: judge specifically through "${L}".`,
         { phase: 'Work', label: `verify:${lbl}·${L.slice(0, 9)}`, ...(li === 0 ? { model: 'opus' } : {}), schema: VERDICT })
-      votes.push(v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` })
-    }                                                            // null lens = distrust: a flaky run can't launder a hard leaf
+      return v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` }
+    }))                                                          // null lens = distrust: a flaky run can't launder a hard leaf
+    // parallel() returns T|null per thunk (catches thunk throws); a null slot also counts as distrust.
+    const votes: Verdict[] = rawVotes.map((v, li) => v ?? { trustworthy: false, reason: `lens "${lenses[li]}" verifier unavailable — counts as distrust` })
     const distrust = votes.filter(v => !v.trustworthy)
     return {
       trustworthy: distrust.length === 0,                       // UNANIMOUS across ALL 3 lenses (null counts against)
@@ -630,7 +632,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         for (let j = slices.length - 1; j >= 0; j--) {
           const iface = slices[j].interface
           const ifaceCtx = (iface && !/^TBD/i.test(iface.trim())) ? `\nInterface (FIXED): ${iface}` : ''
-          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, depth: node.depth + 1, spikes: 0 })
+          stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || 'behavior', atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 })
         }
         continue
       }
@@ -706,8 +708,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         (verdict && verdict.prescription ? `\nREVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}\n` : '') +
         (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : '') +
         `then fix exactly those objections. In git mode add a fresh commit.`
+      const seamCtx = (node.seamPointers && node.seamPointers.length)
+        ? `\nSeam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):\n${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ''}${p.symbol ? ` (${p.symbol})` : ''}${p.currentText ? ` — "${p.currentText}"` : ''}`).join('\n')}`
+        : ''
       res = await agentSafe(
-        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
+        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}${seamCtx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
       if (!res) break
       // ITEM 7: trace the executor call (cost dimension — model:sonnet, which repair attempt). Distinct
