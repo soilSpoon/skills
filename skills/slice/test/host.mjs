@@ -79,13 +79,64 @@ export const FIX = {
 
 const GIT_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'
 
+// ITEM 6 (LATENCY): the engine now BATCHES deterministic git into ONE sh() per logical phase (prologue:
+// git-sha+git-clean+lock-dir+lock-check; the conditional lock-write; per-leaf reset+clean). Each
+// sub-command emits an EXIT MARKER `<<RS:NAME:$?>>` and the engine parses those markers. The fixture
+// stays FAITHFUL: it synthesizes the SAME marker-formatted stdout a real batched shell would emit, so
+// per-command outcome detection is exercised exactly as in production. A batched-script prompt is one
+// that carries the marker protocol (`<<RS:`); a single-command prompt is handled the legacy way.
+//
+// Per-marker canned outcome (NAME → { out, code }). `out` is the stdout that PRECEDES that marker; for
+// lock-dir the engine prints `$GD` before the marker, so out = the gitdir (default '' ⇒ no lock block).
+// `shOver` lets a scenario override a single sub-command's outcome inside the batch (e.g. a non-zero
+// reset, a held lock) WITHOUT killing the whole batch — the realistic per-command failure path. A
+// scenario that wants the WHOLE batch to die (dead proxy) still throws on the batched prompt in `over`.
+const BATCH_DEFAULTS = {
+  'git-sha':    { out: GIT_SHA, code: 0 },
+  'git-clean':  { out: '', code: 0 },
+  'lock-dir':   { out: '', code: 0 },   // gitdir empty by default ⇒ engine skips the lock block
+  'lock-check': { out: '', code: 1 },   // no lock currently held
+  'lock-write': { out: '', code: 0 },
+  'reset':      { out: '', code: 0 },
+  'clean':      { out: '', code: 0 },
+}
+// Build the marker-formatted stdout for a batched script, honoring per-name overrides from shOver.
+// Only emits markers for NAMEs the script actually contains (so a conditional lock-check/lock-write
+// that the engine guarded with `if [ -n "$GD" ]` is omitted exactly as a real shell would omit it).
+export function synthBatch(prompt, shOver = {}) {
+  // Names appear in the script as `<<RS:NAME:%s>>` (the engine's printf template).
+  const names = [...prompt.matchAll(/<<RS:([A-Za-z0-9_-]+):%s>>/g)].map((m) => m[1])
+  // The lock-check / lock-write sub-commands are emitted by the engine ONLY when a real gitdir was
+  // resolved. The fixture default (lock-dir out='') means no gitdir ⇒ those markers must NOT appear,
+  // matching the real shell's `if [ -n "$GD" ]` guard. A scenario that sets lock-dir to a real path
+  // (via shOver) opts those sub-commands back in.
+  const ld = { ...BATCH_DEFAULTS['lock-dir'], ...(shOver['lock-dir'] || {}) }
+  const gitdirPresent = String(ld.out || '').trim().startsWith('/')
+  let out = ''
+  for (const name of names) {
+    if ((name === 'lock-check' || name === 'lock-write') && !gitdirPresent) continue
+    const def = { ...(BATCH_DEFAULTS[name] || { out: '', code: 0 }), ...(shOver[name] || {}) }
+    // lock-write RACE: a scenario can set lock-write to { race: true } to exercise the concurrent-grab
+    // path (the engine's `else` branch emits the non-numeric RACE sentinel instead of a code marker).
+    if (name === 'lock-write' && def.race) { out += `<<RS-RACE:lock-write>>\n`; continue }
+    out += `${def.out}\n<<RS:${name}:${def.code}>>\n`
+  }
+  return { exitCode: 0, stdout: out }
+}
+// Is this sh prompt a batched (marker-protocol) script?
+export const isBatch = (p) => /<<RS:[A-Za-z0-9_-]+:%s>>/.test(p)
+
 // Base dispatcher: green-path answers for every role; `over` intercepts first (return
 // undefined to fall through). Throw inside `over` to simulate API/quota deaths.
-export function dispatcher(over) {
+// `shOver` (2nd dispatcher arg) supplies per-sub-command overrides for batched sh scripts.
+export function dispatcher(over, shOver = {}) {
   return async (c, env) => {
     if (over) { const r = await over(c, env); if (r !== undefined) return r }
     if (isSh(c)) {
       const p = c.prompt
+      // Batched (marker-protocol) script: synthesize the per-command marker output the engine parses.
+      if (isBatch(p)) return synthBatch(p, shOver)
+      // Single-command (legacy) sh calls: head capture, lock-clear (rm -f), wiring scan, t0, integrate…
       if (/rev-parse HEAD/.test(p)) return { exitCode: 0, stdout: GIT_SHA }
       if (/status --porcelain/.test(p)) return { exitCode: 0, stdout: '' }
       if (/rs-lock/.test(p) && /cat /.test(p)) return { exitCode: 1, stdout: '' }

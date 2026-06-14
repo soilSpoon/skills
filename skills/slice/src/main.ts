@@ -164,6 +164,46 @@ const shForce = async (cmd: string, label?: string): Promise<ShResult> => {
   }
 }
 
+// ITEM 6 (LATENCY): each sh() is a full agent round-trip. Independent / sequential-deterministic git
+// is BATCHED into ONE sh() script per logical phase to pay one spawn instead of N serial spawns. The
+// NON-NEGOTIABLE invariant: per-command outcome detection survives byte-for-byte. Every sub-command is
+// followed by an EXIT MARKER `<<RS:name:$?>>` on its own line; its stdout precedes the marker. shBatch()
+// parses those markers so a RED/failure in ANY sub-command is detected EXACTLY as before. The whole
+// batch still goes through sh(), so a dead shell proxy returns SH_UNAVAILABLE for the WHOLE batch — and
+// shUnavailable(raw) on the raw result stays FATAL (a dead proxy never silently reads as "no git").
+//
+// Authoring contract for the script passed to shBatch:
+//   <command> ; printf '<<RS:NAME:%s>>\n' "$?"      ← stdout of <command>, then the marker line
+// NAME must be a stable [A-Za-z0-9_-] token. parseBatch returns, per NAME: { code, out } where `out`
+// is the captured stdout that PRECEDED that marker (between the previous marker and this one), trimmed
+// of the trailing newline only — so `git status --porcelain` empties and SHAs are read verbatim.
+const MARKER = /<<RS:([A-Za-z0-9_-]+):(-?\d+)>>/
+// shBatch: run a marker-delimited multi-command script in ONE sh() round-trip; parse per-command
+// {code,out}. Returns { raw, get(name) }. raw is the underlying ShResult so callers keep the
+// shUnavailable() FATAL check verbatim (a dead proxy → raw is the sentinel → get() returns null for
+// every name → callers detect the outage exactly as a single-command sh() death would surface it).
+const shBatch = async (script: string, label?: string): Promise<{ raw: ShResult; get: (name: string) => { code: number; out: string } | null }> => {
+  const raw = await sh(script, label)
+  const dead = shUnavailable(raw)
+  const stdout = raw.stdout || ''
+  // Split on marker lines; segment i's stdout is everything before marker i since the previous marker.
+  const map = new Map<string, { code: number; out: string }>()
+  if (!dead) {
+    let rest = stdout
+    let m: RegExpMatchArray | null
+    // Walk markers left-to-right; the text before each marker is that command's stdout.
+    while ((m = rest.match(new RegExp(MARKER.source)))) {
+      const idx = m.index || 0
+      const before = rest.slice(0, idx)
+      // Strip exactly one trailing newline that the `printf` line introduces; keep inner content verbatim.
+      const out = before.replace(/\n$/, '')
+      map.set(m[1], { code: parseInt(m[2], 10), out })
+      rest = rest.slice(idx + m[0].length).replace(/^\n/, '')
+    }
+  }
+  return { raw, get: (name: string) => map.get(name) || null }
+}
+
 // =============================================================================
 phase('Baseline')
 log(`Task: ${TASK}${PARALLEL ? ' [parallel mode]' : ''}`)
@@ -228,23 +268,63 @@ const engineRanBlock = ({ cmd, note, exitCode, tail, duty }: { cmd: string; note
 
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
 // didn't, disabling git mode). A fixed `git rev-parse HEAD`, run verbatim, owns this.
-// A1/A7: if the shell proxy is dead, shUnavailable(r) is true; treat that as FATAL — not as
-// "no git" (which would silently downgrade to sequential-no-revert mode, hiding the outage).
-const headR = await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, 'git-sha')
-if (shUnavailable(headR)) {
-  log('FATAL: shell-proxy agent returned no result for git-sha capture — cannot determine git state; aborting.')
+//
+// ITEM 6 (LATENCY): the prologue was 5 SERIAL sh() spawns (git-sha, git-clean, lock-dir, lock-check,
+// lock-write) BEFORE the first leaf. They are all deterministic JS-computed git, and lock-check→write
+// is a sequential dependency — perfect for ONE batched sh() round-trip. Commands stay verbatim; each
+// emits an EXIT MARKER so per-command outcome detection is byte-for-byte unchanged (parsed below).
+// BONUS: batching lock-dir+check+write into one script TIGHTENS atomicity — there is no JS round-trip
+// gap between reading the lock and writing it, so two concurrent runs can no longer interleave there.
+//
+// A1/A7: if the shell proxy is dead, shUnavailable(prologue.raw) is true; treat that as FATAL — not as
+// "no git" (which would silently downgrade to sequential-no-revert mode, hiding the outage). A dead
+// proxy kills the WHOLE batch, so this ONE check covers every decision point the batch carries.
+// Lock-dir retry: a single transport hiccup on the batch retries ONCE before aborting (same guarantee
+// the per-call lock-dir retry gave — proceeding lock-less after 'git mode ON' stays strictly forbidden).
+//
+// BASE_SHA is captured FROM the batch (git-sha marker), but the lock content embeds that sha — so the
+// prologue is TWO batches: batch-1 = git-sha + git-clean + lock-dir + lock-check (all reads, no
+// mutation), then JS decides held/abort using the lock-check marker, then batch-2 = the single
+// conditional lock-write whose content carries the real BASE_SHA from batch-1. The check-then-write
+// stays atomic at the decision (lock-write re-tests `! -s` inside the same shell so a racing run that
+// grabbed the lock between the two batches still loses the write), and the 'lock held → abort' path
+// fires in JS from the lock-check marker exactly as the old per-call lock-check did. 5 spawns → 2.
+//
+// --- Batch 1: git-sha + git-clean + lock-dir + lock-check (all reads, no mutation) ---
+const probe =
+  `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; ` +
+  `git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; ` +
+  `GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; ` +
+  `if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`
+let prologue = await shBatch(probe, 'prologue')
+if (shUnavailable(prologue.raw)) {
+  // Lock-dir retry parity: one transport hiccup retries the whole read-batch ONCE before aborting.
+  log('shell-proxy returned no result for prologue (git-sha/clean/lock) — retrying once …')
+  prologue = await shBatch(probe, 'prologue-retry')
+}
+if (shUnavailable(prologue.raw)) {
+  log('FATAL: shell-proxy agent returned no result for prologue (git-sha/git-clean/lock) — cannot determine git state; aborting.')
+  return { error: 'shell-proxy unavailable at prologue decision point', task: TASK }
+}
+const shaSeg = prologue.get('git-sha')
+const cleanSeg = prologue.get('git-clean')
+// A1/A7: a missing git-sha marker means the batch ran but the marker protocol broke — treat as fatal
+// rather than reading an absent marker as "no git" (a silent git-mode-OFF downgrade).
+if (!shaSeg) {
+  log('FATAL: prologue batch produced no git-sha marker — cannot determine git state; aborting.')
   return { error: 'shell-proxy unavailable at git-sha decision point', task: TASK }
 }
-const headOut = headR.stdout || ''
+const headOut = shaSeg.out
 const BASE_SHA = (headOut.match(/[0-9a-f]{40}/i) || [''])[0]
 const GIT = !!BASE_SHA
 // A1/A7: a shell-proxy death at git-clean must not be silently read as "clean tree" (empty output = clean).
-const gitCleanR = GIT ? await sh(`git -C ${REPO} status --porcelain`, 'git-clean') : null
-if (gitCleanR && shUnavailable(gitCleanR)) {
-  log('FATAL: shell-proxy agent returned no result for git-clean capture — cannot determine working tree state; aborting.')
+// In the batch this is covered by the whole-batch shUnavailable guard above; but if GIT is on we also
+// require the git-clean marker to be present (its absence = broken protocol = fatal, not silent-clean).
+if (GIT && !cleanSeg) {
+  log('FATAL: prologue batch produced no git-clean marker — cannot determine working tree state; aborting.')
   return { error: 'shell-proxy unavailable at git-clean decision point', task: TASK }
 }
-const gitClean = GIT ? ((gitCleanR!.stdout || '').trim() === '') : false
+const gitClean = GIT ? (cleanSeg!.out.trim() === '') : false
 const GIT_EXEC = GIT
   ? `\nGit: after GREEN, commit the behavior step (\`git add -A && git commit -m "test: ..."\`); after any ` +
     `refactor, a SEPARATE commit (two hats). Commit ONLY in-scope files. Report SHAs in \`commits\`.`
@@ -268,39 +348,64 @@ if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edit
 // the front door clears it after confirming no run is alive. Cleared deterministically at the end.
 let LOCKFILE = ''
 if (GIT) {
-  // A1 (4th point): if sh proxy dies at lock-dir, retry ONCE — silent skip would set LOCKFILE=''
-  // and dissolve mutual exclusion entirely (lock-check is never reached). A sentinel on both
-  // attempts is fatal: proceeding lock-less after 'git mode ON' is strictly forbidden.
-  let lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir')
-  if (shUnavailable(lockDirR)) {
-    log('shell-proxy returned no result for lock-dir — retrying once …')
-    lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, 'lock-dir-retry')
-  }
-  if (shUnavailable(lockDirR)) {
-    log('FATAL: shell-proxy unavailable at lock-dir (both attempts) — cannot establish mutual exclusion; aborting.')
+  // lock-dir + lock-check were captured in batch-1 (the prologue) — no extra round-trip. A1 (4th
+  // point): a dead proxy already aborted via the whole-batch shUnavailable guard above (with the
+  // ONE retry), so reaching here means the batch ran; we now read its lock-dir / lock-check markers.
+  // A missing lock-dir marker (protocol broke while GIT is on) is fatal — proceeding lock-less after
+  // 'git mode ON' is strictly forbidden, and an absent marker must NOT silently set LOCKFILE=''.
+  const lockDirSeg = prologue.get('lock-dir')
+  if (!lockDirSeg) {
+    log('FATAL: prologue batch produced no lock-dir marker — cannot establish mutual exclusion; aborting.')
     return { error: 'shell-proxy unavailable at lock-dir decision point', task: TASK }
   }
-  const gd = (lockDirR.stdout || '').trim().split('\n').pop() || ''
+  const gd = lockDirSeg.out.trim().split('\n').pop() || ''
   if (gd && gd.startsWith('/')) {
     LOCKFILE = `${gd}/rs-lock`
-    // A1/A7: if sh proxy is dead here, treat as fatal — a null result would read as "held=''"
-    // (no lock held) and allow a second concurrent engine to clobber the working tree.
-    const lockCheckR = await sh(`cat ${LOCKFILE} 2>/dev/null || true`, 'lock-check')
-    if (shUnavailable(lockCheckR)) {
-      log('FATAL: shell-proxy agent returned no result for lock-check — cannot verify mutual exclusion; aborting.')
+    // A1/A7: the lock-check marker MUST be present — its absence (gitdir resolved but no lock-check
+    // segment) means the batch's lock read was lost; that must NOT read as "held=''" (no lock held),
+    // which would let a second concurrent engine clobber the working tree. Treat as fatal.
+    const lockCheckSeg = prologue.get('lock-check')
+    if (!lockCheckSeg) {
+      log('FATAL: prologue batch produced no lock-check marker — cannot verify mutual exclusion; aborting.')
       return { error: 'shell-proxy unavailable at lock-check decision point', task: TASK }
     }
-    const held = (lockCheckR.stdout || '').trim()
+    const held = lockCheckSeg.out.trim()
     if (held) {
       log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`)
       return { error: 'working tree locked by another recursive-slice run', lock: held, lockFile: LOCKFILE, task: TASK }
     }
+    // --- Batch 2: the single conditional lock-write (carries the real BASE_SHA from batch-1) ---
     // A1 (same class as lock-check): if sh proxy dies writing the lock, the engine would proceed
     // believing it holds the lock when it does not — a second concurrent run could clobber the
-    // working tree. Treat as fatal: aborting is safer than running with unestablished mutual exclusion.
-    const lockWriteR = await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, 'lock-write')
-    if (shUnavailable(lockWriteR)) {
+    // working tree. Treat as fatal. The `[ ! -s ]` re-test inside the same shell keeps check-then-write
+    // atomic at the write itself: a run that grabbed the lock between batch-1 and batch-2 makes the
+    // file non-empty, so this write is skipped and lock-write reports skipped — JS then aborts.
+    // The write marker uses a NON-numeric `race` sentinel for the else branch so it is distinguishable
+    // from a real exit code (a numeric marker = the write ran; `race` = the file became non-empty between
+    // the two batches). We detect `race` from the raw output (it deliberately does NOT parse as a marker
+    // code, so get('lock-write') returns null for it), and `wrote` (any numeric marker) means it ran.
+    const writeBatch = await shBatch(
+      `if [ ! -s "${LOCKFILE}" ]; then echo rs-${BASE_SHA.slice(0, 12)} > "${LOCKFILE}"; printf '<<RS:lock-write:%s>>\\n' "$?"; else printf '<<RS-RACE:lock-write>>\\n'; fi`,
+      'lock-write')
+    if (shUnavailable(writeBatch.raw)) {
       log('FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.')
+      return { error: 'shell-proxy unavailable at lock-write decision point', task: TASK }
+    }
+    // A racing run grabbed the lock between batch-1 and batch-2 (file became non-empty → the `else`
+    // branch emitted the RACE sentinel): abort rather than clobber a concurrent run's lock.
+    if (/<<RS-RACE:lock-write>>/.test(writeBatch.raw.stdout || '')) {
+      log(`FATAL: another recursive-slice run grabbed this working tree between lock-check and lock-write. Remove ${LOCKFILE} if that run is dead, then relaunch.`)
+      return { error: 'working tree locked by a concurrent recursive-slice run (lock-write race)', lockFile: LOCKFILE, task: TASK }
+    }
+    const writeSeg = writeBatch.get('lock-write')
+    // Missing marker AND no race sentinel = batch ran but protocol broke → cannot confirm the lock was
+    // written → fatal (never proceed believing the lock is held when we cannot prove it).
+    if (!writeSeg) {
+      log('FATAL: lock-write batch produced no lock-write marker — lock not confirmed; aborting.')
+      return { error: 'shell-proxy unavailable at lock-write decision point', task: TASK }
+    }
+    if (writeSeg.code !== 0) {
+      log(`FATAL: lock-write failed (exit ${writeSeg.code}) — lock file not written; cannot guarantee mutual exclusion; aborting.`)
       return { error: 'shell-proxy unavailable at lock-write decision point', task: TASK }
     }
   }
@@ -493,11 +598,21 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // set AND sh calls were dispatched). During QUOTA_HALT the inner sh() calls no-op, so we check
     // the exitCode of the first sh to decide: QUOTA_HALT makes sh return SH_UNAVAILABLE (-2) which
     // means the restore was a no-op — callers must not log 'restored to' in that case.
+    // ITEM 6 (LATENCY): the per-leaf restore was 2 SERIAL sh() spawns (reset --hard, then clean -fdq)
+    // for every untrusted leaf. They are sequential-deterministic git on the same tree — BATCHED into
+    // ONE sh() round-trip. Each sub-command keeps its EXIT MARKER so a reset/clean failure is still
+    // detected per-command (the reset marker drives the return value verbatim). A dead proxy / quota
+    // halt makes the WHOLE batch return SH_UNAVAILABLE → no reset marker → returns false (the old
+    // `r.exitCode !== -2` no-op semantics, byte-equivalent: restore did not run).
     const restore = async (): Promise<boolean> => {
       if (!GIT || !cleanOK || !leafStart) return false
-      const r = await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`)
-      await sh(`git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch`, `clean:${lbl}`)   // drop untracked files the leaf created (never the shared build dir)
-      return r.exitCode !== -2   // -2 = SH_UNAVAILABLE = sh no-op'd (quota halt or proxy dead)
+      const b = await shBatch(
+        `git -C ${repo} reset --hard ${leafStart}; printf '<<RS:reset:%s>>\\n' "$?"; ` +
+        `git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch; printf '<<RS:clean:%s>>\\n' "$?"`,   // drop untracked files the leaf created (never the shared build dir)
+        `reset:${lbl}`)
+      // reset marker present ⇔ the reset sub-command actually ran (proxy alive, not a quota no-op).
+      // Absent (SH_UNAVAILABLE / protocol break) = no-op → false, exactly as `r.exitCode !== -2` did.
+      return b.get('reset') !== null
     }
 
     let res: ExecResult | null = null, verdict: Verdict | null = null, attempt = 0, prevIssueCount = Infinity

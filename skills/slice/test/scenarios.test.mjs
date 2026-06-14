@@ -2,7 +2,7 @@
 // Run: node --test skills/slice/test/
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runEngine, dispatcher, FIX, ARGS, ARGS_DEFAULT, ARGS_PARALLEL, isSh, has } from './host.mjs'
+import { runEngine, dispatcher, FIX, ARGS, ARGS_DEFAULT, ARGS_PARALLEL, isSh, has, isBatch } from './host.mjs'
 
 test('happy path: atomic root → trusted leaf → green integrate → briefing', async () => {
   const { result, logs } = await runEngine({ args: ARGS, dispatch: dispatcher() })
@@ -37,25 +37,20 @@ test('repair loop: first verify distrusts, repair re-executes, second verify tru
 // cleanup path that bypasses QUOTA_HALT. After quota death the ONLY allowed subsequent call is a
 // shForce lock-clear (isSh class, rm -f <lockfile> prompt). Non-sh agents stay zero.
 test('quota circuit breaker: after quota death only shForce lock-clear fires (non-sh=0, lock cleared, no false restored log)', async () => {
-  // Engineer LOCKFILE to be set: override rev-parse --absolute-git-dir to return a real path.
-  // Without this, LOCKFILE stays '' and lock-clear never fires — the fixture would prove nothing.
+  // Engineer LOCKFILE to be set: the batched prologue's lock-dir marker must carry a real abs path
+  // (ITEM 6: `rev-parse --absolute-git-dir` is now a sub-command inside the prologue batch, so its
+  // OUTCOME is supplied via shOver, not by intercepting a standalone prompt). With a real gitdir the
+  // engine emits the lock-check + lock-write sub-commands and LOCKFILE is set, so the lock-clear path
+  // is exercised. lock-check defaults to "not held" (exit 1) so the engine proceeds to lock-write.
   let tripped = -1
   const FAKE_GIT_DIR = '/tmp/rs-fixture/.git'
   const dispatch = dispatcher((c) => {
-    // Make lock-dir return a real abs path so LOCKFILE is set and the lock-clear path is exercised
-    if (isSh(c) && /rev-parse --absolute-git-dir/.test(c.prompt)) {
-      return { exitCode: 0, stdout: FAKE_GIT_DIR + '\n' }
-    }
-    // Confirm no lock held (so the engine proceeds past lock-check)
-    if (isSh(c) && /rs-lock/.test(c.prompt) && /cat /.test(c.prompt)) {
-      return { exitCode: 1, stdout: '' }
-    }
     // Trip quota at the first verify call
     if (/verify/.test(c.opts.label || '') && tripped === -1) {
       tripped = c.i
       throw new Error("You've hit your session limit · resets 12:20am (Asia/Seoul)")
     }
-  })
+  }, { 'lock-dir': { out: FAKE_GIT_DIR, code: 0 } })  // shOver: real gitdir ⇒ LOCKFILE set, lock block runs
   const { result, calls, logs } = await runEngine({ args: ARGS, dispatch })
 
   assert.ok(tripped >= 0, 'the quota throw fired')
@@ -261,25 +256,21 @@ test('lock-write sh death is fatal: result.error set, no leaf executes (engine m
   // (result.error) rather than continuing under the false belief that it holds mutual exclusion.
   let lockWriteFired = false
   const execLabels = []
+  // ITEM 6: the prologue batch (git-sha+clean+lock-dir+lock-check) runs first; a real gitdir (shOver
+  // lock-dir) makes the engine emit lock-check (defaults to "not held", exit 1) and then proceed to the
+  // SEPARATE lock-write batch (batch-2). We kill THAT batch (its prompt carries `echo rs-…` + `rs-lock`)
+  // to simulate the shell proxy dying at lock-write → the whole batch returns SH_UNAVAILABLE (sentinel) →
+  // the engine's lock-write fatal guard must fire (same CLAIM as before the batching: result.error, no leaf).
   const dispatch = dispatcher((c) => {
-    if (isSh(c)) {
-      if (/rev-parse --absolute-git-dir/.test(c.prompt)) {
-        return { exitCode: 0, stdout: '/tmp/rs-fixture/.git\n' }
-      }
-      if (/rs-lock/.test(c.prompt) && /cat /.test(c.prompt)) {
-        // No lock currently held — proceed to lock-write
-        return { exitCode: 1, stdout: '' }
-      }
-      if (/rs-lock/.test(c.prompt) && /echo /.test(c.prompt)) {
-        lockWriteFired = true
-        throw new Error('shell-proxy transport died on lock-write (fixture: A1 lock-write sentinel)')
-      }
+    if (isSh(c) && /rs-lock/.test(c.prompt) && /echo /.test(c.prompt)) {
+      lockWriteFired = true
+      throw new Error('shell-proxy transport died on lock-write (fixture: A1 lock-write sentinel)')
     }
     // Track any exec calls (must be zero — no leaf should run if lock was never written)
     if (!isSh(c) && /^exec:|exec:/.test(c.opts.label || '')) {
       execLabels.push(c.opts.label)
     }
-  })
+  }, { 'lock-dir': { out: '/tmp/rs-fixture/.git', code: 0 } })  // shOver: real gitdir ⇒ lock-check + lock-write fire
   const { result } = await runEngine({ args: ARGS, dispatch })
   assert.ok(lockWriteFired, 'lock-write sh call must have been attempted (fixture precondition)')
   // Engine must abort with result.error — not proceed believing lock is held
@@ -459,12 +450,11 @@ test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_H
   let assessLeafCount = 0  // counts assess:d1 calls (leaf-level assesses, NOT the root assess:d0)
   let haltCallI = -1       // calls.length at the moment QUOTA HALT log fires (detected post-run)
 
+  // GIT=false: the batched prologue's git-sha marker carries NO 40-char sha → BASE_SHA='' → GIT=false.
+  // (ITEM 6: rev-parse HEAD is now inside the batched prologue script, so the git-sha OUTCOME is supplied
+  // via shOver, not by intercepting a standalone `rev-parse HEAD` prompt.) This eliminates the per-leaf
+  // leafStart+restore sh() calls that would otherwise reset the streak between leaves.
   const dispatch = dispatcher((c) => {
-    // GIT=false: rev-parse HEAD returns a response with no 40-char sha → BASE_SHA='' → GIT=false.
-    // This eliminates leafStart+restore sh() calls that would reset the streak between leaves.
-    if (isSh(c) && /rev-parse HEAD/.test(c.prompt)) {
-      return { exitCode: 0, stdout: '' }
-    }
     // Root assess (assess:d0) → slice so the slicer fires (must NOT fall through to base assessExecute)
     if (has(c, /assess:d0/)) return FIX.assessSlice
     // Return 2 non-atomic slices so both leaves enter their own assess
@@ -483,7 +473,7 @@ test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_H
     if (/^exec:|exec:/.test(c.opts.label || '') && /\.r\d/.test(c.opts.label || '')) {
       throw new Error('transport error on repair exec (fixture: mixed-class streak pin)')
     }
-  })
+  }, { 'git-sha': { out: '', code: 0 } })  // shOver: empty sha ⇒ GIT=false (no per-leaf restore sh)
 
   const { result, logs, calls } = await runEngine({ args: ARGS, dispatch })
 
@@ -1346,4 +1336,85 @@ test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (g
     'integration signal stays separately distrusted (rollup did not mask it)')
   assert.equal(fail.result.trustedLeaves, fail.result.totalLeaves,
     'leaves are individually trusted — proving overallTrust:false came from the integration dimension, not the leaves')
+})
+
+// ITEM 6 (LATENCY): deterministic git is BATCHED into ONE sh() per logical phase, with a per-command
+// EXIT MARKER so a failure in ANY sub-command is still detected exactly as before. These pins guard
+// (1) the prologue collapses 5 serial spawns into one marker-protocol script carrying every decision
+// sub-command, (2) the per-leaf reset+clean collapses into one marker-protocol script carrying both,
+// (3) the marker shapes survive (git-sha/git-clean/lock-dir/lock-check all in ONE prompt), and (4) the
+// new lock-write RACE-detection path aborts if a concurrent run grabs the lock between the two batches.
+test('ITEM 6: prologue is ONE batched sh carrying every decision sub-command + its exit marker', async () => {
+  const shCalls = []
+  const dispatch = dispatcher((c) => { if (isSh(c)) shCalls.push(c) })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.error, undefined, `green run must not error; got ${result.error}`)
+  // The FIRST sh call is the batched prologue — one round-trip, not 5.
+  const prologue = shCalls.find((c) => /prologue/.test(c.opts.label || ''))
+  assert.ok(prologue, 'a batched prologue sh call must fire')
+  assert.ok(isBatch(prologue.prompt), 'the prologue prompt must use the marker protocol (<<RS:NAME:%s>>)')
+  // All four prologue decision sub-commands live in the ONE prompt (verbatim commands preserved)…
+  for (const cmd of [/rev-parse HEAD/, /status --porcelain/, /rev-parse --absolute-git-dir/, /rs-lock/]) {
+    assert.match(prologue.prompt, cmd, `prologue batch must contain the verbatim ${cmd} command`)
+  }
+  // …each followed by its OWN exit marker so per-command outcome detection survives.
+  for (const name of ['git-sha', 'git-clean', 'lock-dir', 'lock-check']) {
+    assert.ok(prologue.prompt.includes(`<<RS:${name}:%s>>`), `prologue batch must emit the ${name} exit marker`)
+  }
+  // There must NOT be SEPARATE standalone git-sha / git-clean / lock-dir / lock-check sh round-trips
+  // (the whole point of the batch). The only other prologue-era single sh is the per-leaf head capture.
+  const standaloneProbe = shCalls.filter((c) => !isBatch(c.prompt) &&
+    (/status --porcelain/.test(c.prompt) || /rev-parse --absolute-git-dir/.test(c.prompt) ||
+     (/rs-lock/.test(c.prompt) && /cat /.test(c.prompt))))
+  assert.equal(standaloneProbe.length, 0,
+    `prologue git probes must be batched, not standalone; stray: ${standaloneProbe.map((c) => c.opts.label).join(', ')}`)
+})
+
+test('ITEM 6: per-leaf reset+clean is ONE batched sh carrying both reset AND clean markers (no 2 spawns)', async () => {
+  // Force a distrusted leaf so restore() runs; a real gitdir (shOver) + clean tree make cleanOK true.
+  const resetBatches = []
+  const standaloneResets = []
+  const dispatch = dispatcher((c) => {
+    if (isSh(c) && /reset --hard/.test(c.prompt)) (isBatch(c.prompt) ? resetBatches : standaloneResets).push(c)
+    if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) return FIX.distrust
+  }, { 'lock-dir': { out: '/tmp/rs-fixture/.git', code: 0 } })
+  const { logs } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(resetBatches.length >= 1, 'a batched reset+clean sh call must fire on an untrusted leaf')
+  assert.equal(standaloneResets.length, 0, 'reset must NOT be a standalone sh call (it is batched with clean)')
+  const b = resetBatches[0]
+  assert.ok(/reset --hard/.test(b.prompt) && /clean -fdq/.test(b.prompt),
+    'the batch must carry BOTH the verbatim reset --hard AND clean -fdq commands')
+  assert.ok(b.prompt.includes('<<RS:reset:%s>>') && b.prompt.includes('<<RS:clean:%s>>'),
+    'the batch must emit BOTH the reset and clean exit markers (per-command outcome detection)')
+  // The reset marker being parsed is what makes restore() report it ran — proven by the 'restored to' log.
+  assert.ok(logs.some((l) => /restored to/.test(l)),
+    `an untrusted leaf with a clean tree + real gitdir must log 'restored to'; got: ${logs.filter((l) => /restored|clean/.test(l)).join(' | ')}`)
+})
+
+test('ITEM 6: a RED in ONE batched sub-command is detected per-marker — lock-write failure stays fatal', async () => {
+  // The lock-write batch (batch-2) writes the lock; a non-zero exit on JUST that sub-command (proxy alive,
+  // command failed) must surface per-marker as a FATAL abort — NOT silently read as "lock held". This is
+  // the marker protocol's core promise: per-command RED detection survives the batch.
+  const execLabels = []
+  const dispatch = dispatcher((c) => {
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) execLabels.push(c.opts.label)
+  }, { 'lock-dir': { out: '/tmp/rs-fixture/.git', code: 0 }, 'lock-write': { out: '', code: 1 } })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(result.error, 'a non-zero lock-write sub-command exit must abort (result.error set)')
+  assert.match(result.error, /lock.?write|shell.?proxy/i, `error must name lock-write; got "${result.error}"`)
+  assert.equal(execLabels.length, 0, 'no leaf may execute when lock-write failed')
+})
+
+test('ITEM 6: lock-write RACE — a concurrent grab between the two batches aborts (tightened atomicity)', async () => {
+  // The conditional lock-write re-tests `[ ! -s lockfile ]` inside its own shell. If a racing run grabbed
+  // the lock between the read-batch and the write-batch, the file is non-empty → the engine's `else` branch
+  // emits the RACE sentinel (NOT a numeric marker). JS detects it and aborts rather than clobbering.
+  const execLabels = []
+  const dispatch = dispatcher((c) => {
+    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) execLabels.push(c.opts.label)
+  }, { 'lock-dir': { out: '/tmp/rs-fixture/.git', code: 0 }, 'lock-write': { race: true } })
+  const { result } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(result.error, 'a lock-write race must abort (result.error set)')
+  assert.match(result.error, /lock|concurrent|race/i, `error must name the lock race; got "${result.error}"`)
+  assert.equal(execLabels.length, 0, 'no leaf may execute when a concurrent run grabbed the lock')
 })

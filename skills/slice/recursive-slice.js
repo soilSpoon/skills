@@ -205,6 +205,25 @@ ${cmd}`,
       return SH_UNAVAILABLE;
     }
   };
+  const MARKER = /<<RS:([A-Za-z0-9_-]+):(-?\d+)>>/;
+  const shBatch = async (script, label) => {
+    const raw = await sh(script, label);
+    const dead = shUnavailable(raw);
+    const stdout = raw.stdout || "";
+    const map = /* @__PURE__ */ new Map();
+    if (!dead) {
+      let rest = stdout;
+      let m;
+      while (m = rest.match(new RegExp(MARKER.source))) {
+        const idx = m.index || 0;
+        const before = rest.slice(0, idx);
+        const out = before.replace(/\n$/, "");
+        map.set(m[1], { code: parseInt(m[2], 10), out });
+        rest = rest.slice(idx + m[0].length).replace(/^\n/, "");
+      }
+    }
+    return { raw, get: (name) => map.get(name) || null };
+  };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
@@ -238,20 +257,30 @@ LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED
   const engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
 ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
 ${duty}`;
-  const headR = await sh(`git -C ${REPO} rev-parse HEAD 2>/dev/null || true`, "git-sha");
-  if (shUnavailable(headR)) {
-    log("FATAL: shell-proxy agent returned no result for git-sha capture — cannot determine git state; aborting.");
+  const probe = `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`;
+  let prologue = await shBatch(probe, "prologue");
+  if (shUnavailable(prologue.raw)) {
+    log("shell-proxy returned no result for prologue (git-sha/clean/lock) — retrying once …");
+    prologue = await shBatch(probe, "prologue-retry");
+  }
+  if (shUnavailable(prologue.raw)) {
+    log("FATAL: shell-proxy agent returned no result for prologue (git-sha/git-clean/lock) — cannot determine git state; aborting.");
+    return { error: "shell-proxy unavailable at prologue decision point", task: TASK };
+  }
+  const shaSeg = prologue.get("git-sha");
+  const cleanSeg = prologue.get("git-clean");
+  if (!shaSeg) {
+    log("FATAL: prologue batch produced no git-sha marker — cannot determine git state; aborting.");
     return { error: "shell-proxy unavailable at git-sha decision point", task: TASK };
   }
-  const headOut = headR.stdout || "";
+  const headOut = shaSeg.out;
   const BASE_SHA = (headOut.match(/[0-9a-f]{40}/i) || [""])[0];
   const GIT = !!BASE_SHA;
-  const gitCleanR = GIT ? await sh(`git -C ${REPO} status --porcelain`, "git-clean") : null;
-  if (gitCleanR && shUnavailable(gitCleanR)) {
-    log("FATAL: shell-proxy agent returned no result for git-clean capture — cannot determine working tree state; aborting.");
+  if (GIT && !cleanSeg) {
+    log("FATAL: prologue batch produced no git-clean marker — cannot determine working tree state; aborting.");
     return { error: "shell-proxy unavailable at git-clean decision point", task: TASK };
   }
-  const gitClean = GIT ? (gitCleanR.stdout || "").trim() === "" : false;
+  const gitClean = GIT ? cleanSeg.out.trim() === "" : false;
   const GIT_EXEC = GIT ? `
 Git: after GREEN, commit the behavior step (\`git add -A && git commit -m "test: ..."\`); after any refactor, a SEPARATE commit (two hats). Commit ONLY in-scope files. Report SHAs in \`commits\`.` : "";
   const gitVerify = (repo, from) => GIT ? `
@@ -261,31 +290,43 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
   let LOCKFILE = "";
   if (GIT) {
-    let lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir");
-    if (shUnavailable(lockDirR)) {
-      log("shell-proxy returned no result for lock-dir — retrying once …");
-      lockDirR = await sh(`git -C ${REPO} rev-parse --absolute-git-dir`, "lock-dir-retry");
-    }
-    if (shUnavailable(lockDirR)) {
-      log("FATAL: shell-proxy unavailable at lock-dir (both attempts) — cannot establish mutual exclusion; aborting.");
+    const lockDirSeg = prologue.get("lock-dir");
+    if (!lockDirSeg) {
+      log("FATAL: prologue batch produced no lock-dir marker — cannot establish mutual exclusion; aborting.");
       return { error: "shell-proxy unavailable at lock-dir decision point", task: TASK };
     }
-    const gd = (lockDirR.stdout || "").trim().split("\n").pop() || "";
+    const gd = lockDirSeg.out.trim().split("\n").pop() || "";
     if (gd && gd.startsWith("/")) {
       LOCKFILE = `${gd}/rs-lock`;
-      const lockCheckR = await sh(`cat ${LOCKFILE} 2>/dev/null || true`, "lock-check");
-      if (shUnavailable(lockCheckR)) {
-        log("FATAL: shell-proxy agent returned no result for lock-check — cannot verify mutual exclusion; aborting.");
+      const lockCheckSeg = prologue.get("lock-check");
+      if (!lockCheckSeg) {
+        log("FATAL: prologue batch produced no lock-check marker — cannot verify mutual exclusion; aborting.");
         return { error: "shell-proxy unavailable at lock-check decision point", task: TASK };
       }
-      const held = (lockCheckR.stdout || "").trim();
+      const held = lockCheckSeg.out.trim();
       if (held) {
         log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`);
         return { error: "working tree locked by another recursive-slice run", lock: held, lockFile: LOCKFILE, task: TASK };
       }
-      const lockWriteR = await sh(`echo rs-${BASE_SHA.slice(0, 12)} > ${LOCKFILE}`, "lock-write");
-      if (shUnavailable(lockWriteR)) {
+      const writeBatch = await shBatch(
+        `if [ ! -s "${LOCKFILE}" ]; then echo rs-${BASE_SHA.slice(0, 12)} > "${LOCKFILE}"; printf '<<RS:lock-write:%s>>\\n' "$?"; else printf '<<RS-RACE:lock-write>>\\n'; fi`,
+        "lock-write"
+      );
+      if (shUnavailable(writeBatch.raw)) {
         log("FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.");
+        return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
+      }
+      if (/<<RS-RACE:lock-write>>/.test(writeBatch.raw.stdout || "")) {
+        log(`FATAL: another recursive-slice run grabbed this working tree between lock-check and lock-write. Remove ${LOCKFILE} if that run is dead, then relaunch.`);
+        return { error: "working tree locked by a concurrent recursive-slice run (lock-write race)", lockFile: LOCKFILE, task: TASK };
+      }
+      const writeSeg = writeBatch.get("lock-write");
+      if (!writeSeg) {
+        log("FATAL: lock-write batch produced no lock-write marker — lock not confirmed; aborting.");
+        return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
+      }
+      if (writeSeg.code !== 0) {
+        log(`FATAL: lock-write failed (exit ${writeSeg.code}) — lock file not written; cannot guarantee mutual exclusion; aborting.`);
         return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
       }
     }
@@ -477,9 +518,12 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
       const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || "").match(/[0-9a-f]{40}/i) || [""])[0] : "";
       const restore = async () => {
         if (!GIT || !cleanOK || !leafStart) return false;
-        const r = await sh(`git -C ${repo} reset --hard ${leafStart}`, `reset:${lbl}`);
-        await sh(`git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch`, `clean:${lbl}`);
-        return r.exitCode !== -2;
+        const b = await shBatch(
+          `git -C ${repo} reset --hard ${leafStart}; printf '<<RS:reset:%s>>\\n' "$?"; git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch; printf '<<RS:clean:%s>>\\n' "$?"`,
+          // drop untracked files the leaf created (never the shared build dir)
+          `reset:${lbl}`
+        );
+        return b.get("reset") !== null;
       };
       let res = null, verdict = null, attempt = 0, prevIssueCount = Infinity;
       let gateLevel = "llm-only";
