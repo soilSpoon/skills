@@ -1461,7 +1461,8 @@ test('ITEM 6: lock-write RACE — a concurrent grab between the two batches abor
 //   (c) seamPointers is OPTIONAL: a slice WITHOUT the field still produces a valid exec prompt
 //       (backward-compatible contract — no regression on existing fixtures).
 test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXEC anchor-guard wording present', async () => {
-  // Slice with seamPointers populated by a "Slicer that already resolved the seams"
+  // Two slices so the engine takes the real slice path (slices.length > 1 guard); the first carries
+  // seamPointers so we can assert they thread through to that leaf's exec prompt.
   const sliceWithPointers = {
     desc: 'fixture slice with seam pointers',
     interface: 'function foo(): string',
@@ -1477,16 +1478,28 @@ test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXE
       { file: 'src/bar.ts', symbol: 'barHelper' },
     ],
   }
+  const slicePlain = {
+    desc: 'fixture sibling slice no pointers',
+    interface: 'TBD',
+    contract: 'do sibling thing in src/sibling.ts',
+    independent: true,
+    dependsOn: [],
+    kind: 'behavior',
+    atomic: true,
+    riskTier: 'standard',
+    testScope: 'SibSuite',
+    // no seamPointers — sibling without pointers (exercises backward-compat AND the > 1 guard)
+  }
 
   const execPrompts = []
   const dispatch = dispatcher((c) => {
-    // Force slice path returning our fixture slice with seamPointers
+    // Force slice path returning TWO children; first carries seamPointers, second does not
     if (/decompose/.test(c.opts.label || '')) {
-      return { action: 'slice', reason: 'fixture: decompose', slices: [sliceWithPointers] }
+      return { action: 'slice', reason: 'fixture: decompose', slices: [sliceWithPointers, slicePlain] }
     }
-    // Capture exec prompts to inspect
+    // Capture exec prompts to inspect (keyed by label so we can find the right leaf)
     if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
-      execPrompts.push(c.prompt)
+      execPrompts.push({ prompt: c.prompt, label: c.opts.label || '' })
     }
   })
 
@@ -1494,43 +1507,25 @@ test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXE
   assert.equal(result.error, undefined, `engine must not error; got: "${result.error}"`)
   assert.ok(execPrompts.length >= 1, 'at least one exec prompt must fire')
 
-  // (a) exec prompt contains the seam pointer file and symbol
-  const ep = execPrompts[0]
+  // (a) Find the exec prompt for the leaf that had seamPointers (the 'fixture slice with seam pointers' leaf)
+  const epEntry = execPrompts.find((e) => /fixture slice with seam pointers/.test(e.prompt))
+  assert.ok(epEntry, `an exec prompt for the slice carrying seamPointers must exist; labels: ${execPrompts.map((e) => e.label).join(', ')}`)
+  const ep = epEntry.prompt
   assert.ok(/src\/foo\.ts/.test(ep),
-    `exec prompt must contain the seamPointer file 'src/foo.ts'; got (first 500): ${ep.slice(0, 500)}`)
-  assert.ok(/foo/.test(ep) && /src\/bar\.ts/.test(ep),
-    `exec prompt must contain both seam pointer entries; got (first 600): ${ep.slice(0, 600)}`)
+    `exec prompt for the seam-pointer slice must contain 'src/foo.ts'; got (first 600): ${ep.slice(0, 600)}`)
+  assert.ok(/src\/bar\.ts/.test(ep),
+    `exec prompt must contain second seam pointer 'src/bar.ts'; got (first 800): ${ep.slice(0, 800)}`)
 
   // (b) R_EXEC anchor-guard wording: Executor must confirm via Read, not treat as gospel
-  // The R_EXEC persona is injected at the top of every exec prompt
+  // The R_EXEC persona is injected at the top of every exec prompt (the SEAM POINTERS section)
   assert.ok(/confirm.*Read|Read.*confirm/i.test(ep) || /not gospel/i.test(ep) || /anchor/i.test(ep),
-    `exec prompt must instruct Executor to confirm pointer via Read (not gospel); got (first 800): ${ep.slice(0, 800)}`)
+    `exec prompt must instruct Executor to confirm pointer via Read (not gospel); got (first 2000): ${ep.slice(0, 2000)}`)
 
-  // (c) backward-compatible: a slice WITHOUT seamPointers still works (no crash, valid exec prompt)
-  const plainSlice = {
-    desc: 'fixture plain slice no pointers',
-    interface: 'TBD',
-    contract: 'do plain thing in src/plain.ts',
-    independent: true,
-    dependsOn: [],
-    kind: 'behavior',
-    atomic: true,
-    riskTier: 'standard',
-    testScope: 'PlainSuite',
-    // seamPointers intentionally absent
-  }
-  const plainExecPrompts = []
-  const plainDispatch = dispatcher((c) => {
-    if (/decompose/.test(c.opts.label || '')) {
-      return { action: 'slice', reason: 'fixture: decompose', slices: [plainSlice] }
-    }
-    if (!isSh(c) && /^exec:/.test(c.opts.label || '')) {
-      plainExecPrompts.push(c.prompt)
-    }
-  })
-  const { result: plainResult } = await runEngine({ args: ARGS, dispatch: plainDispatch })
-  assert.equal(plainResult.error, undefined, `plain slice (no seamPointers) must not error; got: "${plainResult.error}"`)
-  assert.ok(plainExecPrompts.length >= 1, 'plain slice must still produce an exec prompt')
+  // (c) backward-compatible: the sibling slice WITHOUT seamPointers also produces a valid exec prompt
+  const sibEntry = execPrompts.find((e) => /fixture sibling slice no pointers/.test(e.prompt))
+  assert.ok(sibEntry, `an exec prompt for the plain sibling (no seamPointers) must also exist`)
+  assert.ok(!/Seam Pointers \(already resolved/.test(sibEntry.prompt),
+    `exec prompt for the plain sibling must NOT contain seam-pointer section (no seamPointers on that slice)`)
 })
 
 // ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk). The engine auto-emits its own
