@@ -17,7 +17,7 @@ maps to the engine.
 - **[Mastering Programming](https://newsletter.kentbeck.com/p/mastering-programming)** —
   master programmers scale by solving *fewer* things at once. Heuristics: Slicing, One Thing
   at a Time, Baseline Measurement, Concrete Hypotheses, Isolation, Symmetry, Call Your Shot,
-  Make It Run/Right/Fast. → the decomposition discipline driving `slice-slicer` / `slice-assessor` / `slice-baseliner`.
+  Make It Run/Right/Fast. → the decomposition discipline driving `slice-slicer` (which owns both the recursion-termination decision and the cut) / `slice-baseliner`.
 - **[Canon TDD](https://newsletter.kentbeck.com/p/canon-tdd)** — the exact 5-step loop: list
   scenarios → turn *one* into a concrete test → make it (and all prior) pass → optionally
   refactor → repeat. Names the anti-patterns (deleting assertions, pasting computed values,

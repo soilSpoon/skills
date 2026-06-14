@@ -25,11 +25,14 @@ export interface Baseline {
   inProcessVerifiable?: boolean
   worktreeSetupCommand?: string   // E: shell command run once per parallel git-worktree right after creation
 }
-export interface Assessment {
-  difficulty: 'easy' | 'hard'
-  size?: 'small' | 'big'
+/** ITEM 10: the merged 'decompose' decision (DECOMPOSE schema) — Assessor folded INTO the Slicer.
+ *  ONE agent decides per node: a LEAF ({action:'execute'|'spike', riskTier}) or a cut
+ *  ({action:'slice', slices}). Replaces the old two-role assess(execute|slice|spike) + slice(the cut). */
+export interface Decompose {
   action: 'execute' | 'slice' | 'spike'
+  riskTier?: RiskTier        // for action:'execute' — this leaf's verification tier
   reason: string
+  slices?: SliceSpec[]       // for action:'slice' — the thin vertical children
 }
 export interface SliceSpec {
   desc: string

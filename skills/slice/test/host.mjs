@@ -53,8 +53,15 @@ export const FIX = {
     projectCard: 'fixture conventions', coldBuildCost: 'cheap',
     purposeCheck: 'n/a (pure fixture)', inProcessVerifiable: true,
   },
-  assessExecute: { difficulty: 'easy', size: 'small', action: 'execute', reason: 'fixture: atomic', risk: 'low' },
-  assessSlice: { difficulty: 'easy', size: 'big', action: 'slice', reason: 'fixture: decompose', risk: 'low' },
+  // ITEM 10: the Assessor folded INTO the Slicer — ONE 'decompose' decision per node (DECOMPOSE schema).
+  // decomposeExecute = a LEAF decision (action:'execute' + riskTier). riskTier:'light' preserves the OLD
+  // assessExecute behavior (difficulty:'easy'→light tier) so the existing tier-routing claims hold.
+  decomposeExecute: { action: 'execute', riskTier: 'light', reason: 'fixture: atomic leaf' },
+  // decomposeSlice = a SLICE decision. The merge means the cut comes back in the SAME call, so the slice
+  // decision CARRIES the slices (the 3 independent atomic slices the old separate slicer produced). The
+  // engine's per-child atomic/riskTier judgment (the old assessSlice→slicer→slices chain) is now one call.
+  // `slices` is filled in below (after FIX is constructed) to reuse FIX.slices3 without duplication.
+  decomposeSlice: { action: 'slice', reason: 'fixture: decompose', slices: null /* set below */ },
   exec: {
     summary: 'fixture change applied', passed: true, evidence: 'filtered run green (fixture)',
     filesChanged: ['src/x.ts'], refactor: 'none needed (fixture)', commits: [],
@@ -76,6 +83,9 @@ export const FIX = {
   briefing: { briefing: 'fixture briefing' },
   learn: { summary: 'fixture learning' },
 }
+// ITEM 10: a decompose:'slice' decision carries the cut in the SAME call. Reuse FIX.slices3's 3 atomic
+// independent slices so the merged decision returns the exact children the old separate slicer produced.
+FIX.decomposeSlice.slices = FIX.slices3.slices
 
 const GIT_SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'
 
@@ -143,8 +153,10 @@ export function dispatcher(over, shOver = {}) {
       return { exitCode: 0, stdout: '' }
     }
     if (c.opts.phase === 'Baseline') return FIX.baseline
-    if (has(c, /assess/)) return FIX.assessExecute
-    if (has(c, /slice:/)) return FIX.slices3
+    // ITEM 10: the merged 'decompose' decision (Work-loop label 'decompose:dN'). Default = a LEAF
+    // (execute) so the happy path bottoms out; a scenario overrides with FIX.decomposeSlice to force the
+    // slice path. The former separate 'slice:' label is GONE — the cut comes back in this same decision.
+    if (has(c, /decompose/)) return FIX.decomposeExecute
     if (has(c, /critic/)) return FIX.noMissing
     if (has(c, /spike/)) return FIX.learn
     if (has(c, /^exec:|exec:/)) return FIX.exec

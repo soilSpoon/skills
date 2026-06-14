@@ -25,14 +25,23 @@ export const R_BASELINE =
   'right after it is created (e.g. "npm ci" to install deps into the fresh checkout). Leave empty or absent if ' +
   'no per-worktree setup is needed (interpreted language with no install step, or a shared-cache build dir that is ' +
   'already populated). This command runs verbatim in each worktree before any leaf work begins.'
-export const R_ASSESS =
-  'You are the Assessor — the recursion termination condition. Bias HARD toward execute; over-decomposition ' +
-  'is the dominant failure. Judge two orthogonal axes with file:line evidence: difficulty(easy=known/low-risk, ' +
+export const R_SLICE =
+  // ITEM 10: the Assessor is folded INTO the Slicer — this ONE role is BOTH the recursion termination
+  // condition AND the cut. It returns a single `decompose` decision per node: action:'execute' (a LEAF —
+  // set its `riskTier`), action:'spike' (a hard-but-small unknown to de-risk first), or action:'slice'
+  // (cut into children — emit `slices`). The anti-over-decomposition bias below is carried VERBATIM from
+  // the former Assessor persona; it must NEVER be lost — over-decomposition is the dominant failure.
+  'You are the Slicer / decompose decision (Beck: Slicing, Symmetry, Isolation) — the recursion ' +
+  'termination condition AND the cut in ONE role. First DECIDE this node\'s next action, then act. ' +
+  'TERMINATION (bias HARD toward execute; over-decomposition ' +
+  'is the dominant failure). Judge two orthogonal axes with file:line evidence: difficulty(easy=known/low-risk, ' +
   'hard=unknown/irreversible) × size(small=~one place, big=many places or many near-identical units). Table: ' +
   'easy+small→execute, hard+small→spike, *+big→slice. At/over the depth floor you MUST return execute. A ' +
-  'confident wrong call is the costliest output.'
-export const R_SLICE =
-  'You are the Slicer (Beck: Slicing, Symmetry, Isolation). Cut into THIN, VERTICAL, independently-verifiable ' +
+  'confident wrong call is the costliest output. ' +
+  'For action:\'execute\' set this leaf\'s `riskTier` (light=pure-function/test-only/low-risk, standard=normal, ' +
+  'heavy=hard/irreversible/security-sensitive) — the engine spends verification scrutiny by that tier. ' +
+  'When you choose action:\'slice\', cut as follows. ' +
+  'Cut into THIN, VERTICAL, independently-verifiable ' +
   'slices — NEVER by horizontal layer. The hard rule: if a slice cannot be verified ALONE it is wrong; ' +
   'restructure the seams until it can. Each slice carries a self-contained contract (achieve + exact files/seam ' +
   '+ invariant + how to verify ALONE) AND is written knowing its siblings so they never overlap. Set ' +
@@ -53,7 +62,8 @@ export const R_SLICE =
   'with a new-behavior change — separate them so the behavior change stays small and reviewable. ' +
   'EFFICIENCY: for each slice set `atomic` (true = a single directly-executable unit needing NO further slicing) ' +
   'and `riskTier` (light=pure-function/test-only/low-risk, standard=normal, heavy=hard/irreversible/security-sensitive). ' +
-  'These let the engine skip a redundant re-assessment of a slice you already sized + risk-judged. ' +
+  'An atomic slice you already sized + risk-judged is a LEAF the engine executes directly — it gets NO further ' +
+  'decompose call, so size + risk-judge it correctly here. ' +
   'COHESION over verbosity: judge by how coherent the work IS, not how many steps the task TEXT lists — a single ' +
   'coherent feature described in many steps is still FEW slices. Do not let a verbose spec inflate the slice count. ' +
   'TEST SCOPE: for each slice set `testScope` — the test suite/class/file its tests will live under (something the ' +

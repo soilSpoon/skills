@@ -78,7 +78,8 @@ test('quota circuit breaker: after quota death only shForce lock-clear fires (no
 test('untrusted streak: persistently distrusted leaves halt the unit, run still returns', async () => {
   const dispatch = dispatcher((c) => {
     const l = c.opts.label || ''
-    if (/assess/.test(l) && /d0/.test(l)) return FIX.assessSlice
+    // ITEM 10: root decompose:d0 → slice (carries the 3 fixture children) so leaves run and get distrusted.
+    if (/decompose/.test(l) && /d0/.test(l)) return FIX.decomposeSlice
     if (/verify/.test(l) && !/integration/.test(l)) return FIX.distrust
   })
   const { result } = await runEngine({ args: ARGS, dispatch })
@@ -218,17 +219,15 @@ test('filterCommand {scope} substitutes as file path, t0 fires per-leaf with cor
 
   const sliceDispatch = dispatcher((c) => {
     if (c.opts.phase === 'Baseline') return customBaseline
-    // The root assess must return 'slice' so the slicer is invoked (otherwise engine executes
-    // the root node directly and testScope is undefined — t0 never fires).
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    // ITEM 10: the root decompose must return action:'slice' WITH the 2 children in the SAME call (the
+    // merged decision carries the cut), so the engine slices instead of executing the testScope-less root
+    // (1 child would take the non-reducing→execute path — the empirically verified fix the reviewer prescribed).
+    if (/decompose/.test(c.opts.label || '')) return { action: 'slice', reason: 'fixture: decompose', slices: twoSlices.slices }
     if (isSh(c) && /t0:/.test(c.opts.label || '')) {
       // Intercept the t0 engine-gate sh calls — capture the prompt and return ok
       t0Cmds.push(c.prompt)
       return { exitCode: 0, stdout: 'ok 1\n# tests 1\n# pass 1' }
     }
-    // slice: handler returns exactly 2 slices (1 would cause non-reducing path → execute original,
-    // which has no testScope — the empirically verified fix the reviewer prescribed)
-    if (/slice:/.test(c.opts.label || '')) return twoSlices
   })
 
   await runEngine({ args: ARGS, dispatch: sliceDispatch })
@@ -296,8 +295,8 @@ test('A4+A5: quota during parallel verify → Coordinate skipped + worktrees pre
   let briefingCalled = false
 
   const dispatch = dispatcher((c, env) => {
-    // Plan-phase assess has no label — match by phase to steer parallel partition
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    // Plan-phase decompose has no label — match by phase to steer parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     // Trip quota on the FIRST verify call (happens inside a parallel group's runWork)
     if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') && tripped === -1) {
       tripped = c.i
@@ -345,8 +344,8 @@ test('A5: wt-pre branch -D is preceded by --merged HEAD guard on normal parallel
   const branchDCmds = []
 
   const dispatch = dispatcher((c) => {
-    // Plan-phase assess has no label — match by phase to steer parallel partition
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    // Plan-phase decompose has no label — match by phase to steer parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     if (isSh(c)) {
       // Track --merged HEAD branch list queries (wt-pre guard)
       if (/branch.*--merged/.test(c.prompt)) {
@@ -393,17 +392,17 @@ test('wiring-scan sh death skips wiring-audit: SH_UNAVAILABLE sentinel guards th
 
 // A6 — NULL_STREAK 오발 방지: heavy tier 3-렌즈 연속 null은 설계상 용인 — 같은 클래스만의
 // streak는 QUOTA_HALT를 오발시켜선 안 된다. 서로 다른 클래스 ≥2가 있어야 진짜 신호.
-// Behavioral claim: assess returns {difficulty:'hard',action:'execute'} → heavy tier → all 3
+// Behavioral claim: decompose returns {action:'execute',riskTier:'heavy'} → heavy tier → all 3
 // lens-verify calls throw transient error → (a) no 'QUOTA HALT' log, (b) leaf verdict is
 // 'heavy verify: 3 lenses, 3 distrusted', (c) run returns normally.
 test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — each null is distrust only', async () => {
-  // Engineer the leaf to be heavy-tier: assess returns difficulty:'hard', action:'execute'
-  const assessHeavy = { difficulty: 'hard', size: 'small', action: 'execute', reason: 'fixture: hard leaf', risk: 'high' }
+  // ITEM 10: engineer a heavy-tier leaf via the merged decompose decision (action:'execute', riskTier:'heavy').
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
   let verifyThrows = 0
   // exec succeeds; all verify calls (all class=verify) throw — repair loop also re-runs 3 verify
   // calls (also same class) — streak grows but class set stays {verify} size=1 → no halt.
   const dispatch = dispatcher((c) => {
-    if (has(c, /assess/)) return assessHeavy
+    if (has(c, /decompose/)) return decomposeHeavy
     // All heavy lens verify calls throw a transient (non-session-limit) error. !isSh excludes the engine's
     // deterministic ENGINE-DIFF fetch (label 'verify-diff:…', an sh call) — it must run, not throw here.
     if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
@@ -429,17 +428,18 @@ test('A6: heavy-lens 3-null streak (same class) does NOT fire QUOTA_HALT — eac
 
 // A6 paired positive — 섞인 호출 클래스 3 연속 null이 정확히 streak=3에서 QUOTA_HALT를 발생시킨다.
 // 이 테스트가 없으면 NULL_STREAK 임계값을 ≥4로 올려도 기존 contrast 테스트(4 nulls, 2 classes)는 통과한다.
-// Behavioral claim: 3 consecutive agentSafe nulls from 3 DIFFERENT classes (verify, exec, assess)
+// Behavioral claim: 3 consecutive agentSafe nulls from 3 DIFFERENT classes (verify, exec, decompose)
 // sets NULL_STREAK=3 and NULL_STREAK_CLASSES.size=3 ≥ 2 → QUOTA HALT log fires AND no further
-// agent() is called after the halt-triggering call.
+// agent() is called after the halt-triggering call. (ITEM 10: the third distinct class is now the
+// merged 'decompose' call — formerly 'assess'; the mixed-class claim is unchanged, just renamed.)
 // Engineering:
 //   • GIT=false (empty rev-parse HEAD stdout) removes per-leaf sh calls that would reset the streak
-//   • non-atomic slices: each leaf gets its own assess call
+//   • non-atomic slices: each leaf gets its own decompose call
 //   • leaf0: exec→OK, verify→null(streak=1,{verify}), repair-exec→null(streak=2,{verify,exec})
-//   • leaf1: assess→null(streak=3,{verify,exec,assess},size=3≥2 → QUOTA_HALT fires)
+//   • leaf1: decompose→null(streak=3,{verify,exec,decompose},size=3≥2 → QUOTA_HALT fires)
 // Paired negative: the A6 test immediately above (same-class heavy 3-lens → no halt).
-test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_HALT at streak=3 (threshold pin)', async () => {
-  // Non-atomic slices so each leaf gets an assess call (atomic:true would skip assess → class=assess never fires)
+test('A6 pin: mixed call classes (verify→exec→decompose, 3 nulls) fires QUOTA_HALT at streak=3 (threshold pin)', async () => {
+  // Non-atomic slices so each leaf gets a decompose call (atomic:true would skip decompose → class never fires)
   const nonAtomicSlices = {
     slices: [0, 1].map((i) => ({
       desc: `mixed-class fixture slice ${i}`, interface: 'TBD/exploratory',
@@ -447,23 +447,21 @@ test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_H
       dependsOn: [], kind: 'behavior', atomic: false, riskTier: 'standard', testScope: undefined,
     })),
   }
-  let assessLeafCount = 0  // counts assess:d1 calls (leaf-level assesses, NOT the root assess:d0)
-  let haltCallI = -1       // calls.length at the moment QUOTA HALT log fires (detected post-run)
+  let decomposeLeafCount = 0  // counts decompose:d1 calls (leaf-level decomposes, NOT the root decompose:d0)
 
   // GIT=false: the batched prologue's git-sha marker carries NO 40-char sha → BASE_SHA='' → GIT=false.
   // (ITEM 6: rev-parse HEAD is now inside the batched prologue script, so the git-sha OUTCOME is supplied
   // via shOver, not by intercepting a standalone `rev-parse HEAD` prompt.) This eliminates the per-leaf
   // leafStart+restore sh() calls that would otherwise reset the streak between leaves.
   const dispatch = dispatcher((c) => {
-    // Root assess (assess:d0) → slice so the slicer fires (must NOT fall through to base assessExecute)
-    if (has(c, /assess:d0/)) return FIX.assessSlice
-    // Return 2 non-atomic slices so both leaves enter their own assess
-    if (has(c, /slice:/)) return nonAtomicSlices
-    // Leaf assesses (assess:d1): first (leaf0) succeeds (fall through), second (leaf1) throws
-    if (has(c, /assess:d1/)) {
-      assessLeafCount++
-      if (assessLeafCount >= 2) throw new Error('transport error on leaf1 assess (fixture: mixed-class streak pin)')
-      return undefined  // fall through → base dispatcher → FIX.assessExecute (leaf0 succeeds)
+    // Root decompose (decompose:d0) → slice so children fire (must NOT fall through to base decomposeExecute).
+    // The merged decision carries the 2 non-atomic children in the SAME call (no separate slicer).
+    if (has(c, /decompose:d0/)) return { action: 'slice', reason: 'fixture: decompose', slices: nonAtomicSlices.slices }
+    // Leaf decomposes (decompose:d1): first (leaf0) succeeds (fall through), second (leaf1) throws
+    if (has(c, /decompose:d1/)) {
+      decomposeLeafCount++
+      if (decomposeLeafCount >= 2) throw new Error('transport error on leaf1 decompose (fixture: mixed-class streak pin)')
+      return undefined  // fall through → base dispatcher → FIX.decomposeExecute (leaf0 succeeds)
     }
     // Leaf0 verify throws — first null, class=verify (streak=1, classes={verify})
     if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
@@ -478,12 +476,12 @@ test('A6 pin: mixed call classes (verify→exec→assess, 3 nulls) fires QUOTA_H
   const { result, logs, calls } = await runEngine({ args: ARGS, dispatch })
 
   // Fixture preconditions
-  assert.ok(assessLeafCount >= 2,
-    `both leaf assesses must have fired (fixture precondition: need 2 non-atomic slices); got assessLeafCount=${assessLeafCount}`)
+  assert.ok(decomposeLeafCount >= 2,
+    `both leaf decomposes must have fired (fixture precondition: need 2 non-atomic slices); got decomposeLeafCount=${decomposeLeafCount}`)
 
   // (a) QUOTA HALT must fire — 3 nulls from 3 different classes must trigger the circuit breaker
   assert.ok(logs.some((l) => /QUOTA HALT/.test(l)),
-    `QUOTA HALT must fire for 3-class streak (verify→exec→assess); logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
+    `QUOTA HALT must fire for 3-class streak (verify→exec→decompose); logs: ${logs.filter(l => /QUOTA|NULL/.test(l)).join(' | ')}`)
 
   // (b) Agent spawning stops after halt: the engine's QUOTA_HALT gate (line ~391 in main.ts) breaks
   // the leaf loop before exec fires — no exec:1 call should appear in calls after the halt.
@@ -536,9 +534,9 @@ test('B1: tidy leaf — engine runs measureCommand (tidy-fullsuite sh) before ve
   }
 
   const dispatch = dispatcher((c) => {
-    // Drive decomposition: root assess → slice, then the slicer returns our tidy+behavior pair
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
-    if (/slice:/.test(c.opts.label || '')) return tidySlices
+    // ITEM 10: drive decomposition — the merged decompose decision returns action:'slice' WITH our
+    // tidy+behavior pair in the SAME call (no separate slicer round-trip).
+    if (/decompose/.test(c.opts.label || '')) return { action: 'slice', reason: 'fixture: decompose', slices: tidySlices.slices }
     // Capture tidy-fullsuite sh call
     if (isSh(c) && /tidy-fullsuite/.test(c.opts.label || '')) {
       tidyFullsuiteCmds.push(c.prompt)
@@ -580,19 +578,10 @@ test('B3: light-tier verify prompt does NOT inject LEAF_TEST filter-run text (is
   // LEAF_TEST injection) must NOT appear in the light verify prompt.
   const lightVerifyPrompts = []
 
-  const lightSlices = {
-    slices: [
-      { desc: 'light fixture slice A', interface: 'TBD/exploratory',
-        contract: 'pure-function change', independent: true,
-        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'light', testScope: 'LightSuite' },
-      { desc: 'light fixture slice B', interface: 'TBD/exploratory',
-        contract: 'another low-risk unit', independent: true,
-        dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'light', testScope: 'LightSuite' },
-    ],
-  }
-
+  // ITEM 10: the base decompose decision (FIX.decomposeExecute) is action:'execute', riskTier:'light' —
+  // so the root runs as ONE light-tier leaf and the light verifier (R_VERIFY_LIGHT) fires. No slice
+  // intercept is needed (the merged decision routes straight to a light leaf).
   const dispatch = dispatcher((c) => {
-    if (/slice:/.test(c.opts.label || '')) return lightSlices
     // Capture light verify prompts
     if (/verify.*light/.test(c.opts.label || '')) {
       lightVerifyPrompts.push(c.prompt)
@@ -619,10 +608,10 @@ test('B4: standard verify with engineT0 green — prompt has ENGINE-RAN, no LEAF
   const stdVerifyPrompts = []
   const t0Cmds = []
 
-  // Use FIX.slices3 which has testScope='S0'/'S1'/'S2' (scopeSafe passes)
-  // FIX.baseline filterCommand = 'true # {scope}' so t0cmd fires
+  // Use FIX.decomposeSlice (carries FIX.slices3 — testScope='S0'/'S1'/'S2', scopeSafe passes, atomic
+  // riskTier:'standard' → standard verify). FIX.baseline filterCommand = 'true # {scope}' so t0cmd fires.
   const dispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
     // Capture t0 sh calls and let them succeed
     if (isSh(c) && /t0:/.test(c.opts.label || '')) {
       t0Cmds.push(c.prompt)
@@ -670,11 +659,11 @@ test('ITEM 9: standard verify prompt carries an ENGINE-DIFF block — engine run
   let diffFetches = 0             // how many verify-diff sh calls fired
   const LEAF_DIFF = 'diff --git a/src/s0.ts b/src/s0.ts\n+++ fixture leaf change, non-tidy, in scope\n'
 
-  // Force STANDARD-tier atomic leaves (like B4): decompose the root into FIX.slices3, whose slices are
-  // atomic with riskTier:'standard' → standard verify (the base dispatcher's assessExecute is difficulty
-  // 'easy' = LIGHT tier, which would not exercise the standard verify path this test pins).
+  // Force STANDARD-tier atomic leaves (like B4): the merged decompose decision (FIX.decomposeSlice) slices
+  // the root into FIX.slices3, whose slices are atomic with riskTier:'standard' → standard verify (the base
+  // decomposeExecute is riskTier:'light' = LIGHT tier, which would not exercise the standard verify path).
   const dispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
     // Engine's deterministic ENGINE-DIFF fetch: an sh() call labeled 'verify-diff:…'. Capture its command
     // and hand back a small (sub-cap) diff body so the engine injects it verbatim into the verify prompt.
     if (isSh(c) && /verify-diff:/.test(c.opts.label || '')) {
@@ -720,7 +709,7 @@ test('ITEM 9 cap: oversized leaf diff → ENGINE-DIFF block is the "too large �
   const HUGE = 'x'.repeat(7000)   // > ENGINE_DIFF_CAP (6000)
 
   const dispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice   // standard-tier atomic leaves (see ITEM 9 above)
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice   // standard-tier atomic leaves (see ITEM 9 above)
     if (isSh(c) && /verify-diff:/.test(c.opts.label || '')) return { exitCode: 0, stdout: HUGE }
     if (!isSh(c) && /verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
         !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
@@ -797,7 +786,7 @@ test('B2: merge-conflict LLM prompt has no FULL measure or worktree remove (engi
   const mergeConflictPrompts = []
 
   const dispatch = dispatcher((c, env) => {
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     // Force a merge conflict on the first branch
     if (isSh(c) && /merge --no-ff/.test(c.prompt) && /rs\/g0/.test(c.prompt)) {
       return { exitCode: 1, stdout: 'CONFLICT (content): Merge conflict in src/x.ts' }
@@ -825,12 +814,12 @@ test('B6: standard-tier leaf verify prompt does NOT contain explicitly orders a 
   // Behavioral claim: the dead branch "if the prompt explicitly orders a FULL run (integration/merge),
   // run the full suite" in R_VERIFY is never reachable — the engine never sends such an instruction.
   // After deletion the phrase 'explicitly orders a FULL run' must not appear in any standard leaf verify prompt.
-  // Standard tier is forced by returning difficulty:'medium' from assess (not easy→light, not hard→heavy).
-  const assessStandard = { difficulty: 'medium', size: 'small', action: 'execute', reason: 'fixture: standard', risk: 'medium' }
+  // ITEM 10: standard tier is forced via the merged decompose decision (action:'execute', riskTier:'standard').
+  const decomposeStandard = { action: 'execute', riskTier: 'standard', reason: 'fixture: standard' }
   const stdVerifyPrompts = []
 
   const dispatch = dispatcher((c) => {
-    if (has(c, /assess/)) return assessStandard
+    if (has(c, /decompose/)) return decomposeStandard
     // Capture standard verify prompts (not light, not heavy, not tidy, not integration)
     if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '') &&
         !/tidy/.test(c.opts.label || '') && !/light/.test(c.opts.label || '')) {
@@ -841,7 +830,7 @@ test('B6: standard-tier leaf verify prompt does NOT contain explicitly orders a 
 
   await runEngine({ args: ARGS, dispatch })
 
-  assert.ok(stdVerifyPrompts.length > 0, 'standard-tier leaf verify must have been called (fixture precondition: need assess returning medium difficulty)')
+  assert.ok(stdVerifyPrompts.length > 0, 'standard-tier leaf verify must have been called (fixture precondition: need decompose returning riskTier:standard)')
 
   for (const p of stdVerifyPrompts) {
     assert.ok(!/explicitly orders a FULL run/.test(p),
@@ -885,9 +874,10 @@ test('B8+PURPOSE: integrate agentSafe prompt has no PURPOSE (①) re-injection; 
 test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QUOTA_HALT (circuit breaker preserved)', async () => {
   // Heavy leaf: 3 verify lenses throw (streak=3, classes={verify}, size=1 — no halt yet).
   // Repair exec then throws (streak=4, classes={verify,exec}, size=2, streak>=3 → HALT).
-  const assessHeavy = { difficulty: 'hard', size: 'small', action: 'execute', reason: 'fixture: hard leaf', risk: 'high' }
+  // ITEM 10: heavy tier comes from the merged decompose decision (action:'execute', riskTier:'heavy').
+  const decomposeHeavy = { action: 'execute', riskTier: 'heavy', reason: 'fixture: hard leaf' }
   const dispatch = dispatcher((c) => {
-    if (has(c, /assess/)) return assessHeavy
+    if (has(c, /decompose/)) return decomposeHeavy
     // All verify calls throw (class=verify; same class alone never halts with our fix)
     if (/verify/.test(c.opts.label || '') && !/integration/.test(c.opts.label || '')) {
       throw new Error('transport error on verify (transient fixture throw)')
@@ -904,17 +894,18 @@ test('A6 contrast: cross-class streak (verify nulls + repair exec null) fires QU
 })
 
 // C1-C4 — schema tax cleanup: engine must not emit serialization-tax fields to agents.
-// (a) RESULT schema used in exec opts must have no 'diff' key; ASSESSMENT schema must have
-//     no 'risk' key; VERDICT schema must have no 'silentErrorRisk' key.
-// (b) When assessSlice drives decomposition and slices carry a concrete interface (not TBD),
+// (a) RESULT schema used in exec opts must have no 'diff' key; the DECOMPOSE schema (ITEM 10: the merged
+//     decompose decision — formerly the ASSESSMENT schema) must have no 'risk' key; VERDICT schema must
+//     have no 'silentErrorRisk' key.
+// (b) When the decompose decision drives slicing and slices carry a concrete interface (not TBD),
 //     each leaf exec prompt must contain 'Interface (FIXED):' with that value. A slice whose
 //     interface is 'TBD/exploratory' must NOT inject the Interface line.
 test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prompt (not TBD)', async () => {
   // Behavioral claim: exec opts.schema must have no 'diff' key (serialization tax removed);
-  // assess opts.schema must have no 'risk' key; verify opts.schema must have no 'silentErrorRisk' key;
+  // decompose opts.schema must have no 'risk' key; verify opts.schema must have no 'silentErrorRisk' key;
   // and leaf exec prompts receive 'Interface (FIXED): <interface>' only for non-TBD slices.
   const execSchemas = []
-  const assessSchemas = []
+  const decomposeSchemas = []
   const verdictSchemas = []
   const execPrompts = []
 
@@ -931,13 +922,12 @@ test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prom
   }
 
   const dispatch = dispatcher((c) => {
-    // Collect assess schema
-    if (has(c, /assess/)) {
-      if (c.opts.schema) assessSchemas.push(c.opts.schema)
-      return FIX.assessSlice
+    // Collect the decompose schema + return a slice decision carrying our mixed slices (the merged
+    // decision returns BOTH the action AND the cut in one call — no separate slicer schema/call).
+    if (has(c, /decompose/)) {
+      if (c.opts.schema) decomposeSchemas.push(c.opts.schema)
+      return { action: 'slice', reason: 'fixture: decompose', slices: mixedSlices.slices }
     }
-    // Return our mixed slices
-    if (has(c, /slice:/)) return mixedSlices
     // Collect exec schema + prompt
     if (/^exec:|exec:/.test(c.opts.label || '') && !/\.r/.test(c.opts.label || '')) {
       if (c.opts.schema) execSchemas.push(c.opts.schema)
@@ -961,10 +951,11 @@ test('C1-C4: schema tax fields absent + SLICES interface threaded into exec prom
       `exec opts.schema must NOT have 'diff' property (serialization tax); found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
   }
 
-  // (a) ASSESSMENT schema: no 'risk' key
-  for (const s of assessSchemas) {
+  // (a) DECOMPOSE schema (ITEM 10: merged decompose decision — formerly ASSESSMENT): no 'risk' key
+  assert.ok(decomposeSchemas.length > 0, 'decompose must have been called (fixture precondition)')
+  for (const s of decomposeSchemas) {
     assert.ok(!s.properties || !('risk' in s.properties),
-      `assess opts.schema must NOT have 'risk' property; found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
+      `decompose opts.schema must NOT have 'risk' property; found in: ${JSON.stringify(Object.keys(s.properties || {}))}`)
   }
 
   // (a) VERDICT schema: no 'silentErrorRisk' key
@@ -998,7 +989,7 @@ test('GROUP E (negation): empty-string worktreeSetupCommand → zero wt-setup sh
 
   const dispatch = dispatcher((c) => {
     if (c.opts.phase === 'Baseline') return baselineWithEmptySetup
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
       wtSetupCalls.push(c)
     }
@@ -1027,7 +1018,7 @@ test('GROUP E (failure): wt-setup exitCode!==0 → group leaf NOT trusted (setup
 
   const dispatch = dispatcher((c) => {
     if (c.opts.phase === 'Baseline') return baselineWithSetup
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
       // ALL worktrees' setup fails
       setupFailedCalls.push(c)
@@ -1075,8 +1066,8 @@ test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add
   const dispatchWithSetup = dispatcher((c) => {
     const idx = callCounter++
     if (c.opts.phase === 'Baseline') return baselineWithSetup
-    // Plan-phase assess (no label) steers to slice for parallel partition
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    // Plan-phase decompose (no label) steers to slice for parallel partition
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     if (isSh(c)) {
       if (/worktree add/.test(c.prompt)) { wtAddCalls.push({ idx, prompt: c.prompt }); return { exitCode: 0, stdout: '' } }
       if (/wt-setup/.test(c.opts.label || '')) {
@@ -1084,8 +1075,8 @@ test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add
         return { exitCode: 0, stdout: '' }
       }
     }
-    // Track the first non-sh leaf work call (exec or assess inside a group)
-    if (!isSh(c) && (has(c, /exec:/) || has(c, /assess/)) && idx < firstExecOrAssessIdx.val) {
+    // Track the first non-sh leaf work call (exec or decompose inside a group)
+    if (!isSh(c) && (has(c, /exec:/) || has(c, /decompose/)) && idx < firstExecOrAssessIdx.val) {
       firstExecOrAssessIdx.val = idx
     }
   })
@@ -1121,7 +1112,7 @@ test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add
   const wtSetupCallsAbsent = []
   const dispatchWithoutSetup = dispatcher((c) => {
     // FIX.baseline has no worktreeSetupCommand
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
     if (isSh(c) && /wt-setup/.test(c.opts.label || '')) {
       wtSetupCallsAbsent.push(c)
     }
@@ -1178,7 +1169,7 @@ test('model-access error on verify → resumable QUOTA HALT (not an untrusted-st
 // when unsafe (dirty tree / compile-bound / <2 independent groups).
 test('parallel is the DEFAULT: args without a `parallel` field enter the parallel partition', async () => {
   const dispatch = dispatcher((c) => {
-    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.assessSlice
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
   })
   const { result, logs } = await runEngine({ args: ARGS_DEFAULT, dispatch })
   assert.equal(result.error, undefined, `default-args run must not error; got: "${result.error}"`)
@@ -1207,9 +1198,9 @@ test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degrad
 
   const dispatch = dispatcher((c) => {
     if (c.opts.phase === 'Baseline') return noFilterBaseline
-    // Root assess must return 'slice' so the slicer runs (else the root node has no testScope).
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
-    if (/slice:/.test(c.opts.label || '')) return twoSlices
+    // ITEM 10: the root decompose returns action:'slice' WITH the 2 scoped children in the SAME call, so
+    // the sliced nodes carry a testScope (the root node has none) — the merged decision is the cut.
+    if (/decompose/.test(c.opts.label || '')) return { action: 'slice', reason: 'fixture: decompose', slices: twoSlices.slices }
   })
 
   const { result, logs } = await runEngine({ args: ARGS, dispatch })
@@ -1246,9 +1237,9 @@ test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degrad
   // 'true # {scope}' is a RUNNABLE template) must report NO degradation and tag the leaf
   // gate='deterministic-filtered' — the audit fires ONLY on the real downgrade, never on a healthy run.
   const healthyDispatch = dispatcher((c) => {
-    // Only force the slice path; everything else (slice: → FIX.slices3, baseline → FIX.baseline with a
-    // runnable 'true # {scope}' filterCommand) falls through to the green-path defaults.
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    // ITEM 10: force the slice path via the merged decompose decision (FIX.decomposeSlice carries the
+    // FIX.slices3 cut); baseline → FIX.baseline with a runnable 'true # {scope}' filterCommand by default.
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
   })
   const healthy = await runEngine({ args: ARGS, dispatch: healthyDispatch })
   assert.equal(healthy.result.error, undefined, `healthy run errored: ${healthy.result.error}`)
@@ -1273,7 +1264,7 @@ test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degrad
 test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (green + failing); briefing persisted deterministically', async () => {
   // --- GREEN run: slice path → leaves carry testScope → deterministic-filtered gate → 0 degradations.
   const greenDispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
   })
   const green = await runEngine({ args: ARGS, dispatch: greenDispatch })
 
@@ -1310,7 +1301,7 @@ test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (g
 
   // --- FAILING run: integration verdict distrusts → catastrophe the rollup must catch.
   const failDispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
     if (/integration/.test(c.opts.label || '')) return FIX.distrust
   })
   const fail = await runEngine({ args: ARGS, dispatch: failDispatch })
@@ -1433,7 +1424,7 @@ test('ITEM 6: lock-write RACE — a concurrent grab between the two batches abor
 test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a leaf parseable); an append sh-failure does NOT fail the run', async () => {
   // --- GREEN run: slice path → leaves carry testScope → deterministic-filtered gate (so a leaf line has
   //     a real gateLevel). Capture every trace-append sh call.
-  const dispatch = dispatcher((c) => { if (/assess/.test(c.opts.label || '')) return FIX.assessSlice })
+  const dispatch = dispatcher((c) => { if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice })
   const { result, calls, logs } = await runEngine({ args: ARGS, dispatch })
   assert.equal(result.error, undefined, `green run must not error; got ${result.error}`)
 
@@ -1477,7 +1468,7 @@ test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a l
   // --- FAILURE run: the trace-append sh itself FAILS (dead trace proxy). The passive observer's try/catch
   //     must swallow it — the run stays green, every leaf stays trusted, no error surfaces.
   const failDispatch = dispatcher((c) => {
-    if (/assess/.test(c.opts.label || '')) return FIX.assessSlice
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
     if (isSh(c) && /trace-append/.test(c.opts.label || '')) throw new Error('trace proxy dead (fixture: append sh-failure)')
   })
   const failRun = await runEngine({ args: ARGS, dispatch: failDispatch })

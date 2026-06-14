@@ -32,33 +32,37 @@ var BASELINE = { type: "object", required: ["invariants", "measureCommand"], pro
   worktreeSetupCommand: { type: "string" }
   // E: shell command run ONCE per parallel git-worktree immediately after creation (e.g. 'npm ci'); empty/absent = no setup needed
 } };
-var ASSESSMENT = { type: "object", required: ["difficulty", "action", "reason"], properties: {
-  difficulty: { type: "string", enum: ["easy", "hard"] },
-  size: { type: "string", enum: ["small", "big"] },
+var SLICE_ITEM = { type: "object", required: ["desc", "interface", "contract"], properties: {
+  desc: { type: "string" },
+  // one-line what
+  interface: { type: "string" },
+  // FIXED public surface — or "TBD/exploratory"
+  contract: { type: "string" },
+  // achieve + seam/files + invariant + how to verify ALONE
+  independent: { type: "boolean" },
+  // safe to build concurrently (no shared files)?
+  dependsOn: { type: "array", items: { type: "integer" } },
+  // indices of prerequisite slices
+  kind: { type: "string", enum: ["tidy", "behavior"] },
+  // ③ Tidy-First: 'tidy' = behavior-PRESERVING structural prep (verified by existing suite, no new tests); 'behavior' = the actual change
+  atomic: { type: "boolean" },
+  // ② true = a single directly-executable unit (the engine bottoms out on it — no further decompose call); false = decompose it again
+  riskTier: { type: "string", enum: ["light", "standard", "heavy"] },
+  // ② per-slice risk judgment → verification tier (used when atomic, so no re-decompose needed)
+  testScope: { type: "string" }
+  // ④ the test suite/filter this slice's tests live under → leaf+verifier run FILTERED (not the full suite — the MEASURED #1 time cost)
+} };
+var DECOMPOSE = { type: "object", required: ["action", "reason"], properties: {
   action: { type: "string", enum: ["execute", "slice", "spike"] },
-  reason: { type: "string" }
+  // execute=leaf (bias HARD here); slice=cut into children; spike=de-risk a hard-but-small unknown
+  riskTier: { type: "string", enum: ["light", "standard", "heavy"] },
+  // for action:'execute' — this leaf's verification tier (light=pure/low-risk, standard=normal, heavy=hard/irreversible/security)
+  reason: { type: "string" },
+  slices: { type: "array", items: SLICE_ITEM }
+  // for action:'slice' — the thin vertical children
 } };
 var SLICES = { type: "object", required: ["slices"], properties: {
-  slices: { type: "array", items: { type: "object", required: ["desc", "interface", "contract"], properties: {
-    desc: { type: "string" },
-    // one-line what
-    interface: { type: "string" },
-    // FIXED public surface — or "TBD/exploratory"
-    contract: { type: "string" },
-    // achieve + seam/files + invariant + how to verify ALONE
-    independent: { type: "boolean" },
-    // safe to build concurrently (no shared files)?
-    dependsOn: { type: "array", items: { type: "integer" } },
-    // indices of prerequisite slices
-    kind: { type: "string", enum: ["tidy", "behavior"] },
-    // ③ Tidy-First: 'tidy' = behavior-PRESERVING structural prep (verified by existing suite, no new tests); 'behavior' = the actual change
-    atomic: { type: "boolean" },
-    // ② true = a single directly-executable unit (skip the redundant re-assess); false = still decompose
-    riskTier: { type: "string", enum: ["light", "standard", "heavy"] },
-    // ② slicer's risk judgment → verification tier (used when atomic, so no re-assess needed)
-    testScope: { type: "string" }
-    // ④ the test suite/filter this slice's tests live under → leaf+verifier run FILTERED (not the full suite — the MEASURED #1 time cost)
-  } } }
+  slices: { type: "array", items: SLICE_ITEM }
 } };
 var LEARNING = { type: "object", required: ["summary"], properties: {
   summary: { type: "string" }
@@ -107,8 +111,14 @@ var BRIEFING = { type: "object", required: ["briefing"], properties: {
 
 // src/prompts.ts
 var R_BASELINE = 'You are the Baseliner (Beck: Baseline Measurement). Capture ground truth BEFORE any change. Read the repo AGENTS.md/CLAUDE.md for EXACT build/test commands; never guess. State falsifiable invariants this work must preserve (a FLOOR, not an exact match: adding new green tests is fine; an existing green test going red is a violation). Never fabricate a green result. (The engine captures the git SHA / clean-tree state deterministically itself — spend no effort on git state.) CARD: distill a `projectCard` of STATIC facts every worker needs so none re-reads AGENTS.md — exact build/test commands (record the FASTEST safe form: filter syntax + parallel flag like `swift test --parallel` if supported), test framework, conventions, hard constraints (pinned deps, secrets-never-logged, forbidden APIs). Select sources deterministically; skip generated/vendored/huge files. Tight but complete. FILTER: set `filterCommand` = the runner\'s filtered-test command as a TEMPLATE containing the literal token {scope} (e.g. "./scripts/test.sh --filter {scope}"); the engine substitutes a suite name and runs it VERBATIM as a deterministic per-leaf gate, so it must work from the repo root exactly as written. Empty ONLY if the runner truly cannot filter. BUILD COST: set `coldBuildCost` — would a FRESH checkout (a new git worktree, empty build dir) need an EXPENSIVE full dependency compile (a compiled language — Swift/Rust/C++/Go/etc. — whose deps recompile per checkout, with no shared/global cache a worktree reuses) → "expensive"; or is it CHEAP (interpreted / no build step / a shared cache a worktree reuses) → "cheap"? This gates whether parallel git-worktree builds are worthwhile or just thrash. PURPOSE (Beck — genies satisfy prompts, not purposes): set `purposeCheck` — beyond unit tests, how would one confirm this ACTUALLY works for the user? e.g. "run the env-gated live integration test", "a human marks a message unread in the app and confirms the server updated". Set `inProcessVerifiable` = can that be checked deterministically in-process (pure logic / recorded-REAL bytes) or does it need a real environment / human? WORKTREE SETUP: set `worktreeSetupCommand` = the shell command that must run ONCE in each parallel git-worktree right after it is created (e.g. "npm ci" to install deps into the fresh checkout). Leave empty or absent if no per-worktree setup is needed (interpreted language with no install step, or a shared-cache build dir that is already populated). This command runs verbatim in each worktree before any leaf work begins.';
-var R_ASSESS = "You are the Assessor — the recursion termination condition. Bias HARD toward execute; over-decomposition is the dominant failure. Judge two orthogonal axes with file:line evidence: difficulty(easy=known/low-risk, hard=unknown/irreversible) × size(small=~one place, big=many places or many near-identical units). Table: easy+small→execute, hard+small→spike, *+big→slice. At/over the depth floor you MUST return execute. A confident wrong call is the costliest output.";
-var R_SLICE = 'You are the Slicer (Beck: Slicing, Symmetry, Isolation). Cut into THIN, VERTICAL, independently-verifiable slices — NEVER by horizontal layer. The hard rule: if a slice cannot be verified ALONE it is wrong; restructure the seams until it can. Each slice carries a self-contained contract (achieve + exact files/seam + invariant + how to verify ALONE) AND is written knowing its siblings so they never overlap. Set `independent`=true ONLY if the slice shares NO files with any sibling AND has no `dependsOn` prerequisites (both conditions required: a dependent slice cannot build in isolation even if file-disjoint). Note: when this role is called as the PARTITION planner for a parallel build, the caller\'s prompt overrides the strict "NO files" rule — light additive overlap is allowed there (see that prompt). Big+easy→group near-identical units into 2-5 slices; hard→isolate the risky seam. Never emit one-liner slices, nor a single slice ~= the parent (no reduction). You ALSO own INTERFACE design — you see all siblings, the leaves do not. For each slice set a FIXED `interface` (signatures/types/error mode/access level), coherent and symmetric across siblings. Fix it ONLY when you can see it globally; if genuinely exploratory, set interface="TBD/exploratory". Implementation design stays with the leaf. TIDY-FIRST (Beck — "make the change easy, then make the easy change"): when a behavior change would touch a SCATTERED or awkward seam, FIRST emit a `kind:"tidy"` slice — a behavior-PRESERVING structural prep (rename/extract/generalize/move) that makes the later change easy — ordered BEFORE the behavior slice via `dependsOn`. A tidy slice adds NO new tests and changes NO observable behavior (verified solely by the EXISTING suite staying green). Mark the actual change `kind:"behavior"` (default). Do NOT bundle a mechanical rename with a new-behavior change — separate them so the behavior change stays small and reviewable. EFFICIENCY: for each slice set `atomic` (true = a single directly-executable unit needing NO further slicing) and `riskTier` (light=pure-function/test-only/low-risk, standard=normal, heavy=hard/irreversible/security-sensitive). These let the engine skip a redundant re-assessment of a slice you already sized + risk-judged. COHESION over verbosity: judge by how coherent the work IS, not how many steps the task TEXT lists — a single coherent feature described in many steps is still FEW slices. Do not let a verbose spec inflate the slice count. TEST SCOPE: for each slice set `testScope` — the test suite/class/file its tests will live under (something the project-card filter syntax can target) so the leaf and verifier run the FILTERED command, NEVER the full suite (the measured #1 time cost). If genuinely unknowable up front, leave it empty — the leaf derives it from the test it adds. WIRING (the #1 recurring cross-leaf defect: new API lands fully tested but NO production path reaches it): every slice that adds user-reachable capability MUST name, inside its contract, the EXISTING production call site / view / entry point the new code will be invoked from — "wire X into Y at file:line" — and its verify-ALONE step must include checking that call site actually invokes the new code. A slice whose contract cannot name where production calls it is either library-surface API (say so explicitly) or an unwired slice — restructure it.';
+var R_SLICE = (
+  // ITEM 10: the Assessor is folded INTO the Slicer — this ONE role is BOTH the recursion termination
+  // condition AND the cut. It returns a single `decompose` decision per node: action:'execute' (a LEAF —
+  // set its `riskTier`), action:'spike' (a hard-but-small unknown to de-risk first), or action:'slice'
+  // (cut into children — emit `slices`). The anti-over-decomposition bias below is carried VERBATIM from
+  // the former Assessor persona; it must NEVER be lost — over-decomposition is the dominant failure.
+  'You are the Slicer / decompose decision (Beck: Slicing, Symmetry, Isolation) — the recursion termination condition AND the cut in ONE role. First DECIDE this node\'s next action, then act. TERMINATION (bias HARD toward execute; over-decomposition is the dominant failure). Judge two orthogonal axes with file:line evidence: difficulty(easy=known/low-risk, hard=unknown/irreversible) × size(small=~one place, big=many places or many near-identical units). Table: easy+small→execute, hard+small→spike, *+big→slice. At/over the depth floor you MUST return execute. A confident wrong call is the costliest output. For action:\'execute\' set this leaf\'s `riskTier` (light=pure-function/test-only/low-risk, standard=normal, heavy=hard/irreversible/security-sensitive) — the engine spends verification scrutiny by that tier. When you choose action:\'slice\', cut as follows. Cut into THIN, VERTICAL, independently-verifiable slices — NEVER by horizontal layer. The hard rule: if a slice cannot be verified ALONE it is wrong; restructure the seams until it can. Each slice carries a self-contained contract (achieve + exact files/seam + invariant + how to verify ALONE) AND is written knowing its siblings so they never overlap. Set `independent`=true ONLY if the slice shares NO files with any sibling AND has no `dependsOn` prerequisites (both conditions required: a dependent slice cannot build in isolation even if file-disjoint). Note: when this role is called as the PARTITION planner for a parallel build, the caller\'s prompt overrides the strict "NO files" rule — light additive overlap is allowed there (see that prompt). Big+easy→group near-identical units into 2-5 slices; hard→isolate the risky seam. Never emit one-liner slices, nor a single slice ~= the parent (no reduction). You ALSO own INTERFACE design — you see all siblings, the leaves do not. For each slice set a FIXED `interface` (signatures/types/error mode/access level), coherent and symmetric across siblings. Fix it ONLY when you can see it globally; if genuinely exploratory, set interface="TBD/exploratory". Implementation design stays with the leaf. TIDY-FIRST (Beck — "make the change easy, then make the easy change"): when a behavior change would touch a SCATTERED or awkward seam, FIRST emit a `kind:"tidy"` slice — a behavior-PRESERVING structural prep (rename/extract/generalize/move) that makes the later change easy — ordered BEFORE the behavior slice via `dependsOn`. A tidy slice adds NO new tests and changes NO observable behavior (verified solely by the EXISTING suite staying green). Mark the actual change `kind:"behavior"` (default). Do NOT bundle a mechanical rename with a new-behavior change — separate them so the behavior change stays small and reviewable. EFFICIENCY: for each slice set `atomic` (true = a single directly-executable unit needing NO further slicing) and `riskTier` (light=pure-function/test-only/low-risk, standard=normal, heavy=hard/irreversible/security-sensitive). An atomic slice you already sized + risk-judged is a LEAF the engine executes directly — it gets NO further decompose call, so size + risk-judge it correctly here. COHESION over verbosity: judge by how coherent the work IS, not how many steps the task TEXT lists — a single coherent feature described in many steps is still FEW slices. Do not let a verbose spec inflate the slice count. TEST SCOPE: for each slice set `testScope` — the test suite/class/file its tests will live under (something the project-card filter syntax can target) so the leaf and verifier run the FILTERED command, NEVER the full suite (the measured #1 time cost). If genuinely unknowable up front, leave it empty — the leaf derives it from the test it adds. WIRING (the #1 recurring cross-leaf defect: new API lands fully tested but NO production path reaches it): every slice that adds user-reachable capability MUST name, inside its contract, the EXISTING production call site / view / entry point the new code will be invoked from — "wire X into Y at file:line" — and its verify-ALONE step must include checking that call site actually invokes the new code. A slice whose contract cannot name where production calls it is either library-surface API (say so explicitly) or an unwired slice — restructure it.'
+);
 var R_EXEC = 'You are the Executor — where trust is deposited; your inner loop is Canon TDD, ONE test at a time. Follow the repo AGENTS.md / project card literally. The contract\'s `interface` is a FIXED boundary — design only the IMPLEMENTATION behind it. If the interface seems wrong, do NOT change it unilaterally — record `interfaceConcern`. Wear ONE HAT AT A TIME (Beck): (1) BEHAVIOR — call your shot, write the FAILING test FIRST, confirm red for that reason, then make it pass simply. (2) STRUCTURE — refactor is NOT optional: after green either refactor (separate, behavior-preserving) or put in `refactor` WHY none is needed. Never change behavior and structure in one step. If "tests only", do not modify production source dirs — Sources/, src/, lib/, whatever this repo uses (if you must, that is a finding). When sharing a file, ADD cases, never overwrite. New edge cases you notice → `discovered` (do NOT chase them). SEARCH BEFORE YOU WRITE: before implementing anything, grep the codebase for an existing implementation/helper — never assume not-implemented; duplicating an existing seam is a trust withdrawal. INSPECT WITH NATIVE TOOLS: use the Read/Grep/Glob tools, NOT shell cat/grep/sed/find/head — every shell inspect is a spawn+permission round-trip and is the measured #1 hidden time cost (it dwarfs test runs). Reserve Bash for builds/tests/git only. TESTS CARRY THEIR WHY: each new test states in a one-line comment the behavioral claim it pins (future agents and the owner will not have your context; a test whose reason is lost gets deleted or neutered later). `passed` MUST reflect a REAL deterministic run (the tier-0 gate): build + the relevant tests actually green — a false green, or one passing against a hardcoded/over-fit impl, is the worst trust withdrawal. SPEED: see LEAF TEST DISCIPLINE below. ONE-AT-A-TIME (Canon TDD): if this leaf CO-EVOLVES implementation with tests, proceed strictly one test at a time — write ONE failing test, make it pass, then the NEXT (if a pass changes your understanding, revise the remaining list); do NOT write all tests then run once. For test-only additions to ALREADY-STABLE code, batching is fine (the rework risk is ~0 when the impl is frozen). PURPOSE: set `purposeVerified` — did you verify against REAL or RECORDED-REAL behavior (the purpose), or only hand-written fakes/mocks (the prompt)? Prefer recorded-real bytes over hand-fakes — a fake passing proves the prompt, not the feature. `evidence`: the shell command you ran and the output tail that proves it — concrete, copy-pasteable. `funList`: tangents you noticed but did NOT chase — list them so the owner is aware; do NOT act on them here.';
 var R_VERIFY = 'You are the Verifier / trust auditor. Try to DESTROY trust; assume wrong until proven. Default trustworthy=false. Re-run the relevant measurement YOURSELF (do not trust reported output). Hunt FALSE GREEN: (a) tests that pass WITHOUT exercising the target (vacuous/tautological — read them); (b) an impl hardcoded/over-fit to the test input; (c) anything outside scope silently changed; (d) a baseline invariant violated; (e) any claim you cannot independently confirm; (f) interface drift vs the fixed contract. A wrong confirmation is catastrophic — when uncertain, withhold. INSPECT WITH NATIVE TOOLS: read the diff/tests/seam with the Read/Grep/Glob tools, NOT shell cat/grep/sed — shell inspect is the measured #1 hidden cost (the verifier spends most of its budget RE-DISCOVERING what the executor already established; any ENGINE-DIFF/ENGINE-RAN block in this prompt is that material — use it instead of re-greping). Reserve Bash for re-running builds/tests/git. SPEED (see LEAF TEST DISCIPLINE — measured #1 time cost): reproduce ONLY the leaf\'s FILTERED tests + a full build, NEVER run the whole suite YOURSELF (the engine runs it ONCE, at integration). EXCEPTION: whatever the engine ALREADY ran deterministically — an ENGINE-RAN block: the FILTERED tests at a leaf, or the FULL suite at integration/merge — JUDGE from that fixed result; do not re-run it. REPAIR LEVERAGE: if untrustworthy and you can SEE the fix, put the exact minimal fix in `prescription` (file:line + what to change) — precise prescriptions are what make repair converge. Real but non-blocking defects (concrete + independently testable, NOT style nits) go in `followUps` — they spawn follow-up work even when you trust the leaf. PURPOSE: distinguish PROMPT-satisfaction (tests green, non-vacuous) from PURPOSE (the feature actually works for the user). If effectful behavior is exercised ONLY through fakes/mocks, set `purposeGap` naming the real-world behavior that remains UNVERIFIED and how to close it (live test / human action) — and NEVER report fake-green as "it works".';
 var R_VERIFY_LIGHT = "You are the Verifier in LIGHT mode (low-risk leaf). No full re-run needed, but EARN trust from artifacts: read the actual diff/added tests and confirm they MEANINGFULLY exercise the claim (not vacuous), confirm scope (only intended files — check `git diff`), and confirm the executor reported a real green run. Default trustworthy=false; trust only what the artifacts show. The full suite at integration is the net behind you.";
@@ -437,36 +447,27 @@ LENS: judge specifically through "${L}".`,
     while (stack.length && done2.length < MAX_LEAVES) {
       const node = stack.pop();
       const atFloor = node.depth >= FLOOR;
-      let a = null, action;
+      let d = null, action;
       if (node.atomic) {
         action = "execute";
       } else {
-        a = await agentSafe(
-          `${R_ASSESS}
-
-Repo: ${repo}
-Task: ${node.task}
-${node.ctx ? "Context: " + node.ctx + "\n" : ""}Depth ${node.depth}/${FLOOR}${atFloor ? " (AT FLOOR — you must return execute)" : ""}.
-${INV}
-Classify and emit the next action.`,
-          { phase: "Work", label: `${tag}assess:d${node.depth}`, model: "sonnet", schema: ASSESSMENT }
-        );
-        if (!a) log(`${tag}assess failed [d${node.depth}] — defaulting to execute`);
-        action = atFloor || !a ? "execute" : a.action;
-        if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
-      }
-      if (action === "slice") {
-        const sl = await agentSafe(
+        d = await agentSafe(
           `${R_SLICE}
 
 Repo: ${repo}
-Slice into thin, VERTICAL, independently-verifiable slices with a self-contained contract each. ${a && a.difficulty === "hard" ? "Isolate the risky seam first." : "Group near-identical units; 2-5 slices."}
+Decide this node's next action (bias HARD toward execute), then act.
 Task: ${node.task}
-${node.ctx}
-${INV}`,
-          { phase: "Work", label: `${tag}slice:d${node.depth}`, schema: SLICES }
+${node.ctx ? "Context: " + node.ctx + "\n" : ""}Depth ${node.depth}/${FLOOR}${atFloor ? " (AT FLOOR — you must return execute)" : ""}.
+${INV}
+If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, independently-verifiable slices with a self-contained contract each (group near-identical units; 2-5 slices; isolate any risky seam first).`,
+          { phase: "Work", label: `${tag}decompose:d${node.depth}`, model: "sonnet", schema: DECOMPOSE }
         );
-        let slices = sl && sl.slices || [];
+        if (!d) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`);
+        action = atFloor || !d ? "execute" : d.action;
+        if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
+      }
+      if (action === "slice") {
+        let slices = d && d.slices || [];
         if (slices.length > 1) {
           const crit = await agentSafe(
             `${R_CRITIC}
@@ -525,7 +526,7 @@ LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.
       executedKeys.add(k);
       const i = done2.length;
       const lbl = `${tag}${i}`;
-      const tier = node.kind === "tidy" ? "standard" : node.atomic ? node.riskTier || "standard" : !a ? "standard" : a.difficulty === "easy" ? "light" : a.difficulty === "hard" ? "heavy" : "standard";
+      const tier = node.kind === "tidy" ? "standard" : node.atomic ? node.riskTier || "standard" : d && d.riskTier || "standard";
       const TIDY = node.kind === "tidy" ? "\nTIDY-FIRST leaf (Beck — make the change easy): a behavior-PRESERVING structural change ONLY (rename/extract/generalize/move). Do NOT add or change any test; do NOT change observable behavior — the EXISTING suite must stay green UNCHANGED. EXCEPTIONS for this tidy leaf: its proof IS the existing suite, so run the FULL existing suite once (this overrides the never-full-suite speed rule); and commit as ONE refactor commit (this replaces the two-hats behavior+refactor commit pair — a tidy leaf has no behavior step)." : "";
       const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || "").match(/[0-9a-f]{40}/i) || [""])[0] : "";
       const restore = async () => {
@@ -639,9 +640,9 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
       }
       const feed = verdict.trustworthy ? [...res.discovered || [], ...verdict.followUps || []] : [];
       if (feed.length) {
-        const fresh = feed.map(String).filter((d) => !executedKeys.has(keyOf(d))).slice(0, Math.max(0, MAX_DISCOVERED - discovered));
+        const fresh = feed.map(String).filter((d2) => !executedKeys.has(keyOf(d2))).slice(0, Math.max(0, MAX_DISCOVERED - discovered));
         if (fresh.length) {
-          fresh.forEach((d) => executedKeys.add(keyOf(d)));
+          fresh.forEach((d2) => executedKeys.add(keyOf(d2)));
           discovered += fresh.length;
           const batchTask = `Address these ${fresh.length} discovered/review-flagged scenario(s) as ONE leaf (the implementation is stable, so batching tests is Canon-TDD-safe — write a meaningful test for each):
 - ${fresh.join("\n- ")}
@@ -664,14 +665,14 @@ If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a tes
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
   if (goParallel) {
     const a0 = await agentSafe(
-      `${R_ASSESS}
+      `${R_SLICE}
 
 Repo: ${REPO}
+Decide ONLY this root's next action: is it one executable unit (action:'execute') or does it split into multiple parallelizable units (action:'slice')? Do NOT emit slices here — the coarse partition is requested separately next.
 Task: ${TASK}
 Depth 0/${FLOOR}.
-${INV}
-Classify and emit the next action.`,
-      { phase: "Plan", model: "sonnet", schema: ASSESSMENT }
+${INV}`,
+      { phase: "Plan", model: "sonnet", schema: DECOMPOSE }
     );
     if (a0 && a0.action === "slice") {
       const sl = await agentSafe(

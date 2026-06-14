@@ -17,7 +17,7 @@ verification*. Trust — not code — is the optimization target.
 | Path | What |
 |---|---|
 | `workflows/recursive-slice.js` | the engine (deterministic orchestrator + schema'd agent nodes) |
-| `agents/slice-*.md` | the role agents (baseliner, assessor, slicer, executor, verifier) for standalone use |
+| `agents/slice-*.md` | the role agents (baseliner, slicer, executor, verifier) for standalone use — the slicer also owns the recursion-termination decision (ITEM 10: the former assessor is folded into it) |
 | `skills/slice/SKILL.md` | the `/slice` front door |
 | `scripts/slice-watch.py` | live terminal viewer of a run (decomposition tree + git trust deposits) |
 | `docs/recursive-slice/` | this knowledge base |

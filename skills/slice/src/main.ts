@@ -1,9 +1,9 @@
 // NOTE: the runtime-required `export const meta = {...}` literal lives in tsup.config.ts
 // (banner) — a bundler would relocate an in-module export away from the top of the file.
 
-import { BASELINE, ASSESSMENT, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
-import { R_BASELINE, R_ASSESS, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
-import type { EngineArgs, Baseline, Assessment, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel } from './types'
+import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
+import { R_BASELINE, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
+import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel } from './types'
 
 // ===== Workflow runtime ambient contract (the PORT) ==========================
 // Any host that injects these globals can run the emitted engine unchanged:
@@ -550,27 +550,34 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
   while (stack.length && done.length < MAX_LEAVES) {
     const node = stack.pop()!   // loop condition guarantees a non-empty stack
     const atFloor = node.depth >= FLOOR
-    // ② An atomic slice was already sized + risk-judged by the slicer — skip the redundant re-assess.
-    let a: Assessment | null = null, action: Assessment['action']
+    // ITEM 10: ONE 'decompose' decision per node, returned by ONE agent (the merged Slicer/assess role).
+    // ② An atomic slice was already sized + risk-judged when it was emitted — it is a LEAF; the engine
+    //   bottoms out on it directly with NO decompose call. ① For a non-atomic node, ONE R_SLICE+DECOMPOSE
+    //   call returns BOTH the action (execute|slice|spike — bias HARD to execute) AND, when action:'slice',
+    //   the cut itself (slices[]) — the assessment and the cut are one judgment, no longer two round-trips.
+    //   The depth-floor forced-execute and the spike-cap stay deterministic JS guards around this call.
+    let d: Decompose | null = null, action: Decompose['action']
     if (node.atomic) {
       action = 'execute'
     } else {
-      a = (await agentSafe(
-        `${R_ASSESS}\n\nRepo: ${repo}\nTask: ${node.task}\n${node.ctx ? 'Context: ' + node.ctx + '\n' : ''}` +
-        `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}\nClassify and emit the next action.`,
-        { phase: 'Work', label: `${tag}assess:d${node.depth}`, model: 'sonnet', schema: ASSESSMENT })) as Assessment | null
-      if (!a) log(`${tag}assess failed [d${node.depth}] — defaulting to execute`)
-      action = (atFloor || !a) ? 'execute' : a.action
+      d = (await agentSafe(
+        `${R_SLICE}\n\nRepo: ${repo}\nDecide this node's next action (bias HARD toward execute), then act.\n` +
+        `Task: ${node.task}\n${node.ctx ? 'Context: ' + node.ctx + '\n' : ''}` +
+        `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}\n` +
+        `If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, ` +
+        `independently-verifiable slices with a self-contained contract each (group near-identical units; ` +
+        `2-5 slices; isolate any risky seam first).`,
+        { phase: 'Work', label: `${tag}decompose:d${node.depth}`, model: 'sonnet', schema: DECOMPOSE })) as Decompose | null
+      if (!d) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`)
+      action = (atFloor || !d) ? 'execute' : d.action
       if (action === 'spike' && node.spikes >= MAX_SPIKES) action = 'execute'
     }
 
     if (action === 'slice') {
-      const sl: { slices?: SliceSpec[] } | null = await agentSafe(
-        `${R_SLICE}\n\nRepo: ${repo}\nSlice into thin, VERTICAL, independently-verifiable slices with a ` +
-        `self-contained contract each. ${a && a.difficulty === 'hard' ? 'Isolate the risky seam first.' : 'Group near-identical units; 2-5 slices.'}` +
-        `\nTask: ${node.task}\n${node.ctx}\n${INV}`,
-        { phase: 'Work', label: `${tag}slice:d${node.depth}`, schema: SLICES })
-      let slices: SliceSpec[] = (sl && sl.slices) || []
+      // The merged decompose call ALREADY returned the cut (d.slices) in the SAME round-trip — no
+      // separate slicer call. (A null/empty slices array with action:'slice' falls through to the
+      // non-reducing→execute guard below, exactly as the old separate-slicer empty result did.)
+      let slices: SliceSpec[] = (d && d.slices) || []
       if (slices.length > 1) {
         const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agentSafe(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
@@ -621,7 +628,10 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     executedKeys.add(k)
     const i = done.length
     const lbl = `${tag}${i}`
-    const tier = node.kind === 'tidy' ? 'standard' : (node.atomic ? (node.riskTier || 'standard') : (!a ? 'standard' : a.difficulty === 'easy' ? 'light' : a.difficulty === 'hard' ? 'heavy' : 'standard'))
+    // ITEM 10: the leaf's verification tier. tidy → standard; an atomic slice carries its own riskTier;
+    // a non-atomic node executed directly takes the riskTier the merged decompose decision set on the
+    // execute branch (the former assessor's difficulty→tier mapping is now the role's explicit riskTier).
+    const tier = node.kind === 'tidy' ? 'standard' : (node.atomic ? (node.riskTier || 'standard') : ((d && d.riskTier) || 'standard'))
     // ③ Tidy-First: a tidy leaf is a behavior-PRESERVING prep — verified by the existing suite, not by new tests.
     const TIDY = node.kind === 'tidy' ? '\nTIDY-FIRST leaf (Beck — make the change easy): a behavior-PRESERVING structural change ONLY (rename/extract/generalize/move). Do NOT add or change any test; do NOT change observable behavior — the EXISTING suite must stay green UNCHANGED. EXCEPTIONS for this tidy leaf: its proof IS the existing suite, so run the FULL existing suite once (this overrides the never-full-suite speed rule); and commit as ONE refactor commit (this replaces the two-hats behavior+refactor commit pair — a tidy leaf has no behavior step).' : ''
 
@@ -842,9 +852,15 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 if (goParallel) {
-  const a0: Assessment | null = await agentSafe(
-    `${R_ASSESS}\n\nRepo: ${REPO}\nTask: ${TASK}\nDepth 0/${FLOOR}.\n${INV}\nClassify and emit the next action.`,
-    { phase: 'Plan', model: 'sonnet', schema: ASSESSMENT })
+  // ITEM 10: the merged decompose role gates the partition — does the ROOT split (action:'slice') or is
+  // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
+  // former Plan-phase assessor made; the dedicated COARSE-partition cut below keeps its own R_SLICE call
+  // (it is a different cut from fine slicing — few coarse groups, light-overlap independence engineering).
+  const a0: Decompose | null = await agentSafe(
+    `${R_SLICE}\n\nRepo: ${REPO}\nDecide ONLY this root's next action: is it one executable unit (action:'execute') ` +
+    `or does it split into multiple parallelizable units (action:'slice')? Do NOT emit slices here — the coarse ` +
+    `partition is requested separately next.\nTask: ${TASK}\nDepth 0/${FLOOR}.\n${INV}`,
+    { phase: 'Plan', model: 'sonnet', schema: DECOMPOSE })
   if (a0 && a0.action === 'slice') {
     const sl: { slices?: SliceSpec[] } | null = await agentSafe(
       `${R_SLICE}\n\nRepo: ${REPO}\nThis is the PARALLEL PARTITION — NOT fine slicing. Each group you emit becomes ` +

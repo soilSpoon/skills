@@ -205,9 +205,10 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
 
 ## Notes
 
-- The roles are also standalone subagents (`slice-baseliner`, `slice-assessor`, `slice-slicer`,
+- The roles are also standalone subagents (`slice-baseliner`, `slice-slicer`,
   `slice-executor`, `slice-verifier`) — you can spawn any one directly via the Agent tool for a
-  lighter, interactive pass instead of the full workflow.
+  lighter, interactive pass instead of the full workflow. (`slice-slicer` also owns the
+  recursion-termination decision — the former `slice-assessor` is folded into it.)
   **One-time setup (npx-installed copies)**: plugin installs register these automatically; a
   plain skill install does not. If `slice-*` agents are missing from the agent registry and this
   skill's base directory has an `agents/` folder, copy those files to `~/.claude/agents/` (tell

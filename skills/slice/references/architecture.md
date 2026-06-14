@@ -28,8 +28,7 @@ on interdependent commits — see [pitfalls-and-lessons.md](pitfalls-and-lessons
 | Role | Heuristic | In → Out |
 |---|---|---|
 | **Baseliner** | Baseline Measurement | repo → invariants + measure command + **gitSha** + **project card** |
-| **Assessor** | (recursion termination) | task → `{difficulty, size, action, risk}` |
-| **Slicer** | Slicing, Symmetry, Isolation | big/hard task → vertical slices + **fixed interface** + `independent`/`dependsOn` |
+| **Slicer / decompose** | (recursion termination) + Slicing, Symmetry, Isolation | one task → ONE `decompose` decision: a leaf `{action:'execute', riskTier}` / `{action:'spike'}`, OR `{action:'slice', slices}` with **fixed interface** + `independent`/`dependsOn`. (ITEM 10: the former separate Assessor `{difficulty, size, action}` judgment is folded INTO this role — assessment and the cut are one call.) |
 | **Completeness Critic** | the test list | slice list → missing edge-case scenarios |
 | **Spiker** | Concrete hypotheses | hard-small task → minimal-repro learning |
 | **Executor** | Canon TDD, two hats | one atomic task → diff + evidence + commits (in worktree/main) |
@@ -66,7 +65,7 @@ Baseline → Plan → Work → Coordinate → Integrate
 ## Key mechanisms
 
 ### 2-axis classification → action
-Difficulty (easy/hard) × Size (small/big) are **orthogonal**. The Assessor emits an *action*,
+Difficulty (easy/hard) × Size (small/big) are **orthogonal**. The merged Slicer/decompose role emits an *action*,
 biased hard toward `execute` (over-decomposition is the dominant failure):
 
 | | easy | hard |
@@ -80,7 +79,7 @@ scenarios (edge cases the list missed) that are pushed back as new leaves — "a
 list as you discover." This makes the core loop inherently **sequential** within a unit.
 
 ### Risk-tiered verification (spend scrutiny where trust is fragile)
-The Assessor's difficulty selects verification intensity:
+The decompose decision's `riskTier` (per-leaf, set on the `execute` branch / per atomic slice) selects verification intensity:
 - **light** (easy leaf) — audit the diff/tests, no full re-run (integration is the net).
 - **standard** — one independent reproduction.
 - **heavy** (hard leaf) — **3 perspective-diverse skeptics** (correctness / secrets-never-
@@ -192,7 +191,7 @@ iteration shines.
 
 ## Fault tolerance
 Every `agent()` may return `null` (terminal API error / rate-limit). **All results are
-null-guarded**: baseline-null aborts before any change; assess-null defaults to execute;
+null-guarded**: baseline-null aborts before any change; decompose-null defaults to execute;
 **verify-null = untrusted** (trust-correct); executor-null records a RED leaf and continues.
 A single rate-limit can no longer crash the whole run (it once did — see lessons).
 

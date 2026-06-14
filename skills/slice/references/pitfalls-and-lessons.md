@@ -7,7 +7,7 @@ from real runs. Each pitfall became a guardrail in code — not advice in a prom
 
 | # | Pitfall | Mitigation (tier) |
 |---|---|---|
-| 1 | **Over-decomposition / token explosion** | `FLOOR` depth cap, `MAX_LEAVES`, convergence guard (non-reducing slice → execute), budget gate, assessor bias-to-execute. All log when hit (no silent truncation). |
+| 1 | **Over-decomposition / token explosion** | `FLOOR` depth cap, `MAX_LEAVES`, convergence guard (non-reducing slice → execute), budget gate, the decompose role's bias-to-execute (ITEM 10: carried verbatim from the former assessor). All log when hit (no silent truncation). |
 | 2 | **Context loss across recursion** | A typed, self-contained **contract** per slice (achieve + files + invariant + how-to-verify-alone); the child gets the contract, not the tree. Slicer writes non-overlapping contracts (it sees all siblings). |
 | 3 | **Horizontal (non-verifiable) slices** — make-or-break | Hard rule: a slice that can't be verified *alone* is wrong → restructure the seams. Enforced twice: stated at slice time, reproduced at verify time. |
 | 4 | **Baseline drift** | Baseline = a *floor* (new green fine; green→red = violation), not an exact match. SHA-pinned (`gitSha`) for drift detection; dirty-tree warning. |
@@ -42,12 +42,13 @@ uncommitted. Fixed by making the Baseliner persona **mandate** `gitSha` for a gi
 **a capability gated on an optional model-filled field will silently vanish; make trust-
 critical fields mandatory and detectable** (we now log "git mode OFF" loudly).
 
-### Lesson 4 — The assessor correctly refused to slice
-Given "add tests for 6 pure helpers," the assessor classified it `easy/small → execute` and
+### Lesson 4 — The decompose role correctly refused to slice
+Given "add tests for 6 pure helpers," the decompose decision classified it `easy/small → execute` and
 did it as one leaf (36 tests) rather than slicing. That's *correct* — Beck's "don't slice what
 you can just do." The bias-to-execute guard (anti-over-decomposition) working as designed.
 Lesson: **the right amount of decomposition is often zero**; the system has to *want* to not
-decompose.
+decompose. (ITEM 10 later folded this termination judgment INTO the slicer — one `decompose` role
+now both decides execute-vs-slice and produces the cut; the bias-to-execute rule was carried verbatim.)
 
 ### Lesson 5 — Concurrent edits poison a run (don't run on a tree you're editing)
 Twice, drift appeared because the human was actively editing MailKit while a workflow ran (the

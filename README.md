@@ -7,7 +7,7 @@ engineering workflow with day-to-day dev, job-hunt, and research skills.
 
 ```
 /plugin marketplace add soilSpoon/skills
-/plugin install slice@soilspoon-skills            # trust-first decomposition workflow (+5 role agents)
+/plugin install slice@soilspoon-skills            # trust-first decomposition workflow (+4 role agents)
 /plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, build-config drift, root-cause workflow
 /plugin install job-hunt@soilspoon-skills         # resume tailoring, Wishket applications
 /plugin install research-tools@soilspoon-skills   # fact-checking, human-like browser automation
@@ -56,7 +56,7 @@ npx skills add soilSpoon/skills@slice
 
 **Bundled:**
 - `recursive-slice.js` — the workflow engine (run via the Workflow tool's `scriptPath`)
-- `agents/slice-*.md` — the 5 roles (baseliner/assessor/slicer/executor/verifier) as standalone subagents
+- `agents/slice-*.md` — the 4 roles (baseliner/slicer/executor/verifier) as standalone subagents — the slicer also owns the recursion-termination decision (the former assessor is folded into it)
 - `references/` — architecture, philosophy, and battle-tested lessons (deadlocks, orphaned test runners, false greens)
 - `scripts/` — live run viewer, no-focus window capture for visual UI verification (macOS)
 

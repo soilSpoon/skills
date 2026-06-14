@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Generate the 5 standalone role-agent files agents/slice-<role>.md from the SINGLE
+// Generate the 4 standalone role-agent files agents/slice-<role>.md from the SINGLE
 // source of truth — the R_* persona constants in src/prompts.ts.
+// (ITEM 10: the Assessor was folded INTO the Slicer — there is no slice-assessor.md anymore.)
 //
 // WHY this exists: agents/*.md and src/prompts.ts used to be hand-maintained mirrors of
 // the same persona text. They drifted silently (the build had a grep "drift-guard" that
@@ -16,7 +17,7 @@
 // subagent). It is pinned per-role in ROLES below so the generated files register and
 // behave IDENTICALLY to the hand-written originals. The BODY is the constant verbatim.
 //
-// Only the 5 REAL standalone agents are generated. R_VERIFY_LIGHT / R_CRITIC / R_COORD are
+// Only the 4 REAL standalone agents are generated. R_VERIFY_LIGHT / R_CRITIC / R_COORD are
 // INTERNAL personas (inlined into engine prompts at runtime; never dispatched as a standalone
 // agentType — the only standalone agentType the engine spawns is the built-in 'Explore'), so
 // they have no .md today and none is generated for them.
@@ -46,20 +47,15 @@ const ROLES = [
     model: 'sonnet',
   },
   {
-    file: 'slice-assessor.md',
-    const: 'R_ASSESS',
-    name: 'slice-assessor',
-    description:
-      'Classifies one task on two orthogonal axes — difficulty (easy/hard) and size (small/big) — and emits the next ACTION (execute / slice / spike). The brain of recursive decomposition; biased toward execution.',
-    tools: 'Read, Grep, Glob, Bash',
-    model: 'sonnet',
-  },
-  {
+    // ITEM 10: the Assessor is folded INTO the Slicer — ONE 'decompose' role is both the recursion
+    // termination condition (execute|slice|spike, bias HARD to execute) AND the cut. There is no
+    // separate slice-assessor.md anymore; R_SLICE carries the former assessor's anti-over-decomposition
+    // bias verbatim.
     file: 'slice-slicer.md',
     const: 'R_SLICE',
     name: 'slice-slicer',
     description:
-      "Decomposes one big/hard task into thin, VERTICAL, independently-verifiable slices, ordered by dependency, each with a compact contract AND a fixed interface. Owns interface design (it sees all siblings; leaves don't). Embodies Beck's Slicing + Symmetry + Isolation.",
+      "Decides one task's next action (execute / slice / spike — biased HARD toward execute, the recursion termination condition) AND, when slicing, decomposes it into thin, VERTICAL, independently-verifiable slices, ordered by dependency, each with a compact contract AND a fixed interface. Owns interface design (it sees all siblings; leaves don't). Embodies Beck's Slicing + Symmetry + Isolation.",
     tools: 'Read, Grep, Glob, Bash',
     model: 'sonnet',
   },

@@ -26,9 +26,13 @@ def classify(r):
     if 'measureCommand' in r or 'gitSha' in r:
         return ('baseline', f"{str(r.get('currentState',''))[:48]} · "
                 f"@{str(r.get('gitSha',''))[:8]} clean={r.get('gitClean')}")
+    # ITEM 10: the merged 'decompose' decision — action plus (when action:'slice') the cut itself.
     if 'action' in r:
-        return ('assess', f"{r.get('difficulty')}/{r.get('size')} → {r['action']}")
-    if 'slices' in r:
+        if r.get('slices'):
+            ds = [s.get('desc','')[:64] for s in r['slices']]
+            return ('slice', f"→ slice · {len(ds)} slices\n" + "\n".join(f"      ├ {d}" for d in ds))
+        return ('decompose', f"→ {r['action']}" + (f" · {r.get('riskTier')}" if r.get('riskTier') else ''))
+    if 'slices' in r:   # the parallel-PARTITION result (Plan phase) — bare slices, no action
         ds = [s.get('desc','')[:64] for s in r['slices']]
         return ('slice', f"{len(ds)} slices\n" + "\n".join(f"      ├ {d}" for d in ds))
     if 'missing' in r:
@@ -42,9 +46,9 @@ def classify(r):
                 f"{str(r.get('reason',''))[:60]}")
     return ('?', json.dumps(r)[:60])
 
-ICON = {'baseline':'◆','assess':'?','slice':'⑂','critic':'✎','exec':'⚙',
+ICON = {'baseline':'◆','decompose':'?','slice':'⑂','critic':'✎','exec':'⚙',
         'verify':'🛡','?':'·'}
-COLOR = {'baseline':C['cyn'],'assess':C['dim'],'slice':C['bold'],
+COLOR = {'baseline':C['cyn'],'decompose':C['dim'],'slice':C['bold'],
          'critic':C['ylw'],'exec':C['rst'],'verify':C['cyn'],'?':C['dim']}
 
 def main():
