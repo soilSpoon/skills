@@ -269,8 +269,8 @@ const LEAF_TEST = (scope?: string) =>
   `\nLEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full ` +
   `measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated ` +
   `suite; it runs ONCE at integration as the net). ` +
-  (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test suite/class you add so this exact token matches it (the engine re-runs this filter as a deterministic gate; a name mismatch = zero tests matched = an untrusted leaf). `
-         : `Filter to the test suite/file you add or touch (project-card filter syntax). `) +
+  (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test you add so this EXACT token matches the runner's filter. Know your runner: many match a FUNCTION/TEST-NAME substring (Swift Testing \`--filter\`, pytest \`-k\`) — for those put \`${scope}\` IN the @Test/test-function name, NOT a suite path; suite-path runners match the suite/class name. (The engine re-runs this filter as the deterministic gate; a name mismatch = zero tests matched, which now degrades THIS leaf to LLM-verify — a FINDING, not a false RED.) `
+         : `Filter to the test you add or touch — match the runner's filter syntax (function-name substring for Swift Testing/pytest; suite path otherwise). `) +
   `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to ` +
   `the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's ` +
   `incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. ` +
@@ -615,7 +615,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       // separate slicer call. (A null/empty slices array with action:'slice' falls through to the
       // non-reducing→execute guard below, exactly as the old separate-slicer empty result did.)
       let slices: SliceSpec[] = (d && d.slices) || []
-      if (slices.length > 1) {
+      // B2: the completeness critic's marginal value is highest at SHALLOW depth (top-level scenario gaps);
+      // re-running it at EVERY deep recursion level multiplies leaves for little extra trust (excess ceremony —
+      // proportional-ceremony). Bound to depth ≤ 1 (root + first level); deeper plan-gaps are still caught by
+      // per-leaf discovery (the executor's `discovered` scenarios), so this trims runtime, not the trust floor.
+      if (slices.length > 1 && node.depth <= 1) {
         const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agentSafe(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
           slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}`,

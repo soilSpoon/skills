@@ -1293,6 +1293,32 @@ test('③ root decompose on a compile-bound repo emits a deterministic SCALE hea
     `root decompose must emit a compile-bound SCALE heads-up naming the over-tier signal; saw: ${logs.filter((l) => /SCALE|slice \[d/.test(l)).join(' | ')}`)
 })
 
+// B2 — the completeness critic is bounded to SHALLOW depth (≤1): high-value at the root, but re-running
+// it at every deep recursion level multiplies leaves for little extra trust (excess ceremony). Deeper
+// plan-gaps are still caught by per-leaf discovery, so this trims runtime, not the trust floor.
+test('B2: completeness critic is bounded to depth ≤1 — not re-run at every deep recursion level', async () => {
+  const criticDepths = new Set()
+  // NON-atomic slices (atomic:false) so children DECOMPOSE again → the tree actually reaches depth 2
+  // (FIX.slices3 is atomic:true, which would execute children and never recurse — a vacuous test).
+  const deepSlice = {
+    action: 'slice', reason: 'deep fixture', slices: [0, 1, 2].map((i) => ({
+      desc: `deep slice ${i}`, interface: 'TBD/exploratory', contract: `thing ${i} in src/s${i}.ts`,
+      independent: true, dependsOn: [], kind: 'behavior', atomic: false, riskTier: 'standard', testScope: `S${i}`,
+    })),
+  }
+  const dispatch = dispatcher((c) => {
+    const l = c.opts.label || ''
+    const m = l.match(/critic:d(\d+)/)
+    if (m) criticDepths.add(m[1])              // record the depth the critic ran at, then fall through (noMissing)
+    if (/decompose/.test(l)) return deepSlice  // slice (non-atomic) at EVERY level → decomposes at depth 0,1,2
+  })
+  await runEngine({ args: { ...ARGS, maxDepth: 3 }, dispatch })
+  assert.ok(criticDepths.has('0') || criticDepths.has('1'),
+    `critic must still run at shallow depth (root completeness); ran at: [${[...criticDepths].join(',')}]`)
+  assert.ok(!criticDepths.has('2'),
+    `critic must NOT run at depth ≥2 (the multiplying excess ceremony); ran at: [${[...criticDepths].join(',')}]`)
+})
+
 // Artifact-freshness canary: the suite executes the BUILT artifact, so editing src/*.ts without
 // rebuilding yields green against stale code. This is the fast MTIME guard (catches "forgot to
 // rebuild"); the CONTENT-reproducibility guard — which catches a hand-edited artifact that diverged
