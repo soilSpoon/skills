@@ -1279,6 +1279,20 @@ test('① t0 filter ZERO-match → leaf llm-only, breaker NOT tripped (scope mis
     `each zero-match leaf is gate=llm-only (no real gate ran), not reverted as a false-red; got: ${result.results.map((r) => r.gateLevel).join(',')}`)
 })
 
+// ③ predictability backstop — at the ROOT decomposition the engine emits a deterministic SCALE heads-up
+// (magnitude from breadth + coldBuildCost) so a long / over-tiered run is never a surprise (Lesson 14:
+// a deterministic guard backing the prompt-strength "quote an ETA before launch" rule).
+test('③ root decompose on a compile-bound repo emits a deterministic SCALE heads-up', async () => {
+  const dispatch = dispatcher((c) => {
+    const l = c.opts.label || ''
+    if (c.opts.phase === 'Baseline') return { ...FIX.baseline, coldBuildCost: 'expensive' }
+    if (/decompose/.test(l) && /d0/.test(l)) return FIX.decomposeSlice
+  })
+  const { logs } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(logs.some((l) => /SCALE:/.test(l) && /compile-bound/.test(l) && /over-tier/.test(l)),
+    `root decompose must emit a compile-bound SCALE heads-up naming the over-tier signal; saw: ${logs.filter((l) => /SCALE|slice \[d/.test(l)).join(' | ')}`)
+})
+
 // Artifact-freshness canary: the suite executes the BUILT artifact, so editing src/*.ts without
 // rebuilding yields green against stale code. This is the fast MTIME guard (catches "forgot to
 // rebuild"); the CONTENT-reproducibility guard — which catches a hand-edited artifact that diverged

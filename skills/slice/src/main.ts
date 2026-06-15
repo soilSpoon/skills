@@ -636,6 +636,14 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         action = 'execute'
       } else {
         log(`${tag}slice [d${node.depth}] → ${slices.length}`)
+        if (node.depth === 0) {
+          // ③ PREDICTABILITY backstop (deterministic — the Lesson-14 guard for the prompt-strength
+          // "quote an ETA before launch" rule). Surface run MAGNITUDE from the root breadth + coldBuildCost
+          // so "long" is never a surprise, and so an over-tiered low-risk task is caught at launch. The
+          // completeness critic + per-leaf discovery EXPAND this floor, so the real run is larger.
+          const compileBound = baseline!.coldBuildCost === 'expensive'
+          log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? '; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count' : ''}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`)
+        }
         for (let j = slices.length - 1; j >= 0; j--) {
           const iface = slices[j].interface
           const ifaceCtx = (iface && !/^TBD/i.test(iface.trim())) ? `\nInterface (FIXED): ${iface}` : ''

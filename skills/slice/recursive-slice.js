@@ -526,6 +526,10 @@ ${INV}`,
           action = "execute";
         } else {
           log(`${tag}slice [d${node.depth}] → ${slices.length}`);
+          if (node.depth === 0) {
+            const compileBound = baseline.coldBuildCost === "expensive";
+            log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? "; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count" : ""}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`);
+          }
           for (let j = slices.length - 1; j >= 0; j--) {
             const iface = slices[j].interface;
             const ifaceCtx = iface && !/^TBD/i.test(iface.trim()) ? `
