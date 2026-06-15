@@ -18,6 +18,12 @@
 - [ ] **[spec-first] 토큰 도출 + Canon 감사 정밀화** — test-list.md §4 의 `--list-scopes` 충돌 해소 알고리즘을 4단계 프로즈→구체화(모델 런 간 토큰 도출 drift 감소); evals.json C3 deny-list false-negative 모니터링 + 자연어 smuggling 적대 케이스 추가(현재 정직하게 model-judged로 표기).
 - [ ] **[spec-first] examples.md 폭 확장** — CLI-only / 백엔드-라이브러리 worked example 추가(현재 pure-logic·real-dep·journey 3종 → 백엔드 폭 보강).
 
+## dev-toolkit / review-orchestrator (1.4.0 ship 후 followUp — 적대적 검증 SAFE)
+
+- [ ] **[review-orch] gateTier vs thin-candidate band 정리** — code-fundamentals/SKILL.md 비례게이트의 줄/파일 임계(`gateTier`)와 *별개*인 thin-candidate 단락(`candidates ≤ 5`)을 한 Small/Medium/Large 표로 합치되, 6-15/16+ **finding-count band는 gateTier가 강제하지 않음**(thin-candidate 우회 설명일 뿐)을 명시 — 한 곳만 고치는 footgun 방지.
+- [ ] **[review-orch] e2e 실행 관찰** — `code-review-orchestrator.js`를 실제 small/medium/large diff에 돌려 tier 선택·small의 VOTE skip·thin-candidate 우회·`vote_journal`/`unresolved_disagreements` 출력을 관찰(현재 static + `node --check`만 검증, Workflow 런타임 미실행).
+- [ ] **[review-orch] 프론트엔드 lane-config 주입점** — toss-frontend 5-lane 맵이 SKILL 산문에만 있고 번들 orchestrator의 `LANES`엔 미-wired. FE 도메인 자동화 시 명시적 lane-config 주입점 필요.
+
 - [x] **engine test host** (완료 — `skills/slice/test/`: AsyncFunction 호스트 + 시나리오 5종(해피/리페어/쿼터홀트/streak/sh라우팅), `node --test`로 실행. 파일시스템·git 불요) / - [ ] **phase-module refactor** — `src/main.ts`(~740줄)는 orchestrator 단일 파일로 길다. 단, 엔진엔 회귀 넷이 빌드 게이트(tsc --strict → tsup → node --check) + `adapters/opencode/host-smoke.mjs`뿐이므로 **리팩토링 전에 테스트 호스트부터**: PORT 설계(ambient `agent/log/budget/phase` 주입)를 이용해 스크립트된 가짜 `agent()` 응답으로 엔진 전체를 구동하는 픽스처 테스트(decompose→leaf→verify→integrate 시나리오, quota-halt 시나리오 포함). 그 다음 main.ts를 phase 모듈(baseline / partition / leaf-loop / verify / integrate / briefing)로 추출. `/slice` 레인으로 실행하고 domain guide는 `code-fundamentals`(자동 선택됨). 트리거: dronerush 레인 완료 후 (per-working-tree 동시성 규칙 준수).
 - [x] ~~model tiering~~ — 조사 결과 이미 대부분 티어링됨: executor 전 티어 sonnet, baseline/assess/spike/light-verify sonnet, heavy-verify 첫 렌즈 opus, 표준 verifier는 의도적 강모델(교차 모델 비판). 남은 두 곳 적용 완료: `sh` sonnet→haiku(verbatim 프록시), tidy verifier 모델 미지정→sonnet(일관성).
 - [x] **quota circuit breaker class-gate (A6)** — 구현 완료: `NULL_STREAK_CLASSES` Set으로 연속 null의 call class를 추적; `≥3 null + ≥2 classes`일 때만 QUOTA_HALT 발동. heavy 3-lens 루프(같은 class 3회)는 단일 역할의 일시적 실패로 간주해 halt 제외. `bumpNullStreak(opts)`로 null-return/catch 두 경로 모두 커버. 픽스처 시나리오 C4(quota circuit breaker)로 검증.

@@ -252,7 +252,11 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 
 직렬 다회 호출. 1회당 references는 1 lane만 컨텍스트에 두고 같은 diff에 대해 N번 묻는다. 토큰은 N배지만 관점 오염은 막힌다. diff가 작으면 워크플로 A로 떨어뜨리는 게 합리적.
 
-**5. 확장 lane (선택, 항상 활성화 X)**
+**5. 멀티-에이전트 VOTE 오케스트레이터 (route→section→vote→synthesize) — code-fundamentals 워크플로 D 상속**
+
+위 lane 병렬 리뷰는 code-fundamentals **워크플로 D**의 `section`+`synthesize`다. **VOTE 단계·비례 게이트·반박 vs unavailable 규칙·`tradeoff_decision`은 code-fundamentals에서 그대로 상속**하고, **ROUTE만 프론트엔드용으로 오버라이드**한다 — React/a11y/디자인 토큰 관점을 skeptic 렌즈에 매핑: ① correctness & 진짜 `[MUST]`(a11y 위반·런타임 버그·useEffect race; **Opus**) · ② reuse/coupling(과도한 DRY vs 결합도, props drilling, 어댑터 누락; Sonnet) · ③ context/altitude(채용 과제 vs 프로덕션, 디자인 토큰 산재가 severity를 뒤집나; Sonnet). VOTE의 만장일치·`[unverified]` 플래그·refute-mode·축 충돌 구조화는 동일 — 중복 서술 안 함. 번들 자동화 [code-fundamentals/code-review-orchestrator.js](../code-fundamentals/code-review-orchestrator.js), 손-구동 fallback [code-fundamentals/references/review-orchestration.md](../code-fundamentals/references/review-orchestration.md).
+
+**6. 확장 lane (선택, 항상 활성화 X)**
 
 - 클라이언트 config 위치 (Claude Code: `~/.claude/review-extensions/`)에 사용자 커스텀 규칙이 있으면 추가 lane으로 자동 등록
 - 다른 모델로 rescue (가용 시; Claude Code에서는 `codex:rescue`) — 동일 diff를 같은 schema로 요청해 모델 간 disagree 항목만 별도 표시
