@@ -10,11 +10,11 @@
 ## slice Phase 3 testing-readiness gate (1.11.0 ship 후 followUp — 적대적 검증 SAFE)
 
 - [x] **[slice gate] rigPresent↔measureCommand 교차검증 WARN** (DONE slice 1.11.2 — main.ts 게이트 직전 비-halting 양방향 WARN + 3 테스트) — 게이트는 `rigPresent===false`만 잡는다(fail-closed, 정상). 저렴한 엔진 WARN 추가 고려: `rigPresent:false`인데 measureCommand 비사소(=false halt 의심), 또는 `rigPresent:true`인데 measureCommand 사소(`'true'` 등, =false green 의심). 현재 backstop은 per-leaf llm-only WARN + integrate net이나 둘 다 halt 안 함. TRUE-case 환각(가짜 리그를 true로 보고)은 인정된 residual(베이스라이너 품질 이슈, 엔진 게이트 범위 밖).
-- [ ] **[slice gate] 모노레포 sub-package** — rig 없는 root + rig 있는 sub-package면 root 판정으로 false halt 가능. `confirmNoRig`로 복구되나, repo arg를 sub-package로 가리키게 안내하거나 sub-package 탐지를 R_BASELINE에 추가할지 검토.
+- [x] **[slice gate] 모노레포 sub-package** (DONE slice 1.11.3 — R_BASELINE에 MONOREPO 절: root에 리그 없어도 work-relevant sub-package 리그를 채택, rigPresent:false는 root도 sub-package도 리그 없을 때만 → 진짜 sub-package 리그가 false halt 안 됨) — rig 없는 root + rig 있는 sub-package면 root 판정으로 false halt 가능. `confirmNoRig`로 복구되나, repo arg를 sub-package로 가리키게 안내하거나 sub-package 탐지를 R_BASELINE에 추가할지 검토.
 
 ## reliability-kit / spec-first (0.2.0 ship 후 followUp — 적대적 검증 SAFE)
 
-- [ ] **[spec-first→slice] 핸드오프 기계적 보장 (Phase 2.1, slice-side)** — 0.2.0 은 핸드오프가 *프로즈 컨벤션*(args.task STRING)일 뿐, 슬라이서가 MUST PRESERVE 제약을 보존하거나 NOW 토큰 경계를 지킨다는 *기계적* 보장은 없다. slice 통합 시: args.task 구성(sharpened task + MUST PRESERVE + ACCEPTANCE VARIANTS 힌트 + PUNT 블록)이 정확히 들어가는지, NOW 토큰이 변형 없이 `scripts/verify.sh --scope {scope}` 로 흐르는지 검증. + R_CRITIC 이 힌트된 acceptance 변종 커버리지를 감사하는 enhancement(GROUND Rec 2).
+- [x] **[spec-first→slice] 핸드오프 기계적 보장 (Phase 2.1, slice-side)** (DONE slice 1.11.3 — R_CRITIC에 ACCEPTANCE COVERAGE 절: task의 "ACCEPTANCE VARIANTS" 블록의 각 NOW 변종이 슬라이스로 커버되는지 감사, 미커버 변종을 missing으로 보고. NOW 토큰→filterCommand {scope} 흐름은 기존 테스트로 검증됨) — 0.2.0 은 핸드오프가 *프로즈 컨벤션*(args.task STRING)일 뿐, 슬라이서가 MUST PRESERVE 제약을 보존하거나 NOW 토큰 경계를 지킨다는 *기계적* 보장은 없다. slice 통합 시: args.task 구성(sharpened task + MUST PRESERVE + ACCEPTANCE VARIANTS 힌트 + PUNT 블록)이 정확히 들어가는지, NOW 토큰이 변형 없이 `scripts/verify.sh --scope {scope}` 로 흐르는지 검증. + R_CRITIC 이 힌트된 acceptance 변종 커버리지를 감사하는 enhancement(GROUND Rec 2).
 - [ ] **[spec-first] 토큰 도출 + Canon 감사 정밀화** — test-list.md §4 의 `--list-scopes` 충돌 해소 알고리즘을 4단계 프로즈→구체화(모델 런 간 토큰 도출 drift 감소); evals.json C3 deny-list false-negative 모니터링 + 자연어 smuggling 적대 케이스 추가(현재 정직하게 model-judged로 표기).
 - [ ] **[spec-first] examples.md 폭 확장** — CLI-only / 백엔드-라이브러리 worked example 추가(현재 pure-logic·real-dep·journey 3종 → 백엔드 폭 보강).
 

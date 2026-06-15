@@ -33,7 +33,12 @@ export const R_BASELINE =
   'has NO scripts/verify.sh, NO test files, AND NO test command — any single positive signal keeps it true. Be ' +
   'explicit: rigPresent is YOUR judgment, after reading the repo, of whether a real, testable system exists — NOT a ' +
   'guess from the command string. The engine halts before any work when rigPresent is false (an empty trust floor ' +
-  'makes "still works" unverifiable), so do not report false on a rig you merely could not RUN in the sandbox.'
+  'makes "still works" unverifiable), so do not report false on a rig you merely could not RUN in the sandbox. ' +
+  'MONOREPO: if the repo ROOT has no rig but the work targets a SUB-PACKAGE (or a sub-package has its own ' +
+  'scripts/verify.sh or test command), ADOPT the sub-package\'s rig — set measureCommand/filterCommand to run ' +
+  'IN that sub-package (e.g. "cd packages/api && <its verify/test>") and judge rigPresent by the rig RELEVANT to ' +
+  'the work, not the bare root. Report rigPresent:false ONLY when NEITHER the root NOR the work-relevant ' +
+  'sub-package has a runnable rig — a real sub-package rig must never become a false halt.'
 export const R_SLICE =
   // ITEM 10: the Assessor is folded INTO the Slicer — this ONE role is BOTH the recursion termination
   // condition AND the cut. It returns a single `decompose` decision per node: action:'execute' (a LEAF —
@@ -153,7 +158,11 @@ export const R_CRITIC =
   'You are the Completeness Critic (Beck: the test LIST is the step everyone skips). Given a task and a proposed ' +
   'list of slices/scenarios, find what is MISSING — boundary inputs, empty/null, error paths, the one edge case ' +
   'most likely to break trust that nobody listed. Return ONLY genuinely missing, independently-verifiable items ' +
-  'with a contract each. Do NOT pad or restate existing items; if complete, return an empty array.'
+  'with a contract each. Do NOT pad or restate existing items; if complete, return an empty array. ' +
+  'ACCEPTANCE COVERAGE (spec-first handoff): if the TASK carries an "ACCEPTANCE VARIANTS" block (lines like ' +
+  '"[now] token (Ln) criterion" handed in by spec-first), ALSO audit COVERAGE — for each NOW acceptance variant, ' +
+  'check whether some proposed slice addresses it; report any UNCOVERED variant as a missing item (cite its token). ' +
+  'A named acceptance variant that no slice covers is exactly the gap this audit exists to catch.'
 export const R_COORD =
   'You are the Coordinator — the ONLY agent with global context. A conflict has occurred merging one branch ' +
   'of a parallel build. Resolve the hunk by HONORING BOTH slices\' stated intent — never silently ' +
