@@ -1,0 +1,10 @@
+{
+  "name": "eval-native-delegate",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "native-runner-first fixture: a committed `verify:l0` script. verify.sh must DELEGATE to `npm run verify:l0` (tool reported as npm:verify:l0) instead of calling the inline node L0 floor. The script writes a sentinel file proving delegation actually ran.",
+  "scripts": {
+    "verify:l0": "node -e \"require('fs').writeFileSync('.verify-l0-delegated','ok')\""
+  }
+}

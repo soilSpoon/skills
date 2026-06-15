@@ -1,0 +1,10 @@
+{
+  "name": "eval-changed-routing",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Routing fixture: testcontainers declared so an L2 row exists. The eval copies this into a throwaway git repo and asserts --changed LAYER ROUTING: a changed src/db/ (integration) file selects l2 (affected:true); a changed src-only file does NOT.",
+  "dependencies": {
+    "testcontainers": "^10.0.0"
+  }
+}

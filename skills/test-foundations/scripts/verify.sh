@@ -177,6 +177,7 @@ if [ "$OPT_PRINT_SETUP" = 1 ]; then vd_print_setup; exit 0; fi
 # ---------------------------------------------------------------------------
 CHANGED_BASE=""
 BASE_FALLBACK=0
+CHANGED_FILES=""   # cached newline-separated changed-file set (computed once)
 changed_files() {
   local base
   if [ -n "$OPT_BASE" ]; then
@@ -191,6 +192,36 @@ changed_files() {
     git -C "$REPO_ROOT" diff --name-only HEAD 2>/dev/null
     git -C "$REPO_ROOT" status --porcelain 2>/dev/null | cut -c4-
   } | sed '/^$/d' | sort -u
+}
+
+# ---------------------------------------------------------------------------
+# --changed STAGE-2: LAYER ROUTING by changed-file TYPE.
+# Given the cached CHANGED_FILES set, decide which layers --changed selects.
+#   * l0+l1 ALWAYS (the fast door)
+#   * l2 IF any changed file matches an integration path
+#         (*/integration/*, */db/*, *.repository.*, *.repo.*, */migrations/*)
+#   * l3 IF any changed file matches an e2e/journey path
+#         (e2e/, */e2e/*, */journeys/*, */journey/*, *.e2e.*)
+# Echoes the selected layers, space-separated, in l0 l1 l2 l3 order.
+# A layer chosen here is "affected" (impact-selected), tracked by AFFECTED_LAYERS.
+# ---------------------------------------------------------------------------
+AFFECTED_LAYERS=" "   # space-padded membership set, e.g. " l0 l1 l2 "
+changed_route_layers() {
+  local files="$1" sel="l0 l1" l2=0 l3=0 f
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+      */integration/*|*/db/*|*.repository.*|*.repo.*|*/migrations/*) l2=1 ;;
+    esac
+    case "$f" in
+      e2e/*|*/e2e/*|*/journeys/*|*/journey/*|*.e2e.*) l3=1 ;;
+    esac
+  done <<EOF
+$files
+EOF
+  [ "$l2" = 1 ] && sel="$sel l2"
+  [ "$l3" = 1 ] && sel="$sel l3"
+  echo "$sel"
 }
 
 # ---------------------------------------------------------------------------
@@ -254,6 +285,14 @@ run_layer() {
   local layer="$1"
   R_PRESENT=0; R_PASSED=1; R_EXIT=0; R_TOOL=""; R_TESTS_RUN=0
   R_PURPOSEGAP="null"; R_ZEROMATCH=0; R_INFRA=0; R_DURMS=0
+  # R_AFFECTED: did THIS layer narrow to changed impact?
+  #   1 = honestly affected (path-selected L2/L3, or native per-test narrowing applied on L0/L1)
+  #   0 = ran whole, no impact selection. Default to the routing decision; per-test
+  #       dispatch may UPGRADE l0/l1 to 1 when native narrowing fires.
+  case "$AFFECTED_LAYERS" in *" $layer "*) R_AFFECTED=1 ;; *) R_AFFECTED=0 ;; esac
+  # l0/l1 are in AFFECTED_LAYERS only as the always-on fast door, NOT via impact
+  # selection — start them at 0 (honest) and let native narrowing flip them to 1.
+  if [ "$OPT_CHANGED" = 1 ] && { [ "$layer" = l0 ] || [ "$layer" = l1 ]; }; then R_AFFECTED=0; fi
   mkdir -p "$LOGDIR"
   local log="$LOGDIR/$layer.log"; : > "$log"
 
@@ -333,13 +372,114 @@ dispatch_mode() {
     # ---------------- Python L2/L3 ----------------
     py-testcontainers) l2_infra "$log" "Testcontainers (py)" ;;
     py-playwright)     l3_infra "$log" "Playwright (py)" ;;
-    # ---------------- Go / Rust / .NET / Ruby (STUB: present but unimplemented) ----------------
-    go-*|rs-*|dn-*|rb-*)
-      echo "dispatch '$mode' not yet wired (DETECT-then-MAP stub) — emitting present:false" >>"$log"
-      R_PRESENT=0; R_PASSED=1; R_EXIT=0 ;;
+    # ---------------- Go (real dispatch) ----------------
+    go-fmtvet) go_l0_fmtvet "$log" ;;
+    go-test)   go_l1_test "$log" ;;
+    go-tc)     go_l2_integration "$log" ;;
+    # ---------------- Rust (real dispatch) ----------------
+    rs-fmtclippy) rs_l0_fmtclippy "$log" ;;
+    rs-nextest)   rs_l1_nextest "$log" ;;
+    rs-cargotest) rs_l1_cargotest "$log" ;;
     *)
       echo "unknown mode '$mode'" >>"$log"; R_PRESENT=0 ;;
   esac
+}
+
+# =================== Go layer implementations ===================
+# DETECT-then-MAP already guaranteed `go` is on PATH for these modes; but stay
+# honest if the binary vanished between detect and dispatch (=> exit 3 infra).
+go_l0_fmtvet() {
+  local log="$1"
+  if ! command -v go >/dev/null 2>&1; then
+    echo "go absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="go toolchain missing — could not run L0 fmt/vet"; return 0
+  fi
+  # gofmt -l lists mis-formatted files (non-empty => fail); go vet catches suspect constructs.
+  ( cd "$REPO_ROOT" && \
+    unformatted="$(gofmt -l . 2>>"$log")"; \
+    if [ -n "$unformatted" ]; then echo "gofmt: unformatted files:" >>"$log"; echo "$unformatted" >>"$log"; exit 1; fi; \
+    go vet ./... ) >>"$log" 2>&1; R_EXIT=$?
+  [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+}
+go_l1_test() {
+  local log="$1" args
+  if ! command -v go >/dev/null 2>&1; then
+    echo "go absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="go toolchain missing — could not run L1 tests"; return 0
+  fi
+  args=(test -race)
+  # {scope} => go test -run NAME (verbatim bare-token name filter).
+  [ -n "$OPT_SCOPE" ] && args+=(-run "$OPT_SCOPE")
+  args+=(./...)
+  ( cd "$REPO_ROOT" && go "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
+  # go's per-package build cache IS impact selection under --changed (only changed
+  # packages recompile/retest); honestly affected when narrowing fires.
+  [ "$OPT_CHANGED" = 1 ] && R_AFFECTED=1
+  # zero-match: -run that matches nothing prints "no tests to run" / "[no tests to run]".
+  if [ -n "$OPT_SCOPE" ] && grep -qiE 'no tests to run|no test files' "$log"; then R_ZEROMATCH=1; fi
+  if [ "$R_EXIT" -eq 0 ]; then R_PASSED=1; elif [ "$R_ZEROMATCH" = 1 ]; then R_PASSED=1; else R_PASSED=0; fi
+}
+go_l2_integration() {
+  local log="$1"
+  if ! command -v go >/dev/null 2>&1; then
+    echo "go absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="go toolchain missing — could not run L2 integration"; return 0
+  fi
+  # integration-tagged tests usually need real deps (Docker). Guard infra first.
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    echo "L2 go integration tag requires Docker, which is unavailable — INFRA failure (exit 3, not a green skip)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="go integration build-tag configured but Docker down — could not verify real dependency"
+    return 0
+  fi
+  ( cd "$REPO_ROOT" && go test -tags=integration ./... ) >>"$log" 2>&1; R_EXIT=$?
+  R_PURPOSEGAP="real dependency via container ✓"
+  [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+}
+
+# =================== Rust layer implementations ===================
+rs_l0_fmtclippy() {
+  local log="$1"
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "cargo absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="cargo toolchain missing — could not run L0 fmt/clippy"; return 0
+  fi
+  # cargo fmt --check fails on unformatted code; clippy -D warnings turns lints into errors.
+  ( cd "$REPO_ROOT" && cargo fmt --check && cargo clippy --all-targets -- -D warnings ) >>"$log" 2>&1; R_EXIT=$?
+  [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+}
+rs_l1_nextest() {
+  local log="$1" args
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "cargo absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="cargo toolchain missing — could not run L1 tests"; return 0
+  fi
+  args=(nextest run)
+  # {scope} => nextest -E 'test(/NAME/)' (verbatim bare-token, slash-free per engine guard).
+  [ -n "$OPT_SCOPE" ] && args+=(-E "test(/$OPT_SCOPE/)")
+  ( cd "$REPO_ROOT" && cargo "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
+  # nextest exits 4 when a filter matches no tests.
+  if [ -n "$OPT_SCOPE" ] && { [ "$R_EXIT" -eq 4 ] || grep -qiE 'no tests to run|0 tests run' "$log"; }; then R_ZEROMATCH=1; fi
+  if [ "$R_EXIT" -eq 0 ]; then R_PASSED=1; elif [ "$R_ZEROMATCH" = 1 ]; then R_PASSED=1; else R_PASSED=0; fi
+}
+rs_l1_cargotest() {
+  local log="$1" args
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "cargo absent at dispatch — INFRA failure (exit 3)" >>"$log"
+    R_INFRA=1; R_PASSED=0; R_EXIT=3; R_PRESENT=1
+    R_PURPOSEGAP="cargo toolchain missing — could not run L1 tests"; return 0
+  fi
+  args=(test)
+  # cargo test NAME filters by substring (bare token forwarded verbatim).
+  [ -n "$OPT_SCOPE" ] && args+=("$OPT_SCOPE")
+  ( cd "$REPO_ROOT" && cargo "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
+  if [ -n "$OPT_SCOPE" ] && grep -qiE 'running 0 tests|0 passed' "$log"; then R_ZEROMATCH=1; fi
+  if [ "$R_EXIT" -eq 0 ]; then R_PASSED=1; elif [ "$R_ZEROMATCH" = 1 ]; then R_PASSED=1; else R_PASSED=0; fi
 }
 
 # ---- shared infra guard: L2/L3 need Docker; down => exit 3 (NOT green skip) ----
@@ -403,6 +543,12 @@ js_l1_vitest() {
   local log="$1" bin args; bin="$(vd_node_bin vitest || true)"; [ -z "$bin" ] && bin="vitest"
   args=(run)
   [ -n "$OPT_SCOPE" ] && args+=(-t "$OPT_SCOPE")
+  # native per-test narrowing: vitest --changed <base> runs only tests related to
+  # changed files. This is real impact selection => affected:true for THIS layer.
+  if [ "$OPT_CHANGED" = 1 ]; then
+    if [ -n "$CHANGED_BASE" ]; then args+=(--changed "$CHANGED_BASE"); else args+=(--changed); fi
+    R_AFFECTED=1
+  fi
   ( cd "$REPO_ROOT" && "$bin" "${args[@]}" --reporter=json --outputFile=/dev/stderr ) >>"$log" 2>>"$log"; R_EXIT=$?
   # zero-match guard: vitest exits 1 with "No test files found" or 0 with 0 tests.
   if [ -n "$OPT_SCOPE" ] && grep -qiE 'no test|0 passed|No test files' "$log"; then R_ZEROMATCH=1; fi
@@ -412,6 +558,8 @@ js_l1_jest() {
   local log="$1" bin args; bin="$(vd_node_bin jest || true)"; [ -z "$bin" ] && bin="jest"
   args=()
   [ -n "$OPT_SCOPE" ] && args+=(-t "$OPT_SCOPE")
+  # native per-test narrowing: jest --onlyChanged. Real impact selection => affected:true.
+  if [ "$OPT_CHANGED" = 1 ]; then args+=(--onlyChanged); R_AFFECTED=1; fi
   ( cd "$REPO_ROOT" && "$bin" "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
   if [ -n "$OPT_SCOPE" ] && grep -qiE 'No tests found|0 matched' "$log"; then R_ZEROMATCH=1; fi
   [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
@@ -510,7 +658,12 @@ emit_layer_json() {
   if [ "$R_PURPOSEGAP" = "null" ]; then gap=null; else gap="$(json_str "$R_PURPOSEGAP")"; fi
   if [ -n "$OPT_SCOPE" ]; then scope="$(json_str "$OPT_SCOPE")"; else scope=null; fi
   changed=$([ "$OPT_CHANGED" = 1 ] && echo true || echo false)
-  affected=false  # 0.1.0: per-test impact-selection within a layer is a followUp; --changed routes at LAYER granularity (fast door), tests within a RUN layer are not yet narrowed — so `affected` is honestly false until that lands (never a fake `true`)
+  # HONEST affected: true when --changed impact-selected THIS layer —
+  #   * L2/L3 selected via the changed-file -> layer path map, OR
+  #   * L0/L1 narrowed via the runner's NATIVE changed filter (vitest --changed /
+  #     jest --onlyChanged). Runners without native narrowing (node:test, pytest,
+  #     unittest) ran WHOLE => affected stays false (the remaining per-test followUp).
+  affected=$([ "${R_AFFECTED:-0}" = 1 ] && echo true || echo false)
   printf '{"layer":"%s","tool":%s,"present":%s,"passed":%s,"durationMs":%s,"flake":%s,"flakeRuns":%s,"tests":{"run":%s},"scope":%s,"changed":%s,"affected":%s,"purposeGap":%s,"zeroMatch":%s,"exit":%s,"log":%s}\n' \
     "$layer" "$(json_str "${R_TOOL:-}")" "$present" "$passed" \
     "$([ "$R_PRESENT" = 1 ] && echo "$R_DURMS" || echo null)" \
@@ -521,12 +674,23 @@ emit_layer_json() {
 # ===========================================================================
 # MAIN DRIVE
 # ===========================================================================
+# resolve changed file set ONCE (used for routing + per-test narrowing + JSON base).
+if [ "$OPT_CHANGED" = 1 ]; then CHANGED_FILES="$(changed_files)"; fi
+
 LAYERS_TO_RUN=()
 case "$OPT_LAYER" in
-  # --changed (with the default --layer all) = the FAST DOOR (l0+l1) for quick feedback; L2/L3 run via the
-  # full `verify.sh` (no --changed) or an explicit --layer. (Path-conditional L2/L3 inclusion + per-test
-  # impact-selection are followUps — see references/verify-contract.md §4.) An explicit --layer always wins.
-  all) if [ "$OPT_CHANGED" = 1 ]; then LAYERS_TO_RUN=(l0 l1); else LAYERS_TO_RUN=(l0 l1 l2 l3); fi ;;
+  # --changed (with the default --layer all) = the FAST DOOR (l0+l1) ALWAYS, PLUS impact-selected
+  # L2/L3 when changed files touch integration / e2e paths (changed_route_layers). The layers added
+  # by impact selection are recorded in AFFECTED_LAYERS so `affected` is reported HONESTLY per layer.
+  # An explicit --layer always wins (no routing). See references/verify-contract.md §4.
+  all)
+    if [ "$OPT_CHANGED" = 1 ]; then
+      read -r -a LAYERS_TO_RUN <<<"$(changed_route_layers "$CHANGED_FILES")"
+      # mark every impact-selected layer as affected (selected BY the file->layer map).
+      for _l in "${LAYERS_TO_RUN[@]}"; do AFFECTED_LAYERS="$AFFECTED_LAYERS$_l "; done
+    else
+      LAYERS_TO_RUN=(l0 l1 l2 l3)
+    fi ;;
   *)   LAYERS_TO_RUN=("$OPT_LAYER") ;;
 esac
 
@@ -541,8 +705,7 @@ FULLSUITE_MS=0
 CHANGED_FB_MS=0
 FINAL_EXIT=0
 
-# resolve changed base early so JSON aggregate can report it
-if [ "$OPT_CHANGED" = 1 ]; then changed_files >/dev/null; fi
+# (CHANGED_FILES + CHANGED_BASE already resolved above via changed_files; not re-run here.)
 
 for L in "${LAYERS_TO_RUN[@]}"; do
   run_layer "$L"

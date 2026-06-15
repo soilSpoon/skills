@@ -161,21 +161,38 @@ git status --porcelain | cut -c4-
 
 `--base REF` 가 있으면 BASE 를 덮어씀. base 불능(shallow/detached) → 워킹 트리 폴백 + `baseFallback:true`.
 
-**Stage 2 — 계층 라우팅 (0.1.0 의 실제 동작):**
+**Stage 2 — 계층 라우팅 (변경 파일 유형 → 포함 계층, IMPLEMENTED):**
 
-`--changed`(기본 `--layer all`)는 **fast door = L0+L1** 만 돈다 — 빠른 피드백용. `changedFeedbackMs`
-는 그 L0+L1 누적 시간이다. **L2/L3 는** full `verify.sh`(`--changed` 없이) 또는 명시적 `--layer l2`/
-`l3` 로 돈다 (§5.1 'L3 는 PR/CI 에서만' 라우팅의 보수적·정직한 형태). 명시적 `--layer` 는 항상 우선.
+`--changed`(기본 `--layer all`)는 변경 파일 *유형*으로 도는 계층을 고른다 (`changed_route_layers`):
 
-`affected` 필드는 현재 **항상 `false`** 다 — 정직하게: `--changed` 는 *계층 단위*로 라우팅(fast door)
-할 뿐, 도는 계층 *안에서* 테스트를 좁히지(per-test impact-selection) 않는다. 가짜 `true` 를 내지 않는다.
+| 조건 | 포함 계층 |
+|---|---|
+| 항상 (fast door) | **L0 + L1** |
+| 변경 파일이 integration 경로 매치 — `*/integration/*`, `*/db/*`, `*.repository.*`, `*.repo.*`, `*/migrations/*` | **+ L2** |
+| 변경 파일이 e2e/journey 경로 매치 — `e2e/`, `*/e2e/*`, `*/journeys/*`, `*/journey/*`, `*.e2e.*` | **+ L3** |
 
-**계획된 followUp (0.1.0 미구현, BACKLOG):** 아래가 들어오면 `affected:true` 가 의미를 갖는다 —
-1. **(a) 네이티브 affected** — vitest `--changed $BASE`, go per-package 캐시, jest `--onlyChanged`.
-2. **(b) 경로 관례 맵** — `src/foo/bar` → scope 필터 `foo/bar`; 변경 파일 유형 → 포함 계층(config→L0,
-   integration 경로→L2, `e2e/`/journey 경로→L3).
-3. **(c) 폴백** — 전체 affected 계층 (조용히 건너뛰는 것보다 정확함 우선).
-   그때 선택 전략이 `affected:true/false` 로 보고되어 diagnose 가 진짜 영향 선택 vs 계층 폴백을 판별한다.
+`changedFeedbackMs` 는 L0+L1 누적 시간(fast-door 비용)이다. 명시적 `--layer` 는 항상 우선 — 라우팅을
+하지 않고 그 한 계층만 돈다. STAGE-1 변경 파일 집합은 한 번만 계산되어 라우팅·네이티브 좁힘·`base`
+보고에 재사용된다 (라우팅 후 버려지지 않음).
+
+**`affected` 필드 — 정직한 영향 선택 신호 (IMPLEMENTED):**
+
+`affected:true` 는 `--changed` 가 **이 계층을 영향 선택했을 때만** 참이다 —
+
+1. **L2/L3** — 위 파일→계층 맵으로 *선택되어 추가된* 계층. 선택 자체가 영향 선택이므로 `affected:true`.
+2. **L0/L1** — 러너가 **네이티브 변경 좁힘**을 지원하면 그걸 적용하고 `affected:true`:
+   - vitest → `run --changed $BASE`
+   - jest → `--onlyChanged`
+   - go test → per-package 빌드 캐시(변경 패키지만 재컴파일/재실행)
+   네이티브 좁힘이 없는 러너(node:test / pytest / unittest)는 **계층 전체**를 돌므로 `affected:false`
+   (정직 — 가짜 `true` 를 내지 않는다).
+
+`affected:false` 는 "이 계층이 영향 선택 없이 통째로 돌았다"는 측정된 사실이다. diagnose 는 이 필드로
+진짜 영향 선택(좁힘) vs 계층 폴백(통째)을 구분한다.
+
+**남은 followUp (BACKLOG):** 네이티브 변경 좁힘이 없는 러너(node:test / pytest / unittest)의 *계층 내*
+per-test impact-selection — 변경 파일 경로 → scope 필터 관례 맵(`src/foo/bar` → `foo/bar`). 그 전까지
+해당 러너는 통째로 돌고 `affected:false` 로 정직하게 보고된다.
 
 ---
 

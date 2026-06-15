@@ -29,9 +29,10 @@
 #             py-pytest py-unittest                            (l1, Python)
 #             py-testcontainers                                (l2, Python)
 #             py-playwright                                    (l3, Python)
-#             go-fmtvet go-test go-tc go-harness               (Go      — STUB)
-#             rs-fmtclippy rs-nextest rs-tc rs-harness         (Rust    — STUB)
-#             none                                             (no tool => present:false)
+#             go-fmtvet go-test go-tc                          (l0/l1/l2, Go)
+#             rs-fmtclippy rs-nextest rs-cargotest             (l0/l1, Rust)
+#             none                                             (no tool => present:false;
+#                                                               .NET/JVM/Ruby = unwired => none)
 #
 # DETECT-then-MAP: vd_runner_for picks the FIRST tool that is actually runnable
 # in THIS environment (command -v / node-resolvable), so a repo that declares
@@ -216,46 +217,33 @@ vd_runner_for() {
           echo "l3||none"; return 0 ;;
       esac ;;
 
-    # ===================== Go (STUB: table rows + dispatch, present:false until wired) ====
+    # ===================== Go (FULLY IMPLEMENTED — real dispatch in verify.sh) ====
+    # DETECT-then-MAP: only claim a tool when `go` is actually runnable in THIS env.
+    # Absent go => MODE=none => present:false (a MEASURED FACT, never a false green).
     go)
       case "$layer" in
-        l0) if vd_has gofmt && vd_has go; then echo "l0|go-vet|go-fmtvet"; return 0; fi; echo "l0||none"; return 0 ;;
+        l0) if vd_has go; then echo "l0|go-fmt-vet|go-fmtvet"; return 0; fi; echo "l0||none"; return 0 ;;
         l1) if vd_has go; then echo "l1|go-test|go-test"; return 0; fi; echo "l1||none"; return 0 ;;
-        l2) if [ -d "$root" ] && grep -rqs '//go:build integration' "$root" 2>/dev/null; then echo "l2|testcontainers-go|go-tc"; return 0; fi; echo "l2||none"; return 0 ;;
+        l2) if vd_has go && grep -rqs '//go:build integration' "$root" 2>/dev/null; then echo "l2|go-integration|go-tc"; return 0; fi; echo "l2||none"; return 0 ;;
         l3) echo "l3||none"; return 0 ;;
       esac ;;
 
-    # ===================== Rust (STUB) =====================
+    # ===================== Rust (FULLY IMPLEMENTED — real dispatch in verify.sh) =====================
     rs)
       case "$layer" in
-        l0) if vd_has cargo; then echo "l0|clippy|rs-fmtclippy"; return 0; fi; echo "l0||none"; return 0 ;;
-        l1) if vd_has cargo; then if vd_has cargo-nextest; then echo "l1|nextest|rs-nextest"; return 0; fi; echo "l1|cargo-test|rs-nextest"; return 0; fi; echo "l1||none"; return 0 ;;
+        l0) if vd_has cargo; then echo "l0|cargo-fmt-clippy|rs-fmtclippy"; return 0; fi; echo "l0||none"; return 0 ;;
+        l1) if vd_has cargo; then if vd_has cargo-nextest; then echo "l1|nextest|rs-nextest"; return 0; fi; echo "l1|cargo-test|rs-cargotest"; return 0; fi; echo "l1||none"; return 0 ;;
         l2) echo "l2||none"; return 0 ;;
         l3) echo "l3||none"; return 0 ;;
       esac ;;
 
-    # ===================== .NET / JVM / Ruby (STUB rows — DETECT-then-MAP) =====================
-    dotnet)
-      case "$layer" in
-        l0) if vd_has dotnet; then echo "l0|dotnet-format|dn-format"; return 0; fi; echo "l0||none"; return 0 ;;
-        l1) if vd_has dotnet; then echo "l1|dotnet-test|dn-test"; return 0; fi; echo "l1||none"; return 0 ;;
-        l2) echo "l2||none"; return 0 ;;
-        l3) echo "l3||none"; return 0 ;;
-      esac ;;
-    jvm)
-      case "$layer" in
-        l0) echo "l0||none"; return 0 ;;
-        l1) echo "l1||none"; return 0 ;;
-        l2) echo "l2||none"; return 0 ;;
-        l3) echo "l3||none"; return 0 ;;
-      esac ;;
-    ruby)
-      case "$layer" in
-        l0) if vd_has rubocop; then echo "l0|rubocop|rb-rubocop"; return 0; fi; echo "l0||none"; return 0 ;;
-        l1) if vd_has rspec; then echo "l1|rspec|rb-rspec"; return 0; fi; echo "l1||none"; return 0 ;;
-        l2) echo "l2||none"; return 0 ;;
-        l3) echo "l3||none"; return 0 ;;
-      esac ;;
+    # ===================== .NET / JVM / Ruby (UNWIRED — MODE=none) =====================
+    # These stacks have no real dispatch implemented in verify.sh. Per the contract
+    # ([MUST] present:false for unimplemented modes) we return ||none so the --help
+    # table and NDJSON NEVER claim a tool verify.sh cannot actually run. Wiring a
+    # stack = real dispatch in verify.sh + a real TOOL/MODE row here, together.
+    dotnet|jvm|ruby)
+      echo "${layer}||none"; return 0 ;;
   esac
   echo "${layer}||none"
 }

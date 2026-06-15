@@ -1,0 +1,10 @@
+{
+  "name": "eval-l2-docker-down",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Negative-path fixture: declares testcontainers so detect picks L2=js-testcontainers, but Docker is absent in CI => verify.sh --layer l2 must exit 3 (present:true, passed:false), NOT a green skip.",
+  "dependencies": {
+    "testcontainers": "^10.0.0"
+  }
+}

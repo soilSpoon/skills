@@ -131,6 +131,73 @@
           "desc": "scopeSafe=/^[A-Za-z0-9_.-]+$/ accepts bare identifiers (add_returns_sum) and rejects paths/spaces/colons — the engine constraint test fixtures must honor"
         }
       ]
+    },
+    {
+      "id": 3,
+      "name": "l2-docker-down-not-green-skip",
+      "grounding": "verify-contract.md §2 [MUST]: Docker down = L2/L3 exit 3, NOT a green skip. Fixture declares testcontainers (detect picks L2=js-testcontainers); Docker absent => --layer l2 must be present:true, passed:false, exit 3, infra:1, with a purposeGap naming Docker. Asserts the contract does NOT silently green-skip an infra-gated layer.",
+      "prompt": "N/A — negative-path contract eval. Verified by the checks below.",
+      "files": ["evals/fixtures/eval-l2-docker-down/"],
+      "checks": [
+        {
+          "id": "C0-l2-exit3",
+          "grounding": "L2 with Docker absent exits 3 (infra), never 0 (false green) and never 1 (true RED). Run from the fixture dir so REPO_ROOT resolves to it.",
+          "assert": "shell",
+          "cmd": "cd evals/fixtures/eval-l2-docker-down && bash ../../../scripts/verify.sh --layer l2; test $? -eq 3",
+          "exit": 0,
+          "desc": "scripts/verify.sh --layer l2 exits 3 (infra) when testcontainers is configured but Docker is down — not a green skip"
+        },
+        {
+          "id": "C1-l2-present-not-green",
+          "grounding": "The L2 NDJSON line must carry present:true, passed:false, exit:3, infra:1 and a purposeGap mentioning Docker. A present:false / passed:true here would be the false green the contract forbids.",
+          "assert": "shell",
+          "cmd": "cd evals/fixtures/eval-l2-docker-down && bash ../../../scripts/verify.sh --layer l2 --json | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const l2=ls.find(r=>r.layer==='l2'); if(!l2) throw new Error('no l2 line'); if(l2.present!==true) throw new Error('L2 must be present:true (testcontainers detected), got '+l2.present); if(l2.passed!==false) throw new Error('L2 passed must be false (Docker down), got '+l2.passed); if(l2.exit!==3) throw new Error('L2 exit must be 3, got '+l2.exit); if(!/docker/i.test(l2.purposeGap||'')) throw new Error('purposeGap must name Docker'); const agg=ls.find(r=>r.summary); if(agg.infra!==1) throw new Error('aggregate infra must be 1');\"",
+          "exit": 0,
+          "desc": "L2 NDJSON is present:true + passed:false + exit:3 + infra:1 with a Docker purposeGap (no false green skip)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "changed-routing-layer-selection",
+      "grounding": "verify-contract.md §4 Stage-2 (IMPLEMENTED): --changed routes by changed-file TYPE — always l0+l1; +l2 when a changed file matches an integration path (*/db/* etc); a layer impact-selected via the file->layer map reports affected:true. A src-only change must NOT select l2. Fixture is copied into a throwaway git repo so the diff is deterministic (independent of the marketplace tree's own status).",
+      "prompt": "N/A — routing contract eval. Verified by the checks below.",
+      "files": ["evals/fixtures/eval-changed-routing/"],
+      "checks": [
+        {
+          "id": "C0-src-only-no-l2",
+          "grounding": "Changing only src/calc.js (non-integration) keeps --changed at the fast door l0+l1 — l2 NOT selected.",
+          "assert": "shell",
+          "cmd": "T=$(mktemp -d); cp -R evals/fixtures/eval-changed-routing/. \"$T\"/; V=\"$PWD/scripts/verify.sh\"; ( cd \"$T\" && git init -q && git config user.email e@e && git config user.name e && git add -A && git commit -qm base && echo 'export const add=(a,b)=>a+b+0;' > src/calc.js && \"$V\" --changed --json 2>/dev/null ) | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const agg=ls.find(r=>r.summary); if(agg.layers.includes('l2')) throw new Error('src-only change must NOT select l2; got '+JSON.stringify(agg.layers));\"; rc=$?; rm -rf \"$T\"; test $rc -eq 0",
+          "exit": 0,
+          "desc": "--changed with a src-only diff selects only l0+l1 (l2 excluded)"
+        },
+        {
+          "id": "C1-integration-selects-l2-affected",
+          "grounding": "Changing src/db/pool.js (integration path) selects l2 AND reports l2.affected:true (impact-selected via the file->layer map), proving honest affected.",
+          "assert": "shell",
+          "cmd": "T=$(mktemp -d); cp -R evals/fixtures/eval-changed-routing/. \"$T\"/; V=\"$PWD/scripts/verify.sh\"; ( cd \"$T\" && git init -q && git config user.email e@e && git config user.name e && git add -A && git commit -qm base && echo 'export const pool={connect:()=>false};' > src/db/pool.js && \"$V\" --changed --json 2>/dev/null ) | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const agg=ls.find(r=>r.summary); if(!agg.layers.includes('l2')) throw new Error('db/ change must select l2; got '+JSON.stringify(agg.layers)); const l2=ls.find(r=>r.layer==='l2'); if(l2.affected!==true) throw new Error('l2.affected must be true (path-selected), got '+l2.affected);\"; rc=$?; rm -rf \"$T\"; test $rc -eq 0",
+          "exit": 0,
+          "desc": "--changed with a src/db/ (integration) diff selects l2 and reports l2.affected:true (honest impact selection)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "native-runner-first-delegation",
+      "grounding": "verify-contract.md §7 native-runner-first: when a committed verify:l0 package.json script exists, verify.sh DELEGATES to `npm run verify:l0` instead of running the inline node L0 floor. Fixture's verify:l0 writes a sentinel file proving delegation actually ran; the NDJSON tool field is reported as npm:verify:l0.",
+      "prompt": "N/A — delegation contract eval. Verified by the checks below.",
+      "files": ["evals/fixtures/eval-native-delegate/"],
+      "checks": [
+        {
+          "id": "C0-delegates-to-npm-script",
+          "grounding": "verify.sh must report tool=npm:verify:l0 (delegation) AND the script's side-effect sentinel must exist — inline node-syntax floor would do neither.",
+          "assert": "shell",
+          "cmd": "cd evals/fixtures/eval-native-delegate && rm -f .verify-l0-delegated && bash ../../../scripts/verify.sh --layer l0 --json | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const l0=ls.find(r=>r.layer==='l0'); if(l0.tool!=='npm:verify:l0') throw new Error('expected delegation tool npm:verify:l0, got '+l0.tool); if(l0.passed!==true) throw new Error('delegated l0 must pass');\" && test -f .verify-l0-delegated; rc=$?; rm -f .verify-l0-delegated; test $rc -eq 0",
+          "exit": 0,
+          "desc": "verify.sh --layer l0 delegates to the committed `verify:l0` npm script (tool=npm:verify:l0) and the script's sentinel file proves it ran (not the inline floor)"
+        }
+      ]
     }
   ]
 }
