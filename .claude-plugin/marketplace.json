@@ -30,7 +30,7 @@
     },
     {
       "name": "reliability-kit",
-      "description": "Trustworthy test foundations: language-adaptive 4-layer test rig (L0 quality / L1 unit / L2 integration / L3 E2E) on both axes (quality × speed), with a single `verify` entry the slice engine adopts. Diagnose → scaffold → guide.",
+      "description": "Trustworthy test foundations + spec-first. test-foundations: language-adaptive 4-layer test rig (L0/L1/L2/L3) on both axes (quality × speed), single `verify` entry the slice engine adopts, diagnose → scaffold → guide. spec-first: fuzzy request → real problem + falsifiable acceptance test-list + now/punt cut (the front of the trust loop).",
       "source": "./plugins/reliability-kit"
     }
   ]

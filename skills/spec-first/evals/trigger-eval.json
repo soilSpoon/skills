@@ -1,0 +1,66 @@
+[
+  {
+    "query": "fuzzy 한 요구사항을 falsifiable test-list 로 쪼개줘",
+    "should_trigger": true
+  },
+  {
+    "query": "이거 만들어줘 — 근데 스펙이 애매해. 인수 조건부터 잡아줘",
+    "should_trigger": true
+  },
+  {
+    "query": "큰 기능인데 뭘 지금 하고 뭘 자를지 모르겠어 (now/punt)",
+    "should_trigger": true
+  },
+  {
+    "query": "이 요청에서 진짜 문제가 뭔지 / 숨은 가정이 뭔지 먼저 정리해줘",
+    "should_trigger": true
+  },
+  {
+    "query": "slice 돌리기 전에 acceptance 변종부터 뽑아줘",
+    "should_trigger": true
+  },
+  {
+    "query": "vague PRD 있는데 동작 변종 목록 + 컷 만들어줘",
+    "should_trigger": true
+  },
+  {
+    "query": "what are we actually solving here, and what's the smallest version that validates the core assumption",
+    "should_trigger": true
+  },
+  {
+    "query": "두 작은 프로젝트랑 자를 거 하나로 정리해줘",
+    "should_trigger": true
+  },
+  {
+    "query": "verify 엔트리 만들어줘 — scripts/verify.sh 없어",
+    "should_trigger": false
+  },
+  {
+    "query": "E2E/유닛/lint 세팅 처음부터 해줘",
+    "should_trigger": false
+  },
+  {
+    "query": "이 버그 왜 나는지 추적해줘 — null pointer 같아",
+    "should_trigger": false
+  },
+  {
+    "query": "이 fix 가 진짜 고치는지 검증해줘",
+    "should_trigger": false
+  },
+  {
+    "query": "이 컴포넌트 가독성 리뷰해줘",
+    "should_trigger": false
+  },
+  {
+    "query": "getByRole 셀렉터 어떻게 쓰지? data-testid 대신",
+    "should_trigger": false
+  },
+  {
+    "query": "이미 1줄로 진단된 수정인데 해줘 — off-by-one 이야",
+    "should_trigger": false
+  },
+  {
+    "query": "테스트 스위트가 40분이라 아무도 안 돌려 — 빠르게 만들어줘",
+    "should_trigger": false
+  }
+]
