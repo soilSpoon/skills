@@ -10,6 +10,7 @@ export interface EngineArgs {
   parallel?: boolean
   forceParallel?: boolean
   sharedScratch?: boolean
+  confirmTier?: boolean      // opt-in ack: proceed with the engine even when the depth-0 over-tier gate fires (compile-bound + breadth<=3 + every slice explicitly riskTier:'light')
   skills?: unknown          // validated at use: string[] of guide-file paths
 }
 /** Baseliner output (BASELINE schema). filterCommand is mutable: the engine kills a broken template at runtime. */
@@ -117,6 +118,8 @@ export interface EngineResult {
   wiringGaps?: string[]
   aborts?: string[]
   degradations?: string[]
+  overTierStop?: boolean   // depth-0 over-tier gate fired: compile-bound + small breadth + all-light slices; nothing executed (re-run with confirmTier:true to override)
+  slices?: number          // breadth that tripped the over-tier stop (for the human's machine-readable ETA)
   overallTrust?: boolean   // ITEM 2: single rollup verdict — true IFF every trust dimension held (additive; never a false green)
   ownersHeadline?: string  // ITEM 2: one human line — the green summary, or the first failing dimension named
   briefing?: string

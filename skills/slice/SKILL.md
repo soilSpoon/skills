@@ -95,6 +95,14 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
      serialize on its lock (measured: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). This kills the
      recurring drift of forgetting it on Swift/Rust/CMake lanes and silently crawling. Pass
      `sharedScratch: false` ONLY to force the old per-worktree-cold behavior (rarely what you want).
+   - `confirmTier` — the engine **stops before any leaf runs** when it detects an over-tier launch:
+     a compile-bound repo whose plan is ≤3 slices ALL judged low-risk (`light`) — i.e. inline-T1-shaped
+     work the engine would only make slower (the 5.8h-run lesson). The stop is a clean half-nothing
+     (zero leaves, commits, worktrees; lock released) and names the escape. Pass `confirmTier: true` to
+     override and force the engine anyway. A single non-light slice OR any completeness-critic expansion
+     bypasses the gate — so it fires only on the narrowest, explicitly-lowest-risk run, and trust stays
+     exactly where it is fragile. (Verifier speed: on compile-bound repos the verifier no longer adds a
+     redundant full build when the engine already ran a deterministic build+filtered-test gate.)
    - `skills: [paths]` — domain-guidance guide files threaded into every executor/verifier
      (executors apply them, verifiers enforce them; repo conventions win on conflict).
      **AUTO-SELECT these yourself** — selection is part of right-sizing the call, never

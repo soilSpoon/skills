@@ -1858,3 +1858,82 @@ test('seamPointers 2-slice path: seamPointers reach executor only when 2+ slices
   assert.ok(!/Seam Pointers \(already resolved/.test(betaExec.prompt),
     'second slice exec prompt must NOT contain a seam-pointer section (no seamPointers on that slice)')
 })
+
+// ── Over-tier gate (depth-0 default-stop on inline-T1-shaped work) ───────────────────────────────
+// compile-bound repo + <=3 slices ALL explicitly riskTier:'light' + no confirmTier → stop before any
+// leaf runs (the 5.8h-run lesson: don't run the multi-leaf engine on work that is inline T1). STRICT
+// .every(=== 'light'): one standard/heavy slice OR any completeness-critic addition (undefined tier)
+// flips it false → the engine runs, so trust stays exactly where it is fragile.
+const otLight = (n) => [...Array(n)].map((_, i) => ({
+  desc: `light slice ${i}`, interface: 'TBD/exploratory',
+  contract: `achieve thing ${i} in src/s${i}.ts alone`, independent: true,
+  dependsOn: [], kind: 'behavior', atomic: true, riskTier: 'light', testScope: `S${i}`,
+}))
+const otExpensive = { ...FIX.baseline, coldBuildCost: 'expensive' }
+const otSlice = (slices) => ({ action: 'slice', reason: 'fixture: over-tier scenario', slices })
+
+test('over-tier gate FIRES (default stop): compile-bound + <=3 all-light slices → no leaf runs, lock cleared once', async () => {
+  const over = (c) => {
+    if (c.opts.phase === 'Baseline') return otExpensive
+    if (has(c, /decompose/)) return otSlice(otLight(2))
+    return undefined
+  }
+  // lock-dir set so a real LOCKFILE is acquired → the stop path's single lock-clear is observable
+  const dispatch = dispatcher(over, { 'lock-dir': { out: '/tmp/rs-fixture/.git', code: 0 } })
+  const { result, calls, logs } = await runEngine({ args: { ...ARGS }, dispatch })
+  assert.equal(result.overTierStop, true, 'over-tier stop flagged on the result')
+  assert.match(result.error || '', /over-tiered/, 'error names the over-tier stop')
+  assert.equal(result.slices, 2, 'the breadth that tripped the stop is reported')
+  const leafCalls = calls.filter((c) => !isSh(c) && /exec:|verify/.test(c.opts.label || ''))
+  assert.equal(leafCalls.length, 0, `NOTHING ran; saw: ${leafCalls.map((c) => c.opts.label).join(', ')}`)
+  const lockClears = calls.filter((c) => isSh(c) && /rm -f/.test(c.prompt) && /rs-lock/.test(c.prompt))
+  assert.equal(lockClears.length, 1, 'exactly one lock-clear runs on the over-tier stop path (early return; end-of-run clear never reached)')
+  assert.ok(logs.some((l) => /OVER-TIER STOP/.test(l)), 'the stop is logged for the human')
+})
+
+test('over-tier gate: confirmTier:true OVERRIDES the stop → the engine proceeds and runs the leaves', async () => {
+  const over = (c) => {
+    if (c.opts.phase === 'Baseline') return otExpensive
+    if (has(c, /decompose/)) return otSlice(otLight(2))
+    return undefined
+  }
+  const { result, calls } = await runEngine({ args: { ...ARGS, confirmTier: true }, dispatch: dispatcher(over) })
+  assert.ok(!result.overTierStop, 'gate did NOT fire with confirmTier:true')
+  assert.equal(result.error, undefined, `engine ran clean: ${result.error}`)
+  const execCalls = calls.filter((c) => !isSh(c) && /exec:/.test(c.opts.label || ''))
+  assert.ok(execCalls.length >= 1, 'leaves executed (gate bypassed)')
+})
+
+test('over-tier gate: a non-light slice BYPASSES the stop (trust stays where fragile)', async () => {
+  const mixed = [otLight(1)[0], { ...otLight(1)[0], desc: 'standard slice', riskTier: 'standard', testScope: 'Sx' }]
+  const over = (c) => {
+    if (c.opts.phase === 'Baseline') return otExpensive
+    if (has(c, /decompose/)) return otSlice(mixed)
+    return undefined
+  }
+  const { result, calls } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(!result.overTierStop, 'gate did NOT fire — a standard slice means real risk → the engine earns its keep')
+  const execCalls = calls.filter((c) => !isSh(c) && /exec:/.test(c.opts.label || ''))
+  assert.ok(execCalls.length >= 1, 'leaves executed')
+})
+
+test('over-tier gate: a completeness-critic addition (undefined tier) BYPASSES the stop on an expanded plan', async () => {
+  const over = (c) => {
+    if (c.opts.phase === 'Baseline') return otExpensive
+    if (has(c, /decompose/)) return otSlice(otLight(2))
+    if (has(c, /critic/)) return { missing: [{ desc: 'boundary case the critic found', contract: 'cover the empty input' }] }
+    return undefined
+  }
+  const { result } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(!result.overTierStop, 'gate did NOT fire — the critic expanded the plan (its addition carries no light tier)')
+})
+
+test('over-tier gate: a cheap-build repo NEVER trips the stop (compile-bound is required)', async () => {
+  const over = (c) => {
+    if (c.opts.phase === 'Baseline') return { ...FIX.baseline, coldBuildCost: 'cheap' }
+    if (has(c, /decompose/)) return otSlice(otLight(2))
+    return undefined
+  }
+  const { result } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(!result.overTierStop, 'cheap-build repo: fast iteration is never blocked')
+})

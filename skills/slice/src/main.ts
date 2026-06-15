@@ -124,12 +124,15 @@ const PARALLEL = A.parallel !== false    // DEFAULT ON: parallelize independent 
                                          // fall-back to sequential whenever parallel is unsafe or unbeneficial — so default-on
                                          // means "parallelize where it actually helps," never "force worktrees blindly."
 const FORCE_PARALLEL = A.forceParallel === true   // override the compile-bound auto-fallback to sequential
+const CONFIRM_TIER = A.confirmTier === true        // opt-in: override the depth-0 over-tier stop (compile-bound + small breadth + all-light)
 const SHARED_SCRATCH = A.sharedScratch === true   // compile-bound parallel WITHOUT per-worktree cold builds: all
                                                   // worktrees share ONE build dir (--scratch-path) so dependency
                                                   // artifacts compile once; builds serialize on its lock (measured:
                                                   // 3×cold ≈ 9-15min vs serialized-warm ≈ 1-2min). Opt-in: assumes a
                                                   // SwiftPM-style builder whose test wrapper passes flags through.
 const MAX_LEAVES = 24                    // hard backstop on total executed work units (per work-unit/group)
+let OVER_TIER_STOP = ''                 // depth-0 over-tier gate sentinel (mirrors the QUOTA_HALT string flag): reason string, '' = not tripped; set in runWork, consumed at the top-level call site so the lock-safe teardown still runs
+let OVER_TIER_SLICES = 0                // breadth that tripped the over-tier stop (machine-readable ETA in the EngineResult)
 const MAX_DISCOVERED = 8                 // backstop on Canon-TDD discover-as-you-go feedback growth
 const MAX_SPIKES = 1                     // per-node spike cap (work must bottom out)
 const MAX_REPAIR = 1                     // default self-repair budget before reverting an untrusted leaf
@@ -647,6 +650,15 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
           // completeness critic + per-leaf discovery EXPAND this floor, so the real run is larger.
           const compileBound = baseline!.coldBuildCost === 'expensive'
           log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? '; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count' : ''}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`)
+          // OVER-TIER GATE (deterministic, HARD-to-trip): a compile-bound repo with a small breadth where EVERY
+          // slice was explicitly judged light is inline-T1 work — stop before any leaf runs unless the caller
+          // confirmed. STRICT .every(=== 'light'): a single non-light slice OR any completeness-critic addition
+          // (riskTier undefined) flips this false → the engine runs, so trust is preserved exactly where fragile.
+          if (compileBound && slices.length <= 3 && slices.every(s => s.riskTier === 'light') && !CONFIRM_TIER) {
+            OVER_TIER_STOP = `compile-bound repo, ${slices.length} low-risk slice(s) — inline T1 work`; OVER_TIER_SLICES = slices.length
+            log(`${tag}⟂ OVER-TIER STOP: this looks like inline-T1 work (compile-bound + ${slices.length} all-light slice(s)). Doing it inline is faster. To force the engine anyway, re-run with confirmTier:true. (No leaves ran; nothing changed.)`)
+            return { done: [] }
+          }
         }
         for (let j = slices.length - 1; j >= 0; j--) {
           const iface = slices[j].interface
@@ -1081,6 +1093,11 @@ if (groups) {
 } else {
   const r = await runWork(TASK, REPO, 0, undefined, gitClean)
   done = r.done
+}
+if (OVER_TIER_STOP) {
+  log(`over-tier stop — skipping integrate/wiring/briefing (nothing was executed)`)
+  if (LOCKFILE) { try { await shForce(`rm -f ${LOCKFILE}`, 'lock-clear') } catch (e) { log(`lock-clear failed — stale lock at ${LOCKFILE}; remove before next run.`) } }
+  return { error: `over-tiered: ${OVER_TIER_STOP} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: OVER_TIER_SLICES }
 }
 
 // =============================================================================
