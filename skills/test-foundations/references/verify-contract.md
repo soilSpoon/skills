@@ -184,15 +184,42 @@ git status --porcelain | cut -c4-
    - vitest → `run --changed $BASE`
    - jest → `--onlyChanged`
    - go test → per-package 빌드 캐시(변경 패키지만 재컴파일/재실행)
-   네이티브 좁힘이 없는 러너(node:test / pytest / unittest)는 **계층 전체**를 돌므로 `affected:false`
-   (정직 — 가짜 `true` 를 내지 않는다).
+   네이티브 좁힘이 **없는** 러너(node:test / pytest / unittest)는 **best-effort 좁힘**을 시도한다
+   (IMPLEMENTED, 아래 §4.1) — 변경 SOURCE 파일 basename 에서 보수적 토큰을 도출해 러너 name 필터
+   (node `--test-name-pattern` / pytest·unittest `-k`)로 넘긴다. 토큰이 **≥1 테스트를 실제로
+   선택하면** `affected:true`; 토큰이 zero-match 거나 ambiguous 면 **계층 전체**로 폴백하고
+   `affected:false`.
 
 `affected:false` 는 "이 계층이 영향 선택 없이 통째로 돌았다"는 측정된 사실이다. diagnose 는 이 필드로
 진짜 영향 선택(좁힘) vs 계층 폴백(통째)을 구분한다.
 
-**남은 followUp (BACKLOG):** 네이티브 변경 좁힘이 없는 러너(node:test / pytest / unittest)의 *계층 내*
-per-test impact-selection — 변경 파일 경로 → scope 필터 관례 맵(`src/foo/bar` → `foo/bar`). 그 전까지
-해당 러너는 통째로 돌고 `affected:false` 로 정직하게 보고된다.
+### §4.1 best-effort per-test 좁힘 + whole-layer 폴백 (DONE)
+
+네이티브 `--changed` 가 없는 러너(node:test / pytest / unittest)도 이제 *계층 내* per-test impact
+selection 을 한다 (`derive_changed_token` + 각 L1 dispatcher):
+
+| 단계 | 동작 |
+|---|---|
+| 토큰 도출 | 변경된 **SOURCE** 파일(테스트·config·lockfile 제외) basename 에서 dir+확장자 제거 → NAME 부분문자열 (예: `src/calc.js` → `calc`). |
+| 단일성 | basename 이 **정확히 하나**면 그 토큰을 쓴다. **0개 또는 2개 이상(ambiguous)** → 토큰 `""` → **계층 전체**(correctness over cleverness). |
+| bare-token 가드 | 토큰은 `/^[A-Za-z0-9_.-]+$/` 만 통과 — 아니면 `""` → 전체. |
+| 적용 | node `--test-name-pattern=<token>` / pytest·unittest `-k <token>`. |
+| **검증 후 신뢰** | 토큰이 **≥1 테스트를 실제로 선택**(node: named TAP 줄 ≥1 / pytest: exit≠5 & 비-empty collect / unittest: `Ran ≥1`)하면 `affected:true`. |
+| **whole-layer 폴백** | 토큰이 **zero-match** → 같은 계층을 토큰 없이 **통째로** 재실행, `affected:false`. |
+
+**[MUST] 안전 불변식 — 리그 회귀 금지:** 좁힘은 **절대** 진짜 테스트를 zero-match 시키거나, 게이트를
+실패시키거나, green 을 red 로 뒤집지 않는다. 최악의 경우는 "계층 전체를 `affected:false` 로 돌았다"로
+좁힘 도입 전 동작과 동일하다. zero-match 토큰은 RED(exit 1) 가 아니라 폴백 트리거다.
+
+**좁힘이 실제로 *맞는* 테스트를 잡는 이유:** unittest/pytest `-k` 는 test **id**(module.Class.method)에
+매치하므로 `calc.py` → `calc` 가 *test 모듈* `test_calc` 를 통째로 선택한다. node:test
+`--test-name-pattern` 은 test **NAME** 에만 매치하므로 token 이 테스트 이름 부분문자열일 때만 좁히고
+아니면 폴백한다. 둘 다 안전하게 보수적이다.
+
+**상태:** 네이티브 변경 좁힘이 없는 러너(node:test / pytest / unittest)의 *계층 내* per-test
+impact-selection 은 **DONE** — best-effort 좁힘 + whole-layer 폴백 (위 §4.1). 보수적 basename 토큰이
+≥1 테스트를 선택하면 `affected:true`, zero-match/ambiguous 면 통째로 폴백하고 `affected:false`. 폴백이
+green 을 보존하므로 좁힘은 리그를 절대 회귀시키지 않는다.
 
 ---
 

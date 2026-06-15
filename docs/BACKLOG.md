@@ -2,10 +2,10 @@
 
 ## reliability-kit / test-foundations (0.1.0 ship 후 followUp — 적대적 검증 w5dno4lng)
 
-- [x] **[test-foundations] `--changed` 영향 선택 (DONE 0.3.0 — layer routing(파일유형→계층) + native-affected(vitest/jest/go) + 정직한 affected; node:test/pytest 계층-내 per-test narrowing은 verify-contract §4 잔여)** — 0.1.0 은 `--changed`=fast door(l0+l1) 계층 라우팅만 한다(정직). Stage-2 를 구현하면 `affected:true/false` 가 의미를 갖는다: ① 네이티브 affected(vitest `--changed $BASE`/jest `--onlyChanged`/go per-package 캐시), ② 경로 관례 맵(`src/foo/bar`→scope), ③ 변경파일유형→포함계층(integration→L2, `e2e/`/journey→L3). verify.sh 의 `affected` 하드 false 와 verify-contract.md §4 의 followUp 표가 진입점.
+- [x] **[test-foundations] `--changed` 영향 선택 (DONE 0.3.0 — layer routing(파일유형→계층) + native-affected(vitest/jest/go) + 정직한 affected; node:test/pytest 계층-내 per-test narrowing도 DONE 0.4.0 — derive_changed_token 보수적 best-effort, zero-match/ambiguous→whole-layer fallback, §4.1)** — 0.1.0 은 `--changed`=fast door(l0+l1) 계층 라우팅만 한다(정직). Stage-2 를 구현하면 `affected:true/false` 가 의미를 갖는다: ① 네이티브 affected(vitest `--changed $BASE`/jest `--onlyChanged`/go per-package 캐시), ② 경로 관례 맵(`src/foo/bar`→scope), ③ 변경파일유형→포함계층(integration→L2, `e2e/`/journey→L3). verify.sh 의 `affected` 하드 false 와 verify-contract.md §4 의 followUp 표가 진입점.
 - [x] **[test-foundations] Go/Rust/.NET dispatch 정직성** (DONE 0.3.0 — Go(gofmt/vet·go test -race·-tags=integration) + Rust(fmt/clippy·nextest) 실구현; .NET/JVM/Ruby는 MODE=none → 테이블이 안 도는 도구를 주장 안 함) — `verify.detect.sh:223` 이 `go-test` 모드를 반환하지만 `verify.sh:337` 은 go-*/rs-*/dn-*/rb-* 를 present:false 스텁으로 잡는다(출력은 정직하나 테이블이 안 도는 도구를 주장). dispatch 를 구현하거나 테이블이 `MODE=none` 를 반환하게.
 - [x] **[test-foundations] negative-path eval fixtures** (DONE 0.3.0 — eval-l2-docker-down(→exit 3 present:true passed:false)·eval-changed-routing(src/db→L2 affected)·eval-native-delegate(npm:verify:l0); evals.json ids 3/4/5, 18/18 pass) — (a) L2 Docker-down→exit 3 + present:true + passed:false; (b) `--changed` 라우팅 단언; (c) native-runner-first 위임(package.json `verify:l0`/justfile/mise) vs inline 폴백.
-- [ ] **[test-foundations] 가독성/유지보수** — scope-floor 절(SKILL.md:3·283-288)에 구체 여정 예시(`login→settings 여정이 있을 때만 — 레이아웃/10줄 수정 제외`) 추가; references 8개 load-on-demand 통합 여지 감사; CI 에 shellcheck 패스; Windows `.ps1` twin 또는 git-bash 요구사항 명문화.
+- [x] **[test-foundations] 가독성/유지보수** (DONE 0.4.0 — scope-floor에 login→settings 여정 구체 예시; shellcheck CI 노트(미설치→bash -n fallback); Windows git-bash/WSL 노트) — scope-floor 절(SKILL.md:3·283-288)에 구체 여정 예시(`login→settings 여정이 있을 때만 — 레이아웃/10줄 수정 제외`) 추가; references 8개 load-on-demand 통합 여지 감사; CI 에 shellcheck 패스; Windows `.ps1` twin 또는 git-bash 요구사항 명문화.
 
 ## slice Phase 3 testing-readiness gate (1.11.0 ship 후 followUp — 적대적 검증 SAFE)
 
@@ -15,8 +15,8 @@
 ## reliability-kit / spec-first (0.2.0 ship 후 followUp — 적대적 검증 SAFE)
 
 - [x] **[spec-first→slice] 핸드오프 기계적 보장 (Phase 2.1, slice-side)** (DONE slice 1.11.3 — R_CRITIC에 ACCEPTANCE COVERAGE 절: task의 "ACCEPTANCE VARIANTS" 블록의 각 NOW 변종이 슬라이스로 커버되는지 감사, 미커버 변종을 missing으로 보고. NOW 토큰→filterCommand {scope} 흐름은 기존 테스트로 검증됨) — 0.2.0 은 핸드오프가 *프로즈 컨벤션*(args.task STRING)일 뿐, 슬라이서가 MUST PRESERVE 제약을 보존하거나 NOW 토큰 경계를 지킨다는 *기계적* 보장은 없다. slice 통합 시: args.task 구성(sharpened task + MUST PRESERVE + ACCEPTANCE VARIANTS 힌트 + PUNT 블록)이 정확히 들어가는지, NOW 토큰이 변형 없이 `scripts/verify.sh --scope {scope}` 로 흐르는지 검증. + R_CRITIC 이 힌트된 acceptance 변종 커버리지를 감사하는 enhancement(GROUND Rec 2).
-- [ ] **[spec-first] 토큰 도출 + Canon 감사 정밀화** — test-list.md §4 의 `--list-scopes` 충돌 해소 알고리즘을 4단계 프로즈→구체화(모델 런 간 토큰 도출 drift 감소); evals.json C3 deny-list false-negative 모니터링 + 자연어 smuggling 적대 케이스 추가(현재 정직하게 model-judged로 표기).
-- [ ] **[spec-first] examples.md 폭 확장** — CLI-only / 백엔드-라이브러리 worked example 추가(현재 pure-logic·real-dep·journey 3종 → 백엔드 폭 보강).
+- [x] **[spec-first] 토큰 도출 + Canon 감사 정밀화** (DONE 0.4.0 — test-list §4를 결정론 4단계 알고리즘으로(STOPWORD deny-set·collision disambiguator·재현성 표); evals C3 deny-list 확장 + C7 adversarial smuggling fixtures(Cat-A regex-catch / Cat-B model-judge, 정직하게 partial floor로 표기)) — test-list.md §4 의 `--list-scopes` 충돌 해소 알고리즘을 4단계 프로즈→구체화(모델 런 간 토큰 도출 drift 감소); evals.json C3 deny-list false-negative 모니터링 + 자연어 smuggling 적대 케이스 추가(현재 정직하게 model-judged로 표기).
+- [x] **[spec-first] examples.md 폭 확장** (DONE 0.4.0 — Ex4 config-merge CLI(웹 UI 없음): L1 순수로직 + L2 real-file/env + L3 = CLI subprocess journey(브라우저 아님); '여정≠브라우저' 규칙 추가) — CLI-only / 백엔드-라이브러리 worked example 추가(현재 pure-logic·real-dep·journey 3종 → 백엔드 폭 보강).
 
 ## dev-toolkit / review-orchestrator (1.4.0 ship 후 followUp — 적대적 검증 SAFE)
 

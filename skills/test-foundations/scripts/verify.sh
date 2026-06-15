@@ -225,6 +225,65 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# CONSERVATIVE per-test narrowing token for runners WITHOUT native --changed
+# (node:test / pytest / unittest). Derive a NAME SUBSTRING from a changed SOURCE
+# file's basename (strip dir + extension: src/calc.js -> "calc") so the runner's
+# name filter (node --test-name-pattern / pytest -k / unittest -k) selects only
+# the related tests.
+#
+# SAFETY (do not regress the rig — correctness over cleverness):
+#   * Only changed *source* files of the layer's language are considered;
+#     test files, configs, lockfiles, docs are ignored (a test-file-only change
+#     would derive a useless token).
+#   * ZERO source basenames OR MORE THAN ONE distinct basename => echo "" so the
+#     caller runs the WHOLE layer (ambiguous => whole, never a wrong narrow).
+#   * The token is a bare /^[A-Za-z0-9_.-]+$/ substring; anything else => "".
+# The caller still re-verifies the token actually selected >=1 test before
+# trusting it (zero-match => whole-layer fallback). This NEVER zero-matches the
+# real tests, fails the gate, or turns a green run red — the worst case is
+# "ran the whole layer with affected:false", identical to today's behaviour.
+#
+# Args: $1 = "js" | "py" (language). Echoes a bare token, or "" to run whole.
+# ---------------------------------------------------------------------------
+derive_changed_token() {
+  local lang="$1" f base tokens="" t
+  # never override an explicit --scope; only derive under bare --changed.
+  [ -n "$OPT_SCOPE" ] && { echo ""; return 0; }
+  [ "$OPT_CHANGED" != 1 ] && { echo ""; return 0; }
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$lang" in
+      js)
+        # only .js/.mjs/.ts SOURCE files, excluding test files.
+        case "$f" in *.test.js|*.test.mjs|*.test.ts|*.spec.js|*.spec.mjs|*.spec.ts) continue ;; esac
+        case "$f" in *.js|*.mjs|*.ts) ;; *) continue ;; esac ;;
+      py)
+        # only .py SOURCE files, excluding test_*.py / *_test.py.
+        case "$f" in */test_*.py|test_*.py|*_test.py) continue ;; esac
+        case "$f" in *.py) ;; *) continue ;; esac ;;
+    esac
+    base="$(basename "$f")"
+    base="${base%.*}"        # strip extension (calc.test handled above; here calc.js -> calc)
+    # bare-token guard: only A-Za-z0-9_.- survive; anything else aborts to whole-layer.
+    case "$base" in *[!A-Za-z0-9_.-]*) echo ""; return 0 ;; esac
+    [ -z "$base" ] && continue
+    case " $tokens " in *" $base "*) ;; *) tokens="$tokens $base" ;; esac
+  done <<EOF
+$CHANGED_FILES
+EOF
+  tokens="${tokens# }"
+  # exactly one distinct source basename => narrow; zero or many => whole layer.
+  if [ -n "$tokens" ]; then
+    case "$tokens" in
+      *" "*) echo "" ;;     # >1 distinct basename: ambiguous => whole layer
+      *)     echo "$tokens" ;;
+    esac
+  else
+    echo ""
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # --list-scopes: print legal bare {scope} tokens via runner dry-list
 # ---------------------------------------------------------------------------
 list_scopes() {
@@ -566,13 +625,40 @@ js_l1_jest() {
 }
 # node:test (built-in). Scope => --test-name-pattern. Zero-match detected by
 # counting TAP test lines whose name is NOT a bare filename.
+#
+# node:test has NO native --changed. Under bare --changed we BEST-EFFORT narrow:
+# derive a conservative token from the changed source file's basename and pass it
+# as --test-name-pattern. If that token selects >=1 test => affected:true. If it
+# zero-matches (or is ambiguous => no token) we FALL BACK to the WHOLE layer with
+# affected:false — narrowing must NEVER zero-match the real tests or turn green red.
+node_runs_named() {
+  # echo the count of named (non-filename) ok/not-ok TAP lines in $1.
+  grep -E '^(ok|not ok) [0-9]+ - ' "$1" 2>/dev/null | sed -E 's/^(ok|not ok) [0-9]+ - //' | grep -vE '\.(m?js|ts)( |$)' | grep -cE '.' || true
+}
 js_l1_node() {
-  local log="$1" args=(--test --test-reporter=tap)
-  [ -n "$OPT_SCOPE" ] && args+=("--test-name-pattern=$OPT_SCOPE")
+  local log="$1" args=(--test --test-reporter=tap) narrow="" named
+  if [ -n "$OPT_SCOPE" ]; then
+    args+=("--test-name-pattern=$OPT_SCOPE")
+  else
+    narrow="$(derive_changed_token js)"
+    if [ -n "$narrow" ]; then
+      # best-effort narrowing: run only tests whose NAME matches the changed token.
+      ( cd "$REPO_ROOT" && node --test --test-reporter=tap "--test-name-pattern=$narrow" ) >>"$log" 2>&1
+      local nexit=$?
+      named="$(node_runs_named "$log")"
+      if [ "${named:-0}" -ge 1 ]; then
+        # token actually selected real tests => honest impact selection.
+        R_TESTS_RUN="${named:-0}"; R_AFFECTED=1; R_EXIT="$nexit"
+        [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+        return 0
+      fi
+      # zero-match on the derived token => FALL BACK to the whole layer (safety).
+      : > "$log"; echo "narrow token '$narrow' selected 0 tests — falling back to whole layer" >>"$log"
+    fi
+  fi
   ( cd "$REPO_ROOT" && node "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
   # count "ok N - NAME" / "not ok N - NAME" lines whose NAME is not a *.js file.
-  local named
-  named="$(grep -E '^(ok|not ok) [0-9]+ - ' "$log" 2>/dev/null | sed -E 's/^(ok|not ok) [0-9]+ - //' | grep -vE '\.(m?js|ts)( |$)' | grep -cE '.' || true)"
+  named="$(node_runs_named "$log")"
   R_TESTS_RUN="${named:-0}"
   if [ -n "$OPT_SCOPE" ] && [ "${named:-0}" -eq 0 ]; then R_ZEROMATCH=1; fi
   # also: when scope empty but there were genuinely no named tests at all => zero collected.
@@ -600,9 +686,26 @@ py_l0_compile() {
   ( cd "$REPO_ROOT" && "$PYBIN" -m compileall -q -x '(\.venv|venv|node_modules|build|dist)/' . ) >>"$log" 2>&1; R_EXIT=$?
   [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
 }
+# pytest has NO native --changed. Under bare --changed we BEST-EFFORT narrow:
+# derive a conservative token from the changed source basename and pass it as -k.
+# If -k selects >=1 test => affected:true; if it zero-matches (exit 5) we FALL
+# BACK to the whole layer with affected:false — never zero-match the real tests.
 py_l1_pytest() {
-  local log="$1" runpfx args
+  local log="$1" runpfx args narrow=""
   if command -v pytest >/dev/null 2>&1; then runpfx=(pytest); else runpfx=("$PYBIN" -m pytest); fi
+  if [ -z "$OPT_SCOPE" ]; then narrow="$(derive_changed_token py)"; fi
+  if [ -n "$narrow" ]; then
+    # best-effort narrowing: -k <token>. pytest exit 5 = no match => fall back.
+    ( cd "$REPO_ROOT" && "${runpfx[@]}" -q -k "$narrow" ) >>"$log" 2>&1; R_EXIT=$?
+    if [ "$R_EXIT" -ne 5 ] && ! grep -qiE 'no tests ran|collected 0 items' "$log"; then
+      # token selected real tests => honest impact selection.
+      R_AFFECTED=1
+      [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+      return 0
+    fi
+    # zero-match on the derived token => FALL BACK to the whole layer (safety).
+    : > "$log"; echo "narrow token '$narrow' selected 0 tests — falling back to whole layer" >>"$log"
+  fi
   args=(-q)
   [ -n "$OPT_SCOPE" ] && args+=(-k "$OPT_SCOPE")
   ( cd "$REPO_ROOT" && "${runpfx[@]}" "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
@@ -612,15 +715,35 @@ py_l1_pytest() {
   if [ "$R_EXIT" -eq 0 ]; then R_PASSED=1; elif [ "$R_ZEROMATCH" = 1 ]; then R_PASSED=1; else R_PASSED=0; fi
 }
 # stdlib unittest. Scope => -k. Zero-match detected via "Ran 0 tests".
+#
+# unittest has NO native --changed. Under bare --changed we BEST-EFFORT narrow:
+# derive a conservative token from the changed source basename and pass it as -k.
+# If -k runs >=1 test => affected:true; if it runs 0 we FALL BACK to the whole
+# layer with affected:false — narrowing must never zero-match the real tests.
+_py_unittest_ran() { grep -oE 'Ran [0-9]+ test' "$1" | grep -oE '[0-9]+' | tail -1 || echo 0; }
 py_l1_unittest() {
-  local log="$1" sdir; sdir="$(py_test_startdir)"
+  local log="$1" sdir narrow=""; sdir="$(py_test_startdir)"
   # NOTE: no -t flag — setting top-level-dir to "." would require the test dir to
   # be an importable package (__init__.py). Letting unittest default top-level to
   # the start dir keeps zero-config fixtures (tests/ without __init__.py) working.
+  if [ -z "$OPT_SCOPE" ]; then narrow="$(derive_changed_token py)"; fi
+  if [ -n "$narrow" ]; then
+    # best-effort narrowing: -k <token>. "Ran 0 tests" => fall back.
+    ( cd "$REPO_ROOT" && "$PYBIN" -m unittest discover -s "$sdir" -p 'test_*.py' -k "$narrow" ) >>"$log" 2>&1; R_EXIT=$?
+    local nran; nran="$(_py_unittest_ran "$log")"
+    if [ "${nran:-0}" -ge 1 ]; then
+      # token selected real tests => honest impact selection.
+      R_TESTS_RUN="${nran:-0}"; R_AFFECTED=1
+      [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+      return 0
+    fi
+    # zero-match on the derived token => FALL BACK to the whole layer (safety).
+    : > "$log"; echo "narrow token '$narrow' ran 0 tests — falling back to whole layer" >>"$log"
+  fi
   local args=(-m unittest discover -s "$sdir" -p 'test_*.py')
   [ -n "$OPT_SCOPE" ] && args+=(-k "$OPT_SCOPE")
   ( cd "$REPO_ROOT" && "$PYBIN" "${args[@]}" ) >>"$log" 2>&1; R_EXIT=$?
-  local ran; ran="$(grep -oE 'Ran [0-9]+ test' "$log" | grep -oE '[0-9]+' | tail -1 || echo 0)"
+  local ran; ran="$(_py_unittest_ran "$log")"
   R_TESTS_RUN="${ran:-0}"
   if [ "${ran:-0}" -eq 0 ]; then R_ZEROMATCH=1; fi
   if [ "$R_EXIT" -eq 0 ] && [ "$R_ZEROMATCH" = 0 ]; then R_PASSED=1
@@ -661,8 +784,11 @@ emit_layer_json() {
   # HONEST affected: true when --changed impact-selected THIS layer —
   #   * L2/L3 selected via the changed-file -> layer path map, OR
   #   * L0/L1 narrowed via the runner's NATIVE changed filter (vitest --changed /
-  #     jest --onlyChanged). Runners without native narrowing (node:test, pytest,
-  #     unittest) ran WHOLE => affected stays false (the remaining per-test followUp).
+  #     jest --onlyChanged), OR
+  #   * L0/L1 best-effort narrowed via a derived basename token (node:test /
+  #     pytest / unittest) that actually selected >=1 test (see derive_changed_token).
+  # When the derived token zero-matches or is ambiguous, the layer FALLS BACK to
+  # the whole suite => affected stays false (honest, never a fake true, never RED).
   affected=$([ "${R_AFFECTED:-0}" = 1 ] && echo true || echo false)
   printf '{"layer":"%s","tool":%s,"present":%s,"passed":%s,"durationMs":%s,"flake":%s,"flakeRuns":%s,"tests":{"run":%s},"scope":%s,"changed":%s,"affected":%s,"purposeGap":%s,"zeroMatch":%s,"exit":%s,"log":%s}\n' \
     "$layer" "$(json_str "${R_TOOL:-}")" "$present" "$passed" \

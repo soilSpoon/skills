@@ -1,7 +1,7 @@
 {
   "name": "reliability-kit",
   "description": "Trustworthy test foundations + spec-first. test-foundations: a language-adaptive 4-layer test rig (L0 quality · L1 unit · L2 integration · L3 E2E) optimized on BOTH axes (quality × speed), diagnose → scaffold → guide, with a single `verify` entry the slice baseliner adopts. spec-first: fuzzy request → real problem + falsifiable acceptance test-list (WHAT-to-test) + now/punt cut, fed to slice as a sharpened task + scope tokens (the front of the trust loop).",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": {
     "name": "Daehee Lee",
     "email": "lee111dae11@proton.me"
