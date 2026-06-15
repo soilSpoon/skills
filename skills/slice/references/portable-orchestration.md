@@ -13,6 +13,51 @@ you keep everything that makes the system trustworthy, because those are discipl
 > **The four invariants that must survive any port:** executor ≠ verifier · shell truth before
 > model judgment · one git commit per trusted leaf · the full suite runs ONCE, at integrate.
 
+## Engine gates — testing-readiness and over-tier (halt-and-surface)
+
+Two deterministic STOP gates fire BEFORE any leaf runs and BEFORE the lock is taken, so a tripped
+gate leaves nothing executed, nothing committed, no lock to clean up — re-entry is free.
+
+- **Testing-readiness gate** (post-baseline). The baseliner sets `rigPresent` — its explicit
+  judgment of whether a real RUNNABLE test rig exists (a real test command, OR `scripts/verify.sh`).
+  When `baseline.rigPresent === false` the engine HALTS: the trust floor would be empty, so "still
+  works" is unverifiable. It returns `{ error, noRigStop: true }` before taking the lock. **Fix the
+  cause, not the symptom:** scaffold a rig (test-foundations adds `scripts/verify.sh` per the verify
+  contract below). **Override:** re-run with `confirmNoRig: true` to proceed onto the empty floor.
+- **Over-tier gate** (depth-0 / root decomposition). Fires when ALL three hold: compile-bound repo
+  (`coldBuildCost === 'expensive'`), breadth `slices.length <= 3`, and every slice is
+  `riskTier: 'light'`. The engine HALTS with `{ error, overTierStop: true, slices: <count> }` and
+  the message "this looks like inline-T1 work" — running a multi-leaf engine over a small all-light
+  task on an expensive build is over-engine-ing. **Override:** re-run with `confirmTier: true`.
+
+**The two override args:** `confirmTier` and `confirmNoRig` are `EngineArgs` booleans (default off).
+They are opt-in ACKS from a human, never auto-set by the harness. In pure hand-driven mode there is
+no args object — the gate SEMANTICS survive (you still must not start engine-grade ceremony on an
+all-light task, and you still must not certify "works" with no rig), but the machine-checkable
+override discipline does not; you carry that judgment yourself.
+
+**Verify contract (the rig the testing-readiness gate depends on).** A scaffolded rig must honor
+`test-foundations/references/verify-contract.md`: `measureCommand = 'scripts/verify.sh'` and
+`filterCommand = 'scripts/verify.sh --scope {scope}'` (§1, fixed strings). The `{scope}` token is a
+bare token `[A-Za-z0-9_.-]+` — no slashes/paths/spaces (§5). Exit codes: 0=green, 1=red, 2=zero-match
+graceful-degrade, 3=infra. The baseliner derives `measureCommand`/`filterCommand`/`coldBuildCost`/
+`worktreeSetupCommand`/`rigPresent` by reading `--help`/`--list-scopes` (§8); `filterCommand` is
+mutable at runtime — a template that repeatedly false-REDs is disabled by the engine's circuit
+breaker and the leaf downgrades to llm-only.
+
+**Gate discipline for non-interactive hosts (opencode, Codex CLI).** A non-interactive harness MUST
+halt-and-surface — it does NOT auto-scaffold (scaffolding needs consent) and does NOT auto-confirm:
+1. Log the gate reason.
+2. Return the `EngineResult` unchanged, with `overTierStop` or `noRigStop` true.
+3. Surface to the human (no silent fallback). For testing-readiness offer "run test-foundations to
+   add a rig" OR "re-run with confirmNoRig:true"; for over-tier offer "do it inline (T1)" OR "re-run
+   with confirmTier:true".
+4. The human then scaffolds / re-runs with the override flag.
+The opencode adapter (`adapters/opencode/slice-engine.ts`) does exactly this: it forwards
+`confirmTier`/`confirmNoRig` through to the engine args (it does not consume or auto-set them), its
+native `sh()` makes the tier-0 truth deterministic with no LLM, and on first use it returns
+`needsSetup` rather than guessing a role→agent mapping — the same halt-and-ask posture the gates use.
+
 ## The algorithm, hand-driven
 
 **0. Externalize state.** You have no journal — keep a `WORK.md` scratch file (or equivalent)
@@ -59,6 +104,7 @@ owner, buried bodies, what to verify by hand. Persist to `docs/briefings/`, push
 | Schema forcing | "Answer ONLY with this JSON" + front-door validation/retry |
 | Parallel worktrees | Sequential only (usually fine — compile-bound repos serialize anyway) |
 | Budget/quota plumbing | Watch your own context; prefer more, smaller leaves |
+| Gate overrides (`confirmTier`/`confirmNoRig`) | Requestable via args on an AsyncFunction host (opencode adapter forwards them); in pure manual mode the gate SEMANTICS survive but the override flags do not — apply the judgment yourself |
 
 ## Porting the role personas
 

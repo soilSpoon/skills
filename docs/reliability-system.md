@@ -1,6 +1,6 @@
 # Reliability System — 청사진 (Blueprint)
 
-> 상태: **승인됨 · 실행 중** — Phase 1(`test-foundations` 0.1.0)·**2(`spec-first` 0.2.0)**·3(slice 1.11.0 게이트) **ship 완료**; Phase 4(opencode 휴대)만 대기. §10 로드맵 순서로 구현 중.
+> 상태: **완주** — Phase 1(`test-foundations` 0.1.0)·2(`spec-first` 0.2.0)·3(slice 1.11.0 게이트)·**4(opencode 휴대 slice 1.11.1)** 전부 ship. reliability 시스템 end-to-end 가동(spec-first→test-foundations→slice 게이트→recurrence). 별개로 멀티-에이전트 리뷰 오케스트레이터(dev-toolkit 1.4.0 워크플로 D)도 ship.
 > 목적함수: **신뢰(trust)는 코드도 속도도 아닌, 제조되는 것** (Kent Beck, *Trust Factory*). 이 시스템은 그 제조 기계를 레포에 설치하고, 에이전트가 그 기계를 돌리게 한다.
 
 ---
@@ -180,7 +180,7 @@ Vercel 스킬은 **벤더링하지 않는다**. 설치 안내 + 역할 분담만
 | **1** ✅ | `reliability-kit` 플러그인 + `test-foundations` (진단·스캐폴드·가이드·`verify` 엔트리, 4계층, E2E 1급, **2축 신뢰성 + 언어 적응**). 자체 evals/fixtures. | **reliability-kit 0.1.0 ship** | ✅ node·python fixture에서 verify green + 2축 리포트 (적대적 검증, 2 blocking 수정 후) |
 | **2** ✅ | `spec-first` 스킬 (5단계 de-risk 프로토콜 + falsifiable acceptance test-list + now/punt 컷) | **reliability-kit 0.2.0 ship** | ✅ acceptance ITEM = falsifiable·결정론·layer·scopeSafe proposedTestName(→ slice `{scope}`/recurrence); Canon 규율·seam·6파일 일관성 적대적 검증 SAFE |
 | **3** ✅ | slice 통합: baseline **testing-readiness 게이트**(rigPresent fail-closed) + selection 테이블 확장 + recurrence seam + Vercel 외부설치 README | **slice 1.11.0 ship** | ✅ rigPresent:false 시 작업 전 halt(no leaf/lock), confirmNoRig 탈출 (테스트 60/60, 적대적 검증 SAFE) |
-| **4** | 휴대성: opencode 어댑터에 게이트/`verify` 반영 + portable-orchestration 갱신 | patch | opencode 경로에서 동일 동작 확인 |
+| **4** ✅ | 휴대성: opencode 어댑터에 게이트 args(`confirmTier`/`confirmNoRig`) drift fix + portable-orchestration 게이트 절 갱신 | **slice 1.11.1 ship** | ✅ host-smoke 5/5(게이트 발화·flag 엔진 도달·무발화), 적대적 검증 SAFE |
 
 각 Phase는 **독립적으로 출하 가능**(slice의 vertical slice 원칙). Phase 1이 사용자의 "꼭 해줘야 하는" 비협상 항목이라 최우선.
 

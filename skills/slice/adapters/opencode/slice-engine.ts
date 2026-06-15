@@ -125,10 +125,12 @@ export default tool({
     skills: tool.schema.array(tool.schema.string()).optional().describe("paths to SKILL.md-style domain-guidance files forwarded to every leaf/verifier (up to 8)"),
     enginePath: tool.schema.string().optional().describe("override path to the recursive-slice.js artifact"),
     resume: tool.schema.boolean().optional().describe("replay the repo's slice-journal prefix (crash recovery / idempotent re-run)"),
+    confirmTier: tool.schema.boolean().optional().describe("opt-in ack: override the depth-0 over-tier STOP (compile-bound repo + <=3 slices that are ALL risk-light). Default off = the engine halts and surfaces 'this is inline T1 work'; pass true only after the human chooses to force a multi-leaf engine run anyway"),
+    confirmNoRig: tool.schema.boolean().optional().describe("opt-in ack: override the post-baseline testing-readiness STOP (baseliner judged rigPresent:false → no runnable test rig → empty trust floor). Default off = the engine halts BEFORE any work/lock; pass true only after the human chooses to proceed onto an unverifiable floor (prefer: run test-foundations to scaffold scripts/verify.sh, then re-run)"),
     writeConfig: tool.schema.string().optional().describe(
       'setup: JSON {"roles":{baseliner,assessor,slicer,executor,verifier,heavyLens,critic,spiker,coordinator,briefing,wiringAudit,default},"models":{...}} — written to the global config, then the run proceeds'),
   },
-  async execute(a: { task: string; repo: string; maxDepth?: number; parallel?: boolean; forceParallel?: boolean; sharedScratch?: boolean; skills?: string[]; enginePath?: string; resume?: boolean; writeConfig?: string }) {
+  async execute(a: { task: string; repo: string; maxDepth?: number; parallel?: boolean; forceParallel?: boolean; sharedScratch?: boolean; skills?: string[]; enginePath?: string; resume?: boolean; writeConfig?: string; confirmTier?: boolean; confirmNoRig?: boolean }) {
     if (a.writeConfig) {
       const cfg = JSON.parse(a.writeConfig)
       mkdirSync(`${HOME}/.config/opencode`, { recursive: true })
@@ -245,7 +247,7 @@ export default tool({
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...a: string[]) => (...v: unknown[]) => Promise<unknown>
     const run = new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "workflow", "args", "budget", code)
     const result = await run(agent, parallel, null, phase, log, null,
-      { task: a.task, repo: a.repo, maxDepth: a.maxDepth, parallel: a.parallel, forceParallel: a.forceParallel, sharedScratch: a.sharedScratch, skills: a.skills }, budget)
+      { task: a.task, repo: a.repo, maxDepth: a.maxDepth, parallel: a.parallel, forceParallel: a.forceParallel, sharedScratch: a.sharedScratch, skills: a.skills, confirmTier: a.confirmTier, confirmNoRig: a.confirmNoRig }, budget)
     return JSON.stringify({ engine: enginePath, roles: config.roles || {}, logs, result }, null, 2)
   },
 })
