@@ -1,6 +1,6 @@
 # Reliability System — 청사진 (Blueprint)
 
-> 상태: **DRAFT / 승인 대기**. 이 문서는 빌드 전 정렬용 청사진이다. 승인 후 §8 로드맵을 Phase 순서로 구현한다.
+> 상태: **승인됨 · 실행 중** — Phase 1(`reliability-kit`/`test-foundations` 0.1.0)·Phase 3(slice 1.11.0 testing-readiness 게이트) **ship 완료**; Phase 2(`spec-first`)·4(opencode 휴대) 대기. §10 로드맵 순서로 구현 중.
 > 목적함수: **신뢰(trust)는 코드도 속도도 아닌, 제조되는 것** (Kent Beck, *Trust Factory*). 이 시스템은 그 제조 기계를 레포에 설치하고, 에이전트가 그 기계를 돌리게 한다.
 
 ---
@@ -177,9 +177,9 @@ Vercel 스킬은 **벤더링하지 않는다**. 설치 안내 + 역할 분담만
 | Phase | 산출물 | 버전 | 게이트(완료 정의) |
 |---|---|---|---|
 | **0** | 이 청사진 승인 | — | 사용자 OK |
-| **1** ⭐ | `reliability-kit` 플러그인 + `test-foundations` (진단·스캐폴드·가이드·`verify` 엔트리, 4계층, E2E 1급, **2축 신뢰성 + 언어 적응**). 자체 evals/fixtures. | reliability-kit 0.1.0 | 샘플 레포(node·python 각 1)에서 스캐폴드→`verify` green 재현 **+ 두 축 진단 리포트(계층 wall-clock·flake·purpose-fidelity) 산출** |
+| **1** ✅ | `reliability-kit` 플러그인 + `test-foundations` (진단·스캐폴드·가이드·`verify` 엔트리, 4계층, E2E 1급, **2축 신뢰성 + 언어 적응**). 자체 evals/fixtures. | **reliability-kit 0.1.0 ship** | ✅ node·python fixture에서 verify green + 2축 리포트 (적대적 검증, 2 blocking 수정 후) |
 | **2** | `spec-first` 스킬 (모호함 제거 프로토콜 + acceptance test-list 출력) | 0.2.0 | fuzzy 요청 1건 → test-list+컷 산출 데모 |
-| **3** | slice 통합: baseline **게이트** + selection 테이블 확장 + recurrence seam + Vercel 외부설치 README | slice minor bump | 게이트가 리그-부재 레포에서 스캐폴드 자동 호출 (테스트로 고정) |
+| **3** ✅ | slice 통합: baseline **testing-readiness 게이트**(rigPresent fail-closed) + selection 테이블 확장 + recurrence seam + Vercel 외부설치 README | **slice 1.11.0 ship** | ✅ rigPresent:false 시 작업 전 halt(no leaf/lock), confirmNoRig 탈출 (테스트 60/60, 적대적 검증 SAFE) |
 | **4** | 휴대성: opencode 어댑터에 게이트/`verify` 반영 + portable-orchestration 갱신 | patch | opencode 경로에서 동일 동작 확인 |
 
 각 Phase는 **독립적으로 출하 가능**(slice의 vertical slice 원칙). Phase 1이 사용자의 "꼭 해줘야 하는" 비협상 항목이라 최우선.
