@@ -89,10 +89,12 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
      because the engine **auto-falls back to sequential** whenever parallel can't help — no git,
      dirty main tree, compile-bound builds (unless `sharedScratch`/`forceParallel` lifts it), or
      <2 independent groups. So single-seam work runs sequentially on its own; you don't opt out.
-   - `sharedScratch: true` lifts the compile-bound fallback PROPERLY: all worktrees share one
-     build dir (`--scratch-path`), so dependencies compile once and builds serialize on its lock
-     (measured on one compile-bound repo: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). Use for
-     compile-bound toolchains (SwiftPM/Cargo/CMake-style) whose builder supports a shared build dir.
+   - `sharedScratch` — **now AUTO-ON for compile-bound repos** (the engine enables it whenever the
+     Baseliner reports `coldBuildCost: "expensive"`; you no longer pass it). It lifts the compile-bound
+     fallback PROPERLY: all worktrees share one build dir (`--scratch-path`), deps compile once, builds
+     serialize on its lock (measured: 3×cold ≈ 9-15min → serialized-warm ≈ 1-2min). This kills the
+     recurring drift of forgetting it on Swift/Rust/CMake lanes and silently crawling. Pass
+     `sharedScratch: false` ONLY to force the old per-worktree-cold behavior (rarely what you want).
    - `skills: [paths]` — domain-guidance guide files threaded into every executor/verifier
      (executors apply them, verifiers enforce them; repo conventions win on conflict).
      **AUTO-SELECT these yourself** — selection is part of right-sizing the call, never
@@ -118,7 +120,15 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
    `Workflow({ scriptPath: '<skill-base-dir>/recursive-slice.js', args: { task, repo, maxDepth, parallel } })`
    (or copy `recursive-slice.js` to `~/.claude/workflows/` once and use `{ name: 'recursive-slice' }`)
    It runs in the background; you'll be notified on completion. Tell the user they can watch
-   live progress with `/workflows`. BEFORE launching, enforce the operational rules:
+   live progress with `/workflows`.
+   - **QUOTE AN ETA BEFORE YOU LAUNCH (delivery-predictability is a reliability axis).** A correct
+     result that lands at an unpredictable hour erodes trust as much as a wrong one — "a slow tool
+     trains its owner to distrust it" applies to납기 too. Before launching, state a rough wall-clock
+     estimate to the user, derived from the shape: ~(leaf count) × (per-leaf build+test cost), with
+     compile-bound repos dominated by serial rebuilds. If that number is uncomfortable for a task you
+     diagnosed to `file:line`, that is the signal you mis-tiered — drop the low-risk leaves to inline
+     T1 (step 2) and reserve the engine for the genuinely risky seams. Never let "long" be a surprise.
+   BEFORE launching, enforce the operational rules:
    - **ONE workflow per WORKING TREE, always** (rs-lock enforces it — two runs mutating one
      tree corrupt each other; correctness, not cost). ACROSS repos, concurrent workflows are
      fine when the owner accepts the burn rate — they share one API quota, and three at once

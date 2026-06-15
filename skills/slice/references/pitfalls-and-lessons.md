@@ -202,8 +202,25 @@ one helper, pin a byte-string that only the helper emits — not a token that al
 surrounding prose.** A test whose match string survives in boilerplate is verifying the boilerplate, not
 the extraction.
 
+### Lesson 14 — Delivery-predictability is a reliability axis; a recurring drift means fix the ENGINE, not the memory
+
+A 3-feature compile-bound (Swift) batch was run entirely through the T2 engine when only 2 of the 3 seams
+needed adversarial verification — the third was diagnosed to `file:line` and was a T1-inline change bundled
+in "for one quiesced tree." The owner pushed back: *a process that's correct but finishes at an
+unpredictable hour erodes trust as much as a wrong answer.* Correct. Reliability is **two axes** —
+correctness (output right) AND predictability (lands on time, no surprise) — and the engine had been
+optimizing only the first. Worse, the *same* drift (compile-bound run left `sharedScratch` off and crawled)
+was logged **three times** across sessions in the owner's memory and STILL recurred. Lesson: **a drift that
+recurs despite being written down is not a memory problem — it's a missing deterministic guard.** Fixed
+structurally, not with another note: the engine now **auto-enables `sharedScratch` whenever the Baseliner
+reports `coldBuildCost: "expensive"`** (explicit `sharedScratch:false` still wins; safe because the
+`<2-independent-groups` guard still demotes to sequential when slices share files). And the front door now
+**quotes a wall-clock ETA before launching** so "long" is never a surprise, and routes diagnosed low-risk
+leaves to inline T1 instead of bundling them into a heavy lane for cosmetic tidiness. **When a lesson keeps
+getting re-learned, move it from prose the human must recall to code the engine always executes.**
+
 ## Operational checklist
 - Run against a **clean git tree** (commit/stash first); the engine pins the baseline SHA.
 - Watch live: `/workflows` or `python3 scripts/slice-watch.py latest <repo>` (bundled).
 - After a crash, the **git commits are the durable record** — inspect `git log <baseSha>..HEAD`.
-- Parallel mode is the DEFAULT (`args.parallel: false` opts out); git-only, auto-falls-back to sequential when there are not ≥2 independent top slices or the build is compile-bound without sharedScratch.
+- Parallel mode is the DEFAULT (`args.parallel: false` opts out); git-only, auto-falls-back to sequential when there are not ≥2 independent top slices or the tree is dirty. Compile-bound repos no longer fall back — the engine auto-enables `sharedScratch` (shared build dir) for them (`sharedScratch:false` opts out).
