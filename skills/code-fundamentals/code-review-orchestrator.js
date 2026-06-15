@@ -209,6 +209,10 @@ async function review() {
   const size = parseStat(fetched.stat)         // PLAIN JS parse of the --stat line (lines + files counts)
   const tier = gateTier(size)                  // small | medium | large — deterministic, NOT LLM-decided
   log(`diff: ${size.files} file(s), ~${size.lines} changed lines → tier=${tier}`)
+  // LANE-CONFIG injection point: a caller (e.g. toss-frontend, for the FE domain) passes its own lane set via
+  // the Workflow `args` global — args.lanes = [{ id, focus }, …]. Absent → the code-fundamentals defaults.
+  // ROUTE override only — VOTE/gate/synthesize are inherited unchanged (the core/overlay split).
+  const lanes = (typeof args !== 'undefined' && args && Array.isArray(args.lanes) && args.lanes.length) ? args.lanes : LANES
 
   // SMALL — trust floor: one competent Sonnet pass, no VOTE (a tiny diff can't earn the 3-lens fan-out).
   if (tier === 'small') {
@@ -224,13 +228,13 @@ async function review() {
 
   // SECTION — parallel, perspective-isolated lanes (no cross-lane comms). parallel() returns null on throw.
   phase('Section')
-  const sectioned = await parallel(LANES.map(lane => () =>
+  const sectioned = await parallel(lanes.map(lane => () =>
     agent(sectionPrompt(lane, diff),
       { label: `section:${lane.id}`, phase: 'Section', model: 'sonnet',
         schema: { type: 'object', properties: { findings: { type: 'array', items: FINDING } } } })))
   // merge lanes; dedup but PRESERVE disagreement pairs (R2 — they feed unresolved_disagreements).
   const candidates = dedupKeepDisagreements(sectioned.flatMap(s => (s && s.findings) || []))
-  log(`section: ${candidates.length} candidate finding(s) across ${LANES.length} lane(s)`)
+  log(`section: ${candidates.length} candidate finding(s) across ${lanes.length} lane(s)`)
 
   // Two-key short-circuit: even at medium/large, a thin candidate set (≤5) doesn't earn the fan-out.
   if (candidates.length <= 5) {

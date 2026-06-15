@@ -15,17 +15,17 @@ code = code.replace(/^export const meta = \{[\s\S]*?\n\}\n/m, "")
 if (/^export /m.test(code)) { console.error("SMOKE FAILED: a stray top-level `export` survives — the AsyncFunction body would be a syntax error"); process.exit(1) }
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 let fn
-try { fn = new AsyncFunction("agent", "parallel", "phase", "log", code) }
+try { fn = new AsyncFunction("agent", "parallel", "phase", "log", "args", code) }
 catch (e) { console.error("SMOKE FAILED: artifact does not parse as an AsyncFunction body:", e.message); process.exit(1) }
 console.error("SMOKE OK: orchestrator parses + runs as a Workflow AsyncFunction body (export default trap avoided)")
 
 const parallel = async (thunks) => Promise.all(thunks.map(t => t().catch(() => null)))
 const phase = () => {}
 // drive(mockAgent) → { result, labels } ; mockAgent(prompt, opts) is scripted per scenario.
-async function drive(mockAgent) {
+async function drive(mockAgent, args = {}) {
   const labels = []
   const agent = async (prompt, opts) => { labels.push((opts && opts.label) || ""); return mockAgent(prompt, opts) }
-  const result = await fn(agent, parallel, phase, () => {})
+  const result = await fn(agent, parallel, phase, () => {}, args)
   return { result, labels }
 }
 const finding = (sev, file, line, principle) => ({ severity: sev, file, line, principle, axis: "x", before: "b", after: "a", why: "w" })
@@ -102,6 +102,24 @@ const ok = (cond, msg) => { if (cond) console.error("SMOKE OK:", msg); else { co
   // audit trail
   ok(result.vote_journal.some(j => j.status === "refuted") && result.vote_journal.some(j => j.status === "unverified"), "vote_journal records refuted + unverified (no silent change)")
   ok(result.metrics.dropped_count >= 1 && result.metrics.unverified_count >= 1 && result.metrics.refuted_count >= 2, `metrics tally the vote (dropped=${result.metrics.dropped_count} unverified=${result.metrics.unverified_count} refuted=${result.metrics.refuted_count})`)
+}
+
+// ── Scenario 4: LANE-CONFIG injection (args.lanes) — the FE-domain ROUTE override point ───────────
+{
+  const feLanes = [{ id: "FE1", focus: "a11y" }, { id: "FE2", focus: "react runtime" }, { id: "FE3", focus: "design tokens" }]
+  const f4 = (p, o) => {
+    if (o.label === "fetch-diff") return { stat: "9 files changed, 900 insertions(+), 30 deletions(-)", diff: "@@ fe @@", empty: false }
+    if (o.label === "section:FE1") return { findings: [finding("MUST", "a.tsx", 1, "aria 누락"), finding("MUST", "a.tsx", 2, "color-only")] }
+    if (o.label === "section:FE2") return { findings: [finding("MUST", "b.tsx", 3, "useEffect race"), finding("SHOULD", "b.tsx", 4, "리렌더")] }
+    if (o.label === "section:FE3") return { findings: [finding("SHOULD", "c.tsx", 5, "토큰 산재"), finding("NIT", "c.tsx", 6, "magic px")] }
+    if (o.label.startsWith("vote:")) return { refuted: false }    // all confirm
+    if (o.label.startsWith("section:")) return { findings: [] }   // a DEFAULT lane (L1/L2) → must NOT be called
+    return null
+  }
+  const { result, labels } = await drive(f4, { lanes: feLanes })
+  ok(labels.includes("section:FE1") && labels.includes("section:FE2") && labels.includes("section:FE3"), "injected args.lanes drive the SECTION fan-out (FE lane ids used)")
+  ok(!labels.includes("section:L1") && !labels.includes("section:L2"), "default code-fundamentals lanes are NOT used when args.lanes is injected")
+  ok(result.findings.length >= 1, "injected-lane review ships findings")
 }
 
 if (failed) { console.error(`\n${failed} SMOKE ASSERTION(S) FAILED`); process.exit(1) }

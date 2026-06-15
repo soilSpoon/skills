@@ -1,7 +1,7 @@
 {
   "name": "dev-toolkit",
   "description": "Engineering fundamentals & diagnostics: language-agnostic code-quality core (가독성/예측가능성/응집도/결합도), Toss frontend fundamentals (a11y/React/디자인토큰), build-config drift detection, issue root-cause workflow.",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "author": {
     "name": "Daehee Lee",
     "email": "lee111dae11@proton.me"

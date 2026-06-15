@@ -117,7 +117,12 @@ D는 빠진 **VOTE(출력 전 적대적 finding 검증)** 를 더한다 (slice h
    - **AXIS-CONFLICT**(DRY vs 결합도 등 두 lane 정반대): 승자를 고르지 *않고* `tradeoff_decision`(양측 인용)으로 구조화해 미해결 섹션에 노출 — 사람이 결정.
 4. **SYNTHESIZE** (결정론적 — 모델 판단 아님) — 생존 findings를 `file:line` dedup(강한 severity·짧은 citation) 후 severity→file→line 정렬, prescription 머지, `vote_journal`(강등 감사) + `unresolved_disagreements`(축 충돌) 동봉. **dedup은 반대-verdict 쌍을 붕괴하지 않는다**(그게 축 충돌 신호). 축 충돌을 *자동 해결하지 않는다* — synthesize에 Opus arbiter를 두면 "양측 표면화·사람 결정" 규칙과 모순.
 
-**비례 게이트(deterministic, `git diff --stat` 기반, LLM이 정하지 않음)** — **Small**(<100줄·≤5 findings·1파일)→VOTE 없이 Sonnet 단일 패스(작은 diff는 3-렌즈 팬아웃 본전 못 냄; 바닥=1패스). **Medium**(100–500줄·6–15·2–5파일)→1 Opus(correctness)+2 Sonnet. **Large**(>500줄·16+·5+파일 또는 3+ 모듈/관점)→풀 3-렌즈 VOTE(false-positive 위험 높아 15× Opus 정당화). VOTE는 *큰·다관점 diff에서만* 비용을 번다.
+**비례 게이트 — 두 개의 *독립* 결정론 게이트(LLM이 정하지 않음):**
+
+1. **tier 게이트** = `git diff --stat` 의 *줄+파일 수*만 본다(`gateTier`): **Small**(<100줄 · ≤1파일)→VOTE 없이 Sonnet 단일 패스(바닥=1패스). **Medium**(≤500줄 · ≤5파일)·**Large**(그 외, 또는 3+ 모듈/관점)→ SECTION 팬아웃.
+2. **thin-candidate 단락** = SECTION *후* finding 수가 **≤5** 면 tier 와 무관하게 VOTE 생략(얇은 집합은 3-렌즈 팬아웃 본전 못 냄). 6–15 / 16+ 는 *기대 finding 밀도*의 서술일 뿐 — `gateTier` 가 강제하는 임계가 **아니다**(줄/파일만 본다). 둘을 한 임계로 착각하지 말 것.
+
+순효과: 작은 diff = 1 Sonnet 패스; VOTE(1 Opus + 2 Sonnet)는 *큰·다관점 diff에서 finding 이 6+ 일 때만* 비용을 번다(false-positive 위험이 15× Opus 를 정당화).
 
 > **하니스별 실행** — Claude Code(Workflow): 번들 [code-review-orchestrator.js](code-review-orchestrator.js)가 자동화. Workflow 없는 하니스(opencode/Codex): [references/review-orchestration.md](references/review-orchestration.md)의 손-구동 4단계로 동일 *규율* 수행(직렬·refute-mode·만장일치는 API가 아니라 규율이라 포팅됨).
 
