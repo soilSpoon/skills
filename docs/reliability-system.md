@@ -35,6 +35,7 @@
 5. **scope floor (= ponytail laziness)** — 가장 신뢰하기 쉬운 코드/테스트/도구는 *없는 것*. 단, 신뢰 경계 검증·데이터 손실·보안·a11y·**명시적으로 요청된 테스트**는 절대 생략 금지.
 6. **휴대성** — SKILL.md + node/shell만. Claude-전용 API 금지. (slice가 opencode 어댑터로 이미 증명)
 7. **판단은 사람에게** — 자율적 "무엇을 할지" 결정 AI 금지 (Trust Factory의 anti-genie). 라우팅은 *얇게*, 사람이 분기.
+8. **신뢰성 = 품질 × 속도 (두 축 동시)** — 테스트의 신뢰성은 한 축이 아니다. **품질 신뢰성**(주장하는 걸 실제로 잡나) 과 **시간 신뢰성**(피드백이 쓸 수 있을 만큼 빨리 오나 = 납기·dev 속도). 둘은 상충하며 *둘 다 성립*해야 한다. 품질만 높고 느리면 아무도 안 돌려 시간 신뢰성이 0, 빨라도 fake-green이면 품질 신뢰성이 0. test-foundations(§5.1)의 1급 목적함수.
 
 ## 4. 역할 지도 (현재 + 신규, 경계 명시)
 
@@ -74,8 +75,31 @@
 | **L2 기능/통합** | 모듈 경계·실제 의존(DB/HTTP) — fake 최소 | vitest+testcontainers · supertest |
 | **L3 E2E** | 사용자 여정. *어떤 개발이든 결국 필요* | Playwright(기본) · Cypress |
 
+#### 신뢰성 = 품질 × 속도 (두 축 모두 성립)
+test-foundations는 한 축이 아니라 **두 축을 동시에** 최적화한다.
+- **품질 신뢰성** — 테스트가 주장하는 걸 실제로 잡나: vacuous green·flake 없음, 타깃을 실제 exercise, purpose 검증(fake-green 아님).
+- **시간 신뢰성** — 피드백이 *쓸 수 있을 만큼 빨리* 오나: 납기·dev 속도. 40분 스위트는 아무도 안 돌려 신뢰성이 증발한다.
+
+**주 레버 = 계층 분포 (pyramid economics)** — 같은 동작을 *어느 계층*에서 검증하느냐가 두 축을 동시에 가른다. 전부 E2E = 품질 OK·시간 최악. 전부 무거운 mock 유닛 = 빠름·purpose 결손(anti-genie). 빠르고 결정론적인 건 아래로, 본질적으로 통합/여정인 것만 위로.
+
+**언어·라이브러리 적응 (situational, 하드코딩 금지)** — "항상 Playwright+Vitest" 식 고정 금지. 진단이 스택·기존 컨벤션(레포 컨벤션 우선)·제약을 보고 *적합한 도구와 속도 기법*을 고른다. **`verify` 엔트리가 그 선택을 추상화** → 도구가 레포마다 달라도 slice/baseliner는 *한 계약*만 본다.
+
+| 생태계 | 빠른 L0/L1 | L2/L3 | 시간 기법 |
+|---|---|---|---|
+| JS/TS | biome·vitest(esbuild) | testcontainers · Playwright | `tsc --incremental`, `vitest --changed`, PW 샤딩/워커 |
+| Python | ruff·pytest | pytest+testcontainers · Playwright | pytest-xdist, `-k` 필터, markers |
+| Go | `go vet`·`go test`(병렬 기본) | testcontainers-go · chromedp | `-run` 필터, `t.Parallel` |
+| Rust | clippy·nextest | nextest+containers · … | cargo nextest, 모듈 필터 |
+| 기타 | 진단이 관용 도구 탐지 | … | 생태계 관용 병렬·필터·캐시 |
+
+**시간 신뢰성 기법 (1급)** — 변경분만(`verify --changed`) · 병렬/샤딩 · 계층 라우팅(L0/L1 저장 시, L2 push 시, L3 PR/CI) · 캐시(build·deps·test result) · test-impact 선택 · **flake 제거**(재시도는 시간+품질 이중 비용).
+
+**품질 신뢰성 기법 (1급)** — 타깃 실제 exercise(vacuous 금지) · 결정론(시간/랜덤/네트워크 고정) · L2는 fake보다 real dep(purpose-fidelity) · 격리/teardown · a11y 셀렉터.
+
+**신뢰성 목표(budget) — 측정 가능하게** — 진단이 두 축을 *수치로* 보고하고 목표 대비 평가: 변경분 피드백 시간 · 전체 스위트 시간 · flake율 · vacuous/purpose-gap 수. 목표값은 레포 규모·팀이 정하되 기본 제안 제공. (slice의 `coldBuildCost`·ETA·`purposeGap` 개념과 직결)
+
 **흐름: 진단 → 스캐폴드 → 가이드** (사용자 결정 = 전부 함)
-1. **진단** — 스택 탐지(언어·프레임워크·패키지 매니저·모노레포), 기존 리그/CI 유무, 어느 계층이 비었나, flake·속도 부채.
+1. **진단** — 스택 탐지(언어·프레임워크·패키지 매니저·모노레포), 기존 리그/CI 유무, 어느 계층이 비었나. **두 축을 수치로 보고**: 계층별 wall-clock·flake율(시간 축) + purpose-fidelity·vacuous/커버리지 신호(품질 축). 적합 도구를 스택에 맞춰 *제안*.
 2. **스캐폴드** — 빠진 계층의 러너·설정·CI 워크플로·**샘플 E2E**(스모크 1개)를 실제로 설치/작성. 단일 진입점 노출:
    - `verify` 엔트리 (예: `scripts/verify.sh [--filter <scope>] [--layer l0|l1|l2|l3]`) — slice baseliner의 `measureCommand`/`filterCommand`의 **실재 구현**.
    - `verify --changed` = 변경 파일만(속도). `verify` = 전체(integration 게이트).
@@ -153,7 +177,7 @@ Vercel 스킬은 **벤더링하지 않는다**. 설치 안내 + 역할 분담만
 | Phase | 산출물 | 버전 | 게이트(완료 정의) |
 |---|---|---|---|
 | **0** | 이 청사진 승인 | — | 사용자 OK |
-| **1** ⭐ | `reliability-kit` 플러그인 + `test-foundations` (진단·스캐폴드·가이드·`verify` 엔트리, 4계층, E2E 1급). 자체 evals/fixtures. | reliability-kit 0.1.0 | 빈 샘플 레포(node·python 각 1)에서 스캐폴드→`verify` green 재현 |
+| **1** ⭐ | `reliability-kit` 플러그인 + `test-foundations` (진단·스캐폴드·가이드·`verify` 엔트리, 4계층, E2E 1급, **2축 신뢰성 + 언어 적응**). 자체 evals/fixtures. | reliability-kit 0.1.0 | 샘플 레포(node·python 각 1)에서 스캐폴드→`verify` green 재현 **+ 두 축 진단 리포트(계층 wall-clock·flake·purpose-fidelity) 산출** |
 | **2** | `spec-first` 스킬 (모호함 제거 프로토콜 + acceptance test-list 출력) | 0.2.0 | fuzzy 요청 1건 → test-list+컷 산출 데모 |
 | **3** | slice 통합: baseline **게이트** + selection 테이블 확장 + recurrence seam + Vercel 외부설치 README | slice minor bump | 게이트가 리그-부재 레포에서 스캐폴드 자동 호출 (테스트로 고정) |
 | **4** | 휴대성: opencode 어댑터에 게이트/`verify` 반영 + portable-orchestration 갱신 | patch | opencode 경로에서 동일 동작 확인 |
