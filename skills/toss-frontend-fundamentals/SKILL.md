@@ -1,6 +1,6 @@
 ---
 name: toss-frontend-fundamentals
-description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·응집도·결합도) + 접근성 + 채용 평가축(완성도·확장성·라이브러리 동작 이해·실용성) + 토스 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript 프론트엔드 코드를 작성·리뷰·리팩토링한다. 트리거 - (1) "리뷰해줘"·"개선해줘"·"PR 봐줘"·"code review", (2) React 컴포넌트·훅·유틸 작성·리팩토링, (3) "토스 코딩 컨벤션"·"frontend-fundamentals"·"변경하기 쉬운 코드"·4대 축 명칭, (4) props drilling, 매직 넘버, 중첩 삼항, 커스텀 훅 분리/통합, 전역 상태, 폼 설계, 조건부 렌더링, 디렉토리 구조, (5) "접근성"·"a11y"·"aria"·"스크린 리더"·"semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 a11y 점검, (6) "토스 사전과제"·"기술과제"·"라이브 코딩"·"토스 평가"·"토스 지원"·"코드 리뷰 하는 듯한 경험", (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change. 4대 축 코어(언어 불문)는 code-fundamentals 스킬이 담당하며 이 스킬은 프론트엔드 고유 관점을 얹는다 — 둘을 함께 설치/활성화. Use when reviewing/writing React/TypeScript frontend code that should follow Toss coding principles or Toss-style hiring evaluation.
+description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·응집도·결합도) + 접근성 + 채용 평가축(완성도·확장성·라이브러리 동작 이해·실용성) + 토스 문화 8원칙·플랫폼 엔지니어링 철학으로 React·TypeScript 프론트엔드 코드를 작성·리뷰·리팩토링한다. 트리거 - (1) "리뷰해줘"·"개선해줘"·"PR 봐줘"·"code review", (2) React 컴포넌트·훅·유틸 작성·리팩토링, (3) "토스 코딩 컨벤션"·"frontend-fundamentals"·"변경하기 쉬운 코드"·4대 축 명칭, (4) props drilling, 매직 넘버, 중첩 삼항, 커스텀 훅 분리/통합, 추상화 수준 혼합, 단일 책임(SRP)·이름과 내용 불일치, 진단 가능성(fail-loud), 전역 상태, 폼 설계, 조건부 렌더링, 디렉토리 구조, (5) "접근성"·"a11y"·"aria"·"스크린 리더"·"semantic HTML", 모달·탭·아코디언·라디오·체크박스·스위치 a11y 점검, (6) "토스 사전과제"·"기술과제"·"라이브 코딩"·"토스 평가"·"토스 지원"·"코드 리뷰 하는 듯한 경험", (7) 디자인 토큰·Flat/Compound API·React Native MFE·codemod·breaking change. 4대 축 코어(언어 불문)는 code-fundamentals 스킬이 담당하며 이 스킬은 프론트엔드 고유 관점을 얹는다 — 둘을 함께 설치/활성화. Use when reviewing/writing React/TypeScript frontend code that should follow Toss coding principles or Toss-style hiring evaluation.
 ---
 
 # Toss Frontend Fundamentals
@@ -123,10 +123,10 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 
 | 안티패턴 군 | 1차 lane |
 |---|---|
-| 매직 넘버, 부등호, 중첩 삼항, 인라인 핸들러, 이름 충돌, Boolean 네이밍, 숨은 부작용 | L1 |
+| 매직 넘버, 부등호, 중첩 삼항, 인라인 핸들러, 이름 충돌, Boolean 네이밍, 숨은 부작용, 추상화 수준 혼합, 이름=본문 불일치(SRP) | L1 |
 | props drilling, useEffect 다중, 디렉토리 분류, 환경 분기 산재, 과도한 DRY, 어댑터 누락 | L2 |
 | `<div onClick>`, 아이콘 버튼 무라벨, alt 누락, 커스텀 Modal/Tab/Switch, label 미연결 | L3 |
-| `useEffect` race, navigate inside effect, library 빌드/CI, 디자인 토큰 산재, Flat→Compound | L4 |
+| `useEffect` race, navigate inside effect, library 빌드/CI, 디자인 토큰 산재, Flat→Compound, 삼킨 에러·표현 가능한 불가능 상태(진단 가능성) | L4 |
 | Form/Modal/Toggle "어떻게 만들지?", overlay-kit, query key factory, RSC hydration | L5 |
 
 ## 빠른 트리거 맵 (코드 → 원칙 → 파일)
@@ -301,6 +301,9 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 - `[MUST]` `useEffect`가 "렌더 후 동기화"가 아닌 "이벤트 핸들러"로 쓰이지 않는다 (navigate/setState 내부 호출 + 경쟁 상태 없음)
 - `[MUST]` 커스텀 훅이 **자기 책임의 원자는 자기가 set** 한다 — 페이지가 훅 사용 후 `useSetAtom`을 또 꺼내 쓰면 추상화 실패
 - `[SHOULD]` 함수 시그니처가 동기/비동기·실행 순서·부작용을 드러낸다 (숨은 `Promise`, 숨은 DOM 조작 금지)
+- `[SHOULD]` 한 함수·훅 안에서 **추상화 수준이 섞이지 않는다** (도메인 의도와 저수준 DOM/계산이 한 본문에 뒤섞이면 추출로 층위 정렬)
+- `[SHOULD]` 이름이 **본문 전체를 정직하게** 덮는다 — `and`로 엮인 이름·이름보다 긴 책임 목록이면 분리 신호 (단일 책임)
+- `[SHOULD]` 실패가 **크게·맥락과 함께** 드러난다 — 삼킨 에러(`catch {}`)·무근거 폴백 대신, 가능하면 잘못된 상태를 타입으로 표현 불가능하게 (진단 가능성)
 - `[SHOULD]` 도메인 중심 디렉토리로 **"같이 변하는 파일이 같이 묶여" 있다** — `components/`·`hooks/`·`utils/` 만의 분류는 감점
 - `[SHOULD]` PR·커밋이 "스스로 만든 버그를 스스로 고치는" 루프로 보이지 않는다 (자가 도입 복잡성의 신호)
 
