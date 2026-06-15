@@ -27,6 +27,11 @@
       "name": "research-tools",
       "description": "Verification & web research: 6-agent parallel fact-checking, human-like browser automation.",
       "source": "./plugins/research-tools"
+    },
+    {
+      "name": "reliability-kit",
+      "description": "Trustworthy test foundations: language-adaptive 4-layer test rig (L0 quality / L1 unit / L2 integration / L3 E2E) on both axes (quality × speed), with a single `verify` entry the slice engine adopts. Diagnose → scaffold → guide.",
+      "source": "./plugins/reliability-kit"
     }
   ]
 }

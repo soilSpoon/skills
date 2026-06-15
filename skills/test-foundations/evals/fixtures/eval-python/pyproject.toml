@@ -1,0 +1,15 @@
+[project]
+name = "eval-python"
+version = "0.1.0"
+description = "Tiny fixture: L0 (ruff config) + L1 (one passing test). L2/L3 absent."
+requires-python = ">=3.9"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

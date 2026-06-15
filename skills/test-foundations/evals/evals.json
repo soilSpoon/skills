@@ -1,0 +1,136 @@
+{
+  "skill_name": "test-foundations",
+  "evals": [
+    {
+      "id": 0,
+      "name": "scaffold-verify-node",
+      "grounding": "evalsPlan §B Phase-1 gate: eval-node fixture (pnpm+vitest, L1 present, L0+L2 absent). 5 deterministic checks.",
+      "prompt": "진단해서 두 축(계층 wall-clock·flake·purpose-fidelity)으로 리포트하고, 빠진 계층 스캐폴드하고, verify 엔트리 노출해줘.",
+      "files": ["evals/fixtures/eval-node/"],
+      "checks": [
+        {
+          "id": "C0-node-help",
+          "grounding": "evalsPlan §B check (1): verify.sh exists, chmod +x, --help exits 0 and prints detected stack",
+          "assert": "shell",
+          "cmd": "test -x scripts/verify.sh && scripts/verify.sh --help | grep -qi 'node\\|js\\|vitest\\|biome'",
+          "exit": 0,
+          "desc": "scripts/verify.sh is executable and --help prints the detected JS/Node stack"
+        },
+        {
+          "id": "C1-node-green",
+          "grounding": "evalsPlan §B check (2): scripts/verify.sh exits 0 (green) on the fixture",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh",
+          "exit": 0,
+          "desc": "scripts/verify.sh runs all present layers and exits 0 (green) on eval-node"
+        },
+        {
+          "id": "C2-node-json",
+          "grounding": "evalsPlan §B check (3): --json emits valid NDJSON with one line per present layer + aggregate carrying changedFeedbackMs/fullSuiteMs/flakeRatePct/purposeGapCount",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh --json | node -e \"const lines=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n'); const parsed=lines.map(l=>JSON.parse(l)); const agg=parsed.find(r=>r.summary===true); if(!agg) throw new Error('no aggregate line'); ['changedFeedbackMs','fullSuiteMs','flakeRatePct','purposeGapCount'].forEach(k=>{ if(!(k in agg)) throw new Error('missing '+k); }); const layers=parsed.filter(r=>!r.summary); if(layers.length===0) throw new Error('no per-layer lines');\"",
+          "exit": 0,
+          "desc": "--json emits valid NDJSON: per-layer lines + aggregate with the 4 budget numbers (changedFeedbackMs, fullSuiteMs, flakeRatePct, purposeGapCount)"
+        },
+        {
+          "id": "C3-node-scope",
+          "grounding": "evalsPlan §B check (4): --scope <token> exits 0 for a valid token from --list-scopes; bogus token exits 2 (zero-match contract gap, NOT 1). Token must match /^[A-Za-z0-9_.-]+$/ (recursive-slice.js:611).",
+          "assert": "shell",
+          "cmd": "SCOPE=$(scripts/verify.sh --list-scopes | head -1) && test -n \"$SCOPE\" && scripts/verify.sh --scope \"$SCOPE\" --layer l1 && BOGUS_EXIT=0; scripts/verify.sh --scope bogus_token_that_matches_nothing_xyz 2>/dev/null; BOGUS_EXIT=$?; test \"$BOGUS_EXIT\" -eq 2",
+          "exit": 0,
+          "desc": "--scope <valid-token> --layer l1 exits 0; --scope <bogus> exits 2 (zero-match, not red)"
+        },
+        {
+          "id": "C4-node-diagnose",
+          "grounding": "evalsPlan §B check (5): diagnose report JSON validates against diagnoseReportSchema; absent layers marked present:false (no false green). eval-node has L0 present, L1 present, L2 absent, L3 absent.",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh --json | node -e \"const lines=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const l2=lines.find(r=>r.layer==='l2'); const l3=lines.find(r=>r.layer==='l3'); if(!l2||l2.present!==false) throw new Error('L2 must be present:false'); if(!l3||l3.present!==false) throw new Error('L3 must be present:false'); if(l2.passed!==null) throw new Error('absent layer passed must be null'); const agg=lines.find(r=>r.summary===true); if(agg.purposeGapCount<2) throw new Error('purposeGapCount must count absent L2+L3');\"",
+          "exit": 0,
+          "desc": "Absent L2 and L3 are present:false with purposeGap set; purposeGapCount>=2 in aggregate (no false green)"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "scaffold-verify-python",
+      "grounding": "evalsPlan §B Phase-1 gate: eval-python fixture (uv+pytest, L1 present, L0 absent). 5 deterministic checks.",
+      "prompt": "진단해서 두 축(계층 wall-clock·flake·purpose-fidelity)으로 리포트하고, 빠진 계층 스캐폴드하고, verify 엔트리 노출해줘.",
+      "files": ["evals/fixtures/eval-python/"],
+      "checks": [
+        {
+          "id": "C0-python-help",
+          "grounding": "evalsPlan §B check (1): verify.sh exists, chmod +x, --help exits 0 and prints detected stack",
+          "assert": "shell",
+          "cmd": "test -x scripts/verify.sh && scripts/verify.sh --help | grep -qi 'python\\|pytest\\|ruff'",
+          "exit": 0,
+          "desc": "scripts/verify.sh is executable and --help prints the detected Python stack"
+        },
+        {
+          "id": "C1-python-green",
+          "grounding": "evalsPlan §B check (2): scripts/verify.sh exits 0 (green) on the fixture",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh",
+          "exit": 0,
+          "desc": "scripts/verify.sh runs all present layers and exits 0 (green) on eval-python"
+        },
+        {
+          "id": "C2-python-json",
+          "grounding": "evalsPlan §B check (3): --json emits valid NDJSON with one line per present layer + aggregate carrying the 4 budget numbers",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh --json | python3 -c \"import sys,json; lines=[json.loads(l) for l in sys.stdin.read().strip().split('\\n')]; agg=next(r for r in lines if r.get('summary')); missing=[k for k in ['changedFeedbackMs','fullSuiteMs','flakeRatePct','purposeGapCount'] if k not in agg]; assert not missing, f'missing keys: {missing}'; layers=[r for r in lines if not r.get('summary')]; assert layers, 'no per-layer lines'\"",
+          "exit": 0,
+          "desc": "--json emits valid NDJSON: per-layer lines + aggregate with the 4 budget numbers"
+        },
+        {
+          "id": "C3-python-scope",
+          "grounding": "evalsPlan §B check (4): --scope <token> exits 0 for a valid token; bogus token exits 2. Token is a bare /^[A-Za-z0-9_.-]+$/ name (e.g. test_add_returns_sum from the fixture). recursive-slice.js:611 constraint.",
+          "assert": "shell",
+          "cmd": "SCOPE=$(scripts/verify.sh --list-scopes | head -1) && test -n \"$SCOPE\" && scripts/verify.sh --scope \"$SCOPE\" --layer l1 && scripts/verify.sh --scope bogus_xyz_no_match 2>/dev/null; test $? -eq 2",
+          "exit": 0,
+          "desc": "--scope <valid-token> exits 0; --scope <bogus> exits 2 (zero-match)"
+        },
+        {
+          "id": "C4-python-diagnose",
+          "grounding": "evalsPlan §B check (5): absent layers present:false, no false green. eval-python has L1 present, L0 absent (no ruff until scaffolded), L2 absent, L3 absent.",
+          "assert": "shell",
+          "cmd": "scripts/verify.sh --json | python3 -c \"import sys,json; lines=[json.loads(l) for l in sys.stdin.read().strip().split('\\n')]; l2=next((r for r in lines if r.get('layer')=='l2'),None); l3=next((r for r in lines if r.get('layer')=='l3'),None); assert l2 and l2['present']==False, 'L2 must be present:false'; assert l2['passed'] is None, 'absent layer passed must be null'; assert l3 and l3['present']==False, 'L3 must be present:false'; agg=next(r for r in lines if r.get('summary')); assert agg['purposeGapCount']>=1, 'purposeGapCount must be >=1 for absent L2'\"",
+          "exit": 0,
+          "desc": "Absent L2/L3 are present:false; purposeGapCount>=1 in aggregate; no false green for absent layers"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "slice-integration-contract",
+      "grounding": "evalsPlan §C: filterCommand='scripts/verify.sh --scope {scope}' survives replace({scope},token) for a bare /^[A-Za-z0-9_.-]+$/ token; measureCommand='scripts/verify.sh'. Guards the §5.1-line-104 dual-contract (recursive-slice.js:612,833,886).",
+      "prompt": "N/A — this is a contract smoke eval, not a prompt eval. Verified by the checks below.",
+      "files": [],
+      "checks": [
+        {
+          "id": "C0-filterCommand-replace",
+          "grounding": "recursive-slice.js:612 does filterCommand.replace('{scope}', testScope) verbatim. The resulting string must be a valid shell command for any bare token matching /^[A-Za-z0-9_.-]+$/.",
+          "assert": "inline",
+          "cmd": "node -e \"const fc='scripts/verify.sh --scope {scope}'; const token='add_returns_sum'; const result=fc.replace('{scope}',token); if(result!=='scripts/verify.sh --scope add_returns_sum') throw new Error('replace failed: '+result); const re=/^[A-Za-z0-9_.-]+$/; if(!re.test(token)) throw new Error('token not bare'); console.log('filterCommand replace OK:', result);\"",
+          "exit": 0,
+          "desc": "filterCommand='scripts/verify.sh --scope {scope}' after replace('{scope}','add_returns_sum') yields 'scripts/verify.sh --scope add_returns_sum' — the verbatim shell command the engine runs"
+        },
+        {
+          "id": "C1-measureCommand-identity",
+          "grounding": "recursive-slice.js:833,886 runs measureCommand verbatim. measureCommand must equal 'scripts/verify.sh' (not 'scripts/verify.sh --json' alone; --json is optional diagnostic mode).",
+          "assert": "inline",
+          "cmd": "node -e \"const mc='scripts/verify.sh'; if(mc!=='scripts/verify.sh') throw new Error('wrong measureCommand: '+mc); console.log('measureCommand OK:', mc);\"",
+          "exit": 0,
+          "desc": "measureCommand='scripts/verify.sh' is the exact string the slice baseliner BASELINE.measureCommand field must carry"
+        },
+        {
+          "id": "C2-scope-token-guard",
+          "grounding": "recursive-slice.js:611 gates injected token with scopeSafe=/^[A-Za-z0-9_.-]+$/. Token with slash/space/colon is rejected before reaching filterCommand. Skill must ensure test NAMES are bare-token-shaped (no paths/spaces).",
+          "assert": "inline",
+          "cmd": "node -e \"const scopeSafe=/^[A-Za-z0-9_.-]+$/; const valid=['add_returns_sum','test_clamp_bounds_value','TestCalc.test_add']; const invalid=['src/calc','test name with spaces','foo:bar','../escape']; valid.forEach(t=>{ if(!scopeSafe.test(t)) throw new Error('valid token rejected: '+t); }); invalid.forEach(t=>{ if(scopeSafe.test(t)) throw new Error('invalid token accepted: '+t); }); console.log('scope guard OK');\"",
+          "exit": 0,
+          "desc": "scopeSafe=/^[A-Za-z0-9_.-]+$/ accepts bare identifiers (add_returns_sum) and rejects paths/spaces/colons — the engine constraint test fixtures must honor"
+        }
+      ]
+    }
+  ]
+}

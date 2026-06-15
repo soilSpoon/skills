@@ -1,0 +1,82 @@
+[
+  {
+    "query": "새 레포에 테스트가 하나도 없는데 어떻게 깔지",
+    "should_trigger": true
+  },
+  {
+    "query": "E2E/유닛/lint 세팅 처음부터 해줘",
+    "should_trigger": true
+  },
+  {
+    "query": "verify 엔트리 만들어줘 — scripts/verify.sh 없어",
+    "should_trigger": true
+  },
+  {
+    "query": "slice baseline 돌렸더니 테스트 리그가 없다고 해서 강제 호출됨",
+    "should_trigger": true
+  },
+  {
+    "query": "테스트 스위트가 40분이라 아무도 안 돌려 — 빠르게 만들어줘",
+    "should_trigger": true
+  },
+  {
+    "query": "flake 때문에 CI 가 빨개졌다 초록됐다 해 — 어떻게 잡지",
+    "should_trigger": true
+  },
+  {
+    "query": "L2 가 다 mock 이라 진짜 DB 를 안 친다. purposeGap 을 없애고 싶어",
+    "should_trigger": true
+  },
+  {
+    "query": "이 변경 어떻게 검증하지? scripts/verify.sh 도 없고 리그가 없어",
+    "should_trigger": true
+  },
+  {
+    "query": "pytest 테스트 커버리지가 낮은데 어떤 계층에 뭘 추가해야 하지?",
+    "should_trigger": true
+  },
+  {
+    "query": "vitest 가 단위 테스트는 돌리는데 통합 테스트(real DB) 가 없어. L2 스캐폴드해줘",
+    "should_trigger": true
+  },
+  {
+    "query": "이 컴포넌트 코드 리뷰해줘 — 가독성 괜찮은지",
+    "should_trigger": false
+  },
+  {
+    "query": "이 버그 왜 나는지 추적해줘 — null pointer 같아",
+    "should_trigger": false
+  },
+  {
+    "query": "getByRole 셀렉터 어떻게 쓰지? data-testid 대신",
+    "should_trigger": false
+  },
+  {
+    "query": "fuzzy 한 요구사항을 falsifiable test-list 로 쪼개줘",
+    "should_trigger": false
+  },
+  {
+    "query": "next dev 가 조용히 깨졌어 — lint/test 는 다 통과하는데",
+    "should_trigger": false
+  },
+  {
+    "query": "useEffect 안에서 setState 호출했더니 무한 렌더 발생해. 어떻게 고치지?",
+    "should_trigger": false
+  },
+  {
+    "query": "tsc --noEmit 에서 'Property foo does not exist on type Bar' 떠. 어떻게 타입 확장하지?",
+    "should_trigger": false
+  },
+  {
+    "query": "React 컴포넌트를 어떻게 분리하면 응집도가 높아지지? 리팩터링 제안해줘",
+    "should_trigger": false
+  },
+  {
+    "query": "Playwright getByRole 이 왜 a11y 트리에서 못 찾는지 — aria-label 세팅 도와줘",
+    "should_trigger": false
+  },
+  {
+    "query": "production 에서 Tailwind 클래스가 안 먹혀. PurgeCSS 설정 어떻게 해?",
+    "should_trigger": false
+  }
+]

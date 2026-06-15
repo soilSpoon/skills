@@ -1,0 +1,13 @@
+{
+  "name": "eval-node",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Tiny fixture: L0 (biome config) + L1 (one passing unit test). L2/L3 absent.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.0"
+  }
+}

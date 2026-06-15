@@ -1,5 +1,12 @@
 # BACKLOG
 
+## reliability-kit / test-foundations (0.1.0 ship 후 followUp — 적대적 검증 w5dno4lng)
+
+- [ ] **[test-foundations] 완전한 `--changed` per-test impact-selection** — 0.1.0 은 `--changed`=fast door(l0+l1) 계층 라우팅만 한다(정직). Stage-2 를 구현하면 `affected:true/false` 가 의미를 갖는다: ① 네이티브 affected(vitest `--changed $BASE`/jest `--onlyChanged`/go per-package 캐시), ② 경로 관례 맵(`src/foo/bar`→scope), ③ 변경파일유형→포함계층(integration→L2, `e2e/`/journey→L3). verify.sh 의 `affected` 하드 false 와 verify-contract.md §4 의 followUp 표가 진입점.
+- [ ] **[test-foundations] Go/Rust/.NET dispatch 정직성** — `verify.detect.sh:223` 이 `go-test` 모드를 반환하지만 `verify.sh:337` 은 go-*/rs-*/dn-*/rb-* 를 present:false 스텁으로 잡는다(출력은 정직하나 테이블이 안 도는 도구를 주장). dispatch 를 구현하거나 테이블이 `MODE=none` 를 반환하게.
+- [ ] **[test-foundations] negative-path eval fixtures** — (a) L2 Docker-down→exit 3 + present:true + passed:false; (b) `--changed` 라우팅 단언; (c) native-runner-first 위임(package.json `verify:l0`/justfile/mise) vs inline 폴백.
+- [ ] **[test-foundations] 가독성/유지보수** — scope-floor 절(SKILL.md:3·283-288)에 구체 여정 예시(`login→settings 여정이 있을 때만 — 레이아웃/10줄 수정 제외`) 추가; references 8개 load-on-demand 통합 여지 감사; CI 에 shellcheck 패스; Windows `.ps1` twin 또는 git-bash 요구사항 명문화.
+
 - [x] **engine test host** (완료 — `skills/slice/test/`: AsyncFunction 호스트 + 시나리오 5종(해피/리페어/쿼터홀트/streak/sh라우팅), `node --test`로 실행. 파일시스템·git 불요) / - [ ] **phase-module refactor** — `src/main.ts`(~740줄)는 orchestrator 단일 파일로 길다. 단, 엔진엔 회귀 넷이 빌드 게이트(tsc --strict → tsup → node --check) + `adapters/opencode/host-smoke.mjs`뿐이므로 **리팩토링 전에 테스트 호스트부터**: PORT 설계(ambient `agent/log/budget/phase` 주입)를 이용해 스크립트된 가짜 `agent()` 응답으로 엔진 전체를 구동하는 픽스처 테스트(decompose→leaf→verify→integrate 시나리오, quota-halt 시나리오 포함). 그 다음 main.ts를 phase 모듈(baseline / partition / leaf-loop / verify / integrate / briefing)로 추출. `/slice` 레인으로 실행하고 domain guide는 `code-fundamentals`(자동 선택됨). 트리거: dronerush 레인 완료 후 (per-working-tree 동시성 규칙 준수).
 - [x] ~~model tiering~~ — 조사 결과 이미 대부분 티어링됨: executor 전 티어 sonnet, baseline/assess/spike/light-verify sonnet, heavy-verify 첫 렌즈 opus, 표준 verifier는 의도적 강모델(교차 모델 비판). 남은 두 곳 적용 완료: `sh` sonnet→haiku(verbatim 프록시), tidy verifier 모델 미지정→sonnet(일관성).
 - [x] **quota circuit breaker class-gate (A6)** — 구현 완료: `NULL_STREAK_CLASSES` Set으로 연속 null의 call class를 추적; `≥3 null + ≥2 classes`일 때만 QUOTA_HALT 발동. heavy 3-lens 루프(같은 class 3회)는 단일 역할의 일시적 실패로 간주해 halt 제외. `bumpNullStreak(opts)`로 null-return/catch 두 경로 모두 커버. 픽스처 시나리오 C4(quota circuit breaker)로 검증.

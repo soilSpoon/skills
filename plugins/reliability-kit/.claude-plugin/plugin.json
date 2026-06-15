@@ -1,0 +1,9 @@
+{
+  "name": "reliability-kit",
+  "description": "Trustworthy test foundations: a language-adaptive 4-layer test rig (L0 quality · L1 unit · L2 integration · L3 E2E) optimized on BOTH axes — quality × speed. Diagnose → scaffold → guide, with a single `verify` entry that the slice baseliner adopts as measureCommand/filterCommand. (spec-first joins in 0.2.0.)",
+  "version": "0.1.0",
+  "author": {
+    "name": "Daehee Lee",
+    "email": "lee111dae11@proton.me"
+  }
+}
