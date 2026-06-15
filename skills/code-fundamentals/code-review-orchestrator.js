@@ -193,7 +193,11 @@ function refutePrompt(finding, lens, diff) {
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────────────────────────
-export default async function () {
+// Workflow scripts run as an AsyncFunction BODY (the runtime strips `export const meta` + any export and
+// executes the rest, with a top-level `return await …` as the entry — same convention as slice's
+// recursive-slice.js). So this is a NAMED function called by a top-level return at the end, NOT an
+// `export default` (which would be defined-but-never-invoked under that runtime → the workflow no-ops).
+async function review() {
   // ROUTE — fetch the diff (the agent runs git via Bash; no top-level shell here) + the deterministic gate.
   phase('Route')
   const fetched = await agent(FETCH, { label: 'fetch-diff', phase: 'Route', model: 'sonnet', schema: DIFF })
@@ -294,3 +298,7 @@ function finalize(decided, proposed, tier) {
     },
   }
 }
+
+// Workflow entry — top-level return (AsyncFunction-body convention, matching slice/recursive-slice.js).
+// `review` and `finalize` are hoisted function declarations, so this runs after both are defined.
+return await review()
