@@ -1258,6 +1258,27 @@ test('compile-bound + explicit sharedScratch:false → NO auto-enable, demotes t
     `must demote to SEQUENTIAL citing explicit sharedScratch:false; saw: ${logs.filter((l) => /SEQUENTIAL|scratch/i.test(l)).join(' | ')}`)
 })
 
+// ① Swift-class fix — a t0 filtered gate that matched ZERO tests (exit non-zero on a scope/name mismatch,
+// e.g. Swift Testing exits 1) must NOT read as a t0red disagreement nor trip the breaker that disables the
+// filterCommand run-wide. Without the fix, 2 such mismatches kill deterministic gating for the whole run
+// (the live MailKit degradation). Stdout below is the REAL ./scripts/test.sh --filter <none> signature.
+test('① t0 filter ZERO-match → leaf llm-only, breaker NOT tripped (scope mismatch ≠ broken template)', async () => {
+  const dispatch = dispatcher((c) => {
+    const l = c.opts.label || ''
+    if (/decompose/.test(l) && /d0/.test(l)) return FIX.decomposeSlice   // root → 3 children (testScopes S0/S1/S2)
+    if (isSh(c) && /t0:/.test(l)) {
+      return { exitCode: 1, stdout: 'warning: No matching test cases were run\n✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.\nERROR: --filter matched zero tests.' }
+    }
+  })
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.ok(!logs.some((l) => /disabling the engine gate/.test(l)),
+    `zero-match must NOT trip the breaker / disable the template; saw: ${logs.filter((l) => /gate|ZERO|disabl/i.test(l)).join(' | ')}`)
+  assert.ok(logs.some((l) => /matched ZERO tests/.test(l)),
+    'a zero-match t0 must be surfaced LOUD as a per-leaf scope-mismatch finding')
+  assert.ok(result.results.length > 0 && result.results.every((r) => r.gateLevel === 'llm-only'),
+    `each zero-match leaf is gate=llm-only (no real gate ran), not reverted as a false-red; got: ${result.results.map((r) => r.gateLevel).join(',')}`)
+})
+
 // Artifact-freshness canary: the suite executes the BUILT artifact, so editing src/*.ts without
 // rebuilding yields green against stale code. This is the fast MTIME guard (catches "forgot to
 // rebuild"); the CONTENT-reproducibility guard — which catches a hand-edited artifact that diverged

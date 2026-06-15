@@ -464,6 +464,7 @@ LENS: judge specifically through "${L}".`,
     return await agentSafe(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
   };
   const t0redBreaker = circuitBreaker(2);
+  const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i;
   const ABORTS = [];
   async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
     buildNote = buildNote || "";
@@ -602,10 +603,22 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
           if (t0cmd) {
             const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
             if (t0.exitCode !== 0) {
-              t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${String(t0.stdout || "").slice(-300)}`] };
-              if (t0redBreaker.record(), t0redBreaker.tripped()) {
-                baseline.filterCommand = "";
-                log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
+              const t0tail = String(t0.stdout || "");
+              if (RE_ZERO_TESTS.test(t0tail)) {
+                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${node.testScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
+                engineT0 = engineRanBlock({
+                  cmd: t0cmd,
+                  note: "(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)",
+                  exitCode: t0.exitCode,
+                  tail: t0tail.slice(-300),
+                  duty: `The engine's filtered gate matched ZERO tests under scope \`${node.testScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.`
+                });
+              } else {
+                t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] };
+                if (t0redBreaker.record(), t0redBreaker.tripped()) {
+                  baseline.filterCommand = "";
+                  log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
+                }
               }
             } else {
               t0redBreaker.reset();

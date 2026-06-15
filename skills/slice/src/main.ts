@@ -564,6 +564,13 @@ const verifyLeaf = async (lbl: string, node: WorkNode, res: ExecResult, tier: Ri
 // the template it disables). Trips at 2 (no class gate). I1 fallback: a broken filterCommand template
 // false-REDs every leaf run-wide; after 2 in a row, distrust the TEMPLATE (kill it), not the leaves.
 const t0redBreaker = circuitBreaker(2)
+// ① A filtered t0 run that exits NON-ZERO because the filter matched ZERO tests (a scope/name mismatch —
+// Swift Testing exits 1 with "matched zero tests" / "Test run with 0 tests" / "No matching test cases")
+// is NOT a real failure and NOT a broken template — it is a per-leaf scope mismatch. Telling it apart from
+// a real red (tests ran AND failed) stops ONE mismatched scope from tripping t0redBreaker and disabling
+// deterministic gating run-wide (observed live on MailKit: 13 leaves silently llm-only). Regex verified
+// against the actual `./scripts/test.sh --filter <none>` output; broadened for other runners.
+const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i
 const ABORTS: string[] = []     // A: units halted by the untrusted-streak guard (surfaced in the final payload)
 async function runWork(rootTask: string, repo: string, startDepth: number, gid?: number | string, cleanOK?: boolean, kind?: SliceKind, buildNote?: string): Promise<{ done: LeafRecord[] }> {
   buildNote = buildNote || ''
@@ -746,11 +753,23 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
           // too (assumes the filter template passes appended flags through — documented opt-in).
           const t0 = await sh(`cd ${repo} && ${t0cmd}${(SCRATCH && repo !== REPO) ? ` --scratch-path ${SCRATCH}` : ''}`, `t0:${lbl}`)
           if (t0.exitCode !== 0) {
-            t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${String(t0.stdout || '').slice(-300)}`] }
-            // A BROKEN template (env/wrapper/filter-syntax) false-REDs every leaf run-wide. After 2
-            // consecutive engine-RED-vs-executor-green disagreements, distrust the TEMPLATE, not the
-            // leaves — kill it and fall back to LLM verification (the pre-gate path).
-            if ((t0redBreaker.record(), t0redBreaker.tripped())) { baseline!.filterCommand = ''; log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`) }
+            const t0tail = String(t0.stdout || '')
+            if (RE_ZERO_TESTS.test(t0tail)) {
+              // ① ZERO tests matched (scope/name mismatch, NOT a failure, NOT a broken template). Do NOT
+              // t0red and do NOT trip the breaker — else one mismatched scope kills gating run-wide. This
+              // leaf stays gate=llm-only (default); hand the verifier the finding to confirm independently.
+              log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${node.testScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`)
+              engineT0 = engineRanBlock({
+                cmd: t0cmd, note: '(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)',
+                exitCode: t0.exitCode, tail: t0tail.slice(-300),
+                duty: `The engine's filtered gate matched ZERO tests under scope \`${node.testScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.` })
+            } else {
+              t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] }
+              // A BROKEN template (env/wrapper/filter-syntax) false-REDs every leaf run-wide. After 2
+              // consecutive engine-RED-vs-executor-green disagreements, distrust the TEMPLATE, not the
+              // leaves — kill it and fall back to LLM verification (the pre-gate path).
+              if ((t0redBreaker.record(), t0redBreaker.tripped())) { baseline!.filterCommand = ''; log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`) }
+            }
           } else {
             t0redBreaker.reset()
             gateLevel = 'deterministic-filtered'   // ITEM 1: the engine ran the filtered tier-0 (green) — full trust floor held
