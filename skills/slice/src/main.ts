@@ -239,6 +239,15 @@ const baseline: Baseline | null = await agentSafe(
   { phase: 'Baseline', model: 'sonnet', schema: BASELINE })
 if (!baseline) { log('FATAL: baseline agent returned no result (API/rate-limit) — aborting before any change.'); return { error: 'baseline failed', task: TASK } }
 log(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`)
+// RIG CROSS-CHECK (non-halting, additive — surfaces a baseliner inconsistency between its rigPresent verdict
+// and the measureCommand it authored). rigPresent:false + a REAL measureCommand ⇒ likely UNDER-judgment (a
+// false halt the human can override); rigPresent:true + a TRIVIAL measureCommand ('true'/''/'echo'/'exit 0')
+// ⇒ likely a vacuous floor (per-leaf gates degrade to llm-only, the integrate net cannot go red — false-green
+// risk). A WARN only: it NEVER halts (the gate below owns halting) — the engine just makes the mismatch LOUD.
+const rigMeasure = String(baseline.measureCommand || '').trim()
+const rigTrivial = rigMeasure === '' || /^(true|:|echo|exit\s+0)\b/.test(rigMeasure)
+if (baseline.rigPresent === false && !rigTrivial) log(`⚠ rig cross-check: rigPresent:false but measureCommand looks real (\`${rigMeasure}\`) — possible baseliner under-judgment. If the rig is real, fix the baseliner or re-run with confirmNoRig:true.`)
+if (baseline.rigPresent === true && rigTrivial) log(`⚠ rig cross-check: rigPresent:true but measureCommand is trivial (\`${rigMeasure || '(empty)'}\`) — possible vacuous floor (false-green risk): per-leaf gates degrade to llm-only and the integrate net cannot go red.`)
 // TESTING-READINESS GATE — enforce the Baseliner's rigPresent verdict. The trust floor ("an existing green test
 // going red is a violation") is meaningful ONLY if a real runnable rig exists; rigPresent===false means
 // measureCommand is vacuous, every per-leaf filtered gate degrades to gate=llm-only, and the integrate net runs a

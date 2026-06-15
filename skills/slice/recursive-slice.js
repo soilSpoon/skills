@@ -285,6 +285,10 @@ Establish the trust invariant BEFORE any change. Find the measurement command, r
     return { error: "baseline failed", task: TASK };
   }
   log(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`);
+  const rigMeasure = String(baseline.measureCommand || "").trim();
+  const rigTrivial = rigMeasure === "" || /^(true|:|echo|exit\s+0)\b/.test(rigMeasure);
+  if (baseline.rigPresent === false && !rigTrivial) log(`⚠ rig cross-check: rigPresent:false but measureCommand looks real (\`${rigMeasure}\`) — possible baseliner under-judgment. If the rig is real, fix the baseliner or re-run with confirmNoRig:true.`);
+  if (baseline.rigPresent === true && rigTrivial) log(`⚠ rig cross-check: rigPresent:true but measureCommand is trivial (\`${rigMeasure || "(empty)"}\`) — possible vacuous floor (false-green risk): per-leaf gates degrade to llm-only and the integrate net cannot go red.`);
   if (baseline.rigPresent === false && !CONFIRM_NO_RIG) {
     log(`TESTING-READINESS STOP: baseliner judged NO runnable test rig (no scripts/verify.sh, no test files, no test command). The trust floor would be empty — 'still works' would be unverifiable. Scaffold a rig (test-foundations: add scripts/verify.sh or a real test command), then re-run. To proceed anyway, re-run with confirmNoRig:true. (No lock taken; nothing changed.)`);
     return { error: `no runnable test rig — baseliner reported rigPresent:false; add a test rig (test-foundations: scripts/verify.sh or a real test command) or re-run with confirmNoRig:true`, task: TASK, baseline, noRigStop: true };

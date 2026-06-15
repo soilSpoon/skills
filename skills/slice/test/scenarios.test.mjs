@@ -1979,3 +1979,24 @@ test('testing-readiness gate: rigPresent UNDEFINED does NOT fire (back-compat �
   assert.ok(!result.noRigStop, 'an omitted rigPresent (older/resumed baseline) never trips the gate')
   assert.equal(result.error, undefined, 'happy path unaffected by the new gate')
 })
+
+// ── Rig cross-check WARN (non-halting; surfaces rigPresent ↔ measureCommand inconsistency) ───────
+test('rig cross-check: rigPresent:true + TRIVIAL measureCommand → WARN (vacuous-floor / false-green risk)', async () => {
+  const over = (c) => { if (c.opts.phase === 'Baseline') return { ...FIX.baseline, rigPresent: true, measureCommand: 'true' }; return undefined }
+  const { result, logs } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(logs.some((l) => /rig cross-check: rigPresent:true but measureCommand is trivial/.test(l)), 'WARN names the vacuous-floor risk')
+  assert.ok(!result.noRigStop, 'rigPresent:true never trips the gate — the WARN is non-halting')
+})
+
+test('rig cross-check: rigPresent:false + REAL measureCommand → WARN (under-judgment), gate still halts', async () => {
+  const over = (c) => { if (c.opts.phase === 'Baseline') return { ...FIX.baseline, rigPresent: false, measureCommand: 'swift test --parallel' }; return undefined }
+  const { result, logs } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(logs.some((l) => /rig cross-check: rigPresent:false but measureCommand looks real/.test(l)), 'WARN names the under-judgment (printed before the halt)')
+  assert.equal(result.noRigStop, true, 'the gate still halts (WARN is additive, not an override)')
+})
+
+test('rig cross-check: no WARN when rigPresent and measureCommand agree (default fixture)', async () => {
+  // FIX.baseline = measureCommand:'true' (trivial) + rigPresent omitted → neither WARN fires (undefined ≠ true/false).
+  const { logs } = await runEngine({ args: ARGS, dispatch: dispatcher() })
+  assert.ok(!logs.some((l) => /rig cross-check/.test(l)), 'no spurious cross-check WARN on the consistent happy path')
+})

@@ -9,7 +9,7 @@
 
 ## slice Phase 3 testing-readiness gate (1.11.0 ship 후 followUp — 적대적 검증 SAFE)
 
-- [ ] **[slice gate] rigPresent↔measureCommand 교차검증 WARN** — 게이트는 `rigPresent===false`만 잡는다(fail-closed, 정상). 저렴한 엔진 WARN 추가 고려: `rigPresent:false`인데 measureCommand 비사소(=false halt 의심), 또는 `rigPresent:true`인데 measureCommand 사소(`'true'` 등, =false green 의심). 현재 backstop은 per-leaf llm-only WARN + integrate net이나 둘 다 halt 안 함. TRUE-case 환각(가짜 리그를 true로 보고)은 인정된 residual(베이스라이너 품질 이슈, 엔진 게이트 범위 밖).
+- [x] **[slice gate] rigPresent↔measureCommand 교차검증 WARN** (DONE slice 1.11.2 — main.ts 게이트 직전 비-halting 양방향 WARN + 3 테스트) — 게이트는 `rigPresent===false`만 잡는다(fail-closed, 정상). 저렴한 엔진 WARN 추가 고려: `rigPresent:false`인데 measureCommand 비사소(=false halt 의심), 또는 `rigPresent:true`인데 measureCommand 사소(`'true'` 등, =false green 의심). 현재 backstop은 per-leaf llm-only WARN + integrate net이나 둘 다 halt 안 함. TRUE-case 환각(가짜 리그를 true로 보고)은 인정된 residual(베이스라이너 품질 이슈, 엔진 게이트 범위 밖).
 - [ ] **[slice gate] 모노레포 sub-package** — rig 없는 root + rig 있는 sub-package면 root 판정으로 false halt 가능. `confirmNoRig`로 복구되나, repo arg를 sub-package로 가리키게 안내하거나 sub-package 탐지를 R_BASELINE에 추가할지 검토.
 
 ## reliability-kit / spec-first (0.2.0 ship 후 followUp — 적대적 검증 SAFE)
