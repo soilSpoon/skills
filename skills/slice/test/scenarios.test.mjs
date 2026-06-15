@@ -1937,3 +1937,45 @@ test('over-tier gate: a cheap-build repo NEVER trips the stop (compile-bound is 
   const { result } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
   assert.ok(!result.overTierStop, 'cheap-build repo: fast iteration is never blocked')
 })
+
+// ── Testing-readiness gate (post-baseline / pre-lock; fires on baseliner rigPresent:false) ──────
+// A repo with NO runnable test rig has an EMPTY deterministic trust floor — leaves degrade to llm-only,
+// the integrate net runs a command that cannot go red — so "still works" would be a false green. The gate
+// HALTS before any work (and before the lock is taken). undefined NEVER trips (back-compat); confirmNoRig
+// overrides. This is the INVERSE of the over-tier lock test: ZERO lock-clear because no lock is held yet.
+test('testing-readiness gate FIRES (default stop): rigPresent:false → no leaf runs, NO lock taken', async () => {
+  const over = (c) => { if (c.opts.phase === 'Baseline') return { ...FIX.baseline, rigPresent: false }; return undefined }
+  const { result, calls, logs } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.equal(result.noRigStop, true, 'no-rig stop flagged on the result')
+  assert.match(result.error || '', /no runnable test rig/, 'error names the missing rig')
+  const leafCalls = calls.filter((c) => !isSh(c) && /exec:|verify/.test(c.opts.label || ''))
+  assert.equal(leafCalls.length, 0, `NOTHING ran; saw: ${leafCalls.map((c) => c.opts.label).join(', ')}`)
+  // INVERSE of the over-tier gate: the gate fires BEFORE the lock is acquired → exactly ZERO lock-clears
+  const lockClears = calls.filter((c) => isSh(c) && /rm -f/.test(c.prompt) && /rs-lock/.test(c.prompt))
+  assert.equal(lockClears.length, 0, 'no lock is taken pre-baseline, so no lock-clear runs on the stop path')
+  assert.ok(logs.some((l) => /TESTING-READINESS STOP/.test(l)), 'the stop is logged for the human')
+})
+
+test('testing-readiness gate: confirmNoRig:true OVERRIDES the stop → the engine proceeds', async () => {
+  const over = (c) => { if (c.opts.phase === 'Baseline') return { ...FIX.baseline, rigPresent: false }; return undefined }
+  const { result, calls } = await runEngine({ args: { ...ARGS, confirmNoRig: true }, dispatch: dispatcher(over) })
+  assert.ok(!result.noRigStop, 'gate did NOT fire with confirmNoRig:true')
+  assert.equal(result.error, undefined, `engine ran clean: ${result.error}`)
+  const execCalls = calls.filter((c) => !isSh(c) && /exec:/.test(c.opts.label || ''))
+  assert.ok(execCalls.length >= 1, 'leaves executed (gate bypassed)')
+})
+
+test('testing-readiness gate: rigPresent:true does NOT fire', async () => {
+  const over = (c) => { if (c.opts.phase === 'Baseline') return { ...FIX.baseline, rigPresent: true }; return undefined }
+  const { result, calls } = await runEngine({ args: { ...ARGS }, dispatch: dispatcher(over) })
+  assert.ok(!result.noRigStop, 'a present rig never trips the gate')
+  const execCalls = calls.filter((c) => !isSh(c) && /exec:/.test(c.opts.label || ''))
+  assert.ok(execCalls.length >= 1, 'leaves executed')
+})
+
+test('testing-readiness gate: rigPresent UNDEFINED does NOT fire (back-compat — default baseline omits it)', async () => {
+  // FIX.baseline omits rigPresent → `=== false` is false → the gate is inert; the happy path is unaffected.
+  const { result } = await runEngine({ args: ARGS, dispatch: dispatcher() })
+  assert.ok(!result.noRigStop, 'an omitted rigPresent (older/resumed baseline) never trips the gate')
+  assert.equal(result.error, undefined, 'happy path unaffected by the new gate')
+})

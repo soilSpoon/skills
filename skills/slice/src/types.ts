@@ -11,6 +11,7 @@ export interface EngineArgs {
   forceParallel?: boolean
   sharedScratch?: boolean
   confirmTier?: boolean      // opt-in ack: proceed with the engine even when the depth-0 over-tier gate fires (compile-bound + breadth<=3 + every slice explicitly riskTier:'light')
+  confirmNoRig?: boolean     // opt-in ack: proceed even when the post-baseline testing-readiness gate fires (baseliner judged no runnable test rig → empty trust floor)
   skills?: unknown          // validated at use: string[] of guide-file paths
 }
 /** Baseliner output (BASELINE schema). filterCommand is mutable: the engine kills a broken template at runtime. */
@@ -24,6 +25,7 @@ export interface Baseline {
   coldBuildCost?: 'cheap' | 'expensive'
   purposeCheck?: string
   inProcessVerifiable?: boolean
+  rigPresent?: boolean            // baseliner's explicit judgment: does a real RUNNABLE test rig exist (a real test cmd that runs real tests, OR a test-foundations scripts/verify.sh)? false ONLY if NO verify.sh, NO test files, AND NO test command — the testing-readiness gate keys off `=== false`
   worktreeSetupCommand?: string   // E: shell command run once per parallel git-worktree right after creation
 }
 /** ITEM 10: the merged 'decompose' decision (DECOMPOSE schema) — Assessor folded INTO the Slicer.
@@ -119,6 +121,7 @@ export interface EngineResult {
   aborts?: string[]
   degradations?: string[]
   overTierStop?: boolean   // depth-0 over-tier gate fired: compile-bound + small breadth + all-light slices; nothing executed (re-run with confirmTier:true to override)
+  noRigStop?: boolean      // post-baseline testing-readiness gate fired: baseliner judged no runnable test rig; nothing executed, no lock taken (re-run with confirmNoRig:true to override)
   slices?: number          // breadth that tripped the over-tier stop (for the human's machine-readable ETA)
   overallTrust?: boolean   // ITEM 2: single rollup verdict — true IFF every trust dimension held (additive; never a false green)
   ownersHeadline?: string  // ITEM 2: one human line — the green summary, or the first failing dimension named

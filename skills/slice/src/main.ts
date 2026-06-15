@@ -125,6 +125,7 @@ const PARALLEL = A.parallel !== false    // DEFAULT ON: parallelize independent 
                                          // means "parallelize where it actually helps," never "force worktrees blindly."
 const FORCE_PARALLEL = A.forceParallel === true   // override the compile-bound auto-fallback to sequential
 const CONFIRM_TIER = A.confirmTier === true        // opt-in: override the depth-0 over-tier stop (compile-bound + small breadth + all-light)
+const CONFIRM_NO_RIG = A.confirmNoRig === true     // opt-in: override the post-baseline testing-readiness gate (baseliner judged no runnable test rig → empty trust floor)
 const SHARED_SCRATCH = A.sharedScratch === true   // compile-bound parallel WITHOUT per-worktree cold builds: all
                                                   // worktrees share ONE build dir (--scratch-path) so dependency
                                                   // artifacts compile once; builds serialize on its lock (measured:
@@ -238,6 +239,17 @@ const baseline: Baseline | null = await agentSafe(
   { phase: 'Baseline', model: 'sonnet', schema: BASELINE })
 if (!baseline) { log('FATAL: baseline agent returned no result (API/rate-limit) — aborting before any change.'); return { error: 'baseline failed', task: TASK } }
 log(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`)
+// TESTING-READINESS GATE — enforce the Baseliner's rigPresent verdict. The trust floor ("an existing green test
+// going red is a violation") is meaningful ONLY if a real runnable rig exists; rigPresent===false means
+// measureCommand is vacuous, every per-leaf filtered gate degrades to gate=llm-only, and the integrate net runs a
+// command that cannot go red — so "still works" would be an EMPTY-floor false green. Halt BEFORE any work. The lock
+// is NOT yet held here (LOCKFILE assigned ~428, written ~452-454, prologue starts ~318) → no shForce cleanup,
+// unlike the over-tier gate (1097) and final teardown (1281). undefined NEVER trips (older/resumed baselines); only
+// an explicit false does. confirmNoRig:true collapses the guard so the owner can proceed onto the empty floor.
+if (baseline.rigPresent === false && !CONFIRM_NO_RIG) {
+  log(`TESTING-READINESS STOP: baseliner judged NO runnable test rig (no scripts/verify.sh, no test files, no test command). The trust floor would be empty — 'still works' would be unverifiable. Scaffold a rig (test-foundations: add scripts/verify.sh or a real test command), then re-run. To proceed anyway, re-run with confirmNoRig:true. (No lock taken; nothing changed.)`)
+  return { error: `no runnable test rig — baseliner reported rigPresent:false; add a test rig (test-foundations: scripts/verify.sh or a real test command) or re-run with confirmNoRig:true`, task: TASK, baseline, noRigStop: true }
+}
 const CARD = baseline.projectCard
   ? `\nProject card (authoritative repo conventions — use instead of re-reading AGENTS.md unless insufficient):\n${baseline.projectCard}`
   : ''

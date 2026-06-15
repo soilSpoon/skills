@@ -24,7 +24,16 @@ export const R_BASELINE =
   'WORKTREE SETUP: set `worktreeSetupCommand` = the shell command that must run ONCE in each parallel git-worktree ' +
   'right after it is created (e.g. "npm ci" to install deps into the fresh checkout). Leave empty or absent if ' +
   'no per-worktree setup is needed (interpreted language with no install step, or a shared-cache build dir that is ' +
-  'already populated). This command runs verbatim in each worktree before any leaf work begins.'
+  'already populated). This command runs verbatim in each worktree before any leaf work begins. ' +
+  'TEST RIG JUDGMENT: inspect the repo for a runnable test foundation. (1) If `scripts/verify.sh` exists and is ' +
+  'executable, run it; if it succeeds, ADOPT it — set measureCommand="scripts/verify.sh" and ' +
+  'filterCommand="scripts/verify.sh --scope {scope}". (2) Otherwise scan for conventional test files (test.ts, ' +
+  '*_test.go, spec.rb, test/*.py, Perl t/, etc.) or a test command in package.json/Makefile/justfile/Taskfile/build ' +
+  'metadata. (3) Set rigPresent=true if ANY of these exists AND is runnable; set rigPresent=false ONLY when the repo ' +
+  'has NO scripts/verify.sh, NO test files, AND NO test command — any single positive signal keeps it true. Be ' +
+  'explicit: rigPresent is YOUR judgment, after reading the repo, of whether a real, testable system exists — NOT a ' +
+  'guess from the command string. The engine halts before any work when rigPresent is false (an empty trust floor ' +
+  'makes "still works" unverifiable), so do not report false on a rig you merely could not RUN in the sandbox.'
 export const R_SLICE =
   // ITEM 10: the Assessor is folded INTO the Slicer — this ONE role is BOTH the recursion termination
   // condition AND the cut. It returns a single `decompose` decision per node: action:'execute' (a LEAF —

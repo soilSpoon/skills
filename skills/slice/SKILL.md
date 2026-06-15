@@ -114,11 +114,18 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
      | lane touches | add |
      |---|---|
      | any substantial code (default) | `code-fundamentals` |
-     | React/Next.js UI (.tsx/.jsx, components/hooks/routes) | `toss-frontend-fundamentals` + `vercel-react-best-practices` + `vercel-composition-patterns` |
+     | shipping code with no/weak test rig (the testing-readiness gate's fix path) | `test-foundations` |
+     | fuzzy / ambiguous spec or exploratory entry point | `spec-first` |
+     | React/Next.js UI (.tsx/.jsx, components/hooks/routes) | `toss-frontend-fundamentals` + `vercel-react-best-practices` *(if-installed)* + `vercel-composition-patterns` *(if-installed)* |
      | build config / deps / workspace / codemod migration | `build-config-drift` |
      | bug-hunt / regression / rootcause lane | `issue-rootcause-workflow` |
 
-     A lane in a domain with no matching guide gets none. Every entry taxes every leaf's
+     The `test-foundations` row is the named REMEDY the engine's testing-readiness gate points at: when the
+     Baseliner reports `rigPresent:false` the run halts before any work, and scaffolding a `scripts/verify.sh`
+     (or a real test command) via `test-foundations` is the zero-flag fix that flips the gate green on re-run
+     (the `confirmNoRig:true` arg is the explicit-bypass alternative). The `vercel-*` guides are *(if-installed)*:
+     resolve them only if present in the skill-library search path (see install note below); a missing guide is
+     silently dropped, never a blocker. A lane in a domain with no matching guide gets none. Every entry taxes every leaf's
      attention, but the engine's per-leaf RELEVANCE GATE (leaves skip guides whose domain
      doesn't match their contract) bounds the cost for mixed lanes — so a full-stack lane may
      safely carry both backend and frontend guides.
@@ -245,3 +252,29 @@ tier; only the ceremony *above* it scales with risk. Step 2 below is the per-gro
     judgment, one commit per trusted leaf, full suite only at integrate.
 - If the target repo is not under git, note it: small reversible commits are themselves a trust
   mechanism, and git unlocks worktree isolation for parallel slices. Offer to `git init`.
+
+## Integrating Vercel Agent Skills (Optional)
+
+Two React/Next.js selection-table rows reference `vercel-react-best-practices` and
+`vercel-composition-patterns`, tagged *(if-installed)*. These wrap Vercel's open-source agent-skills
+(perf + API/composition guidance) and are NOT bundled with slice — install them once if you do
+frontend work, or skip them entirely.
+
+Install (source: github.com/vercel-labs/agent-skills) into a path the front-door resolver searches
+(`~/.agents/skills/<name>/` — the user-level skill-library dir from §4):
+
+```sh
+mkdir -p ~/.agents/skills/vercel-react-best-practices ~/.agents/skills/vercel-composition-patterns
+cp <clone>/skills/react-best-practices/SKILL.md  ~/.agents/skills/vercel-react-best-practices/
+cp <clone>/skills/composition-patterns/SKILL.md  ~/.agents/skills/vercel-composition-patterns/
+```
+
+**Role split** on a React/Next.js lane (compose, do not duplicate): `toss-frontend-fundamentals` owns
+usability + a11y + the Toss 4-axis judgment; `vercel-composition-patterns` owns component/API
+composition design; `vercel-react-best-practices` owns React runtime performance.
+
+**If-installed treatment:** the front door resolves each `vercel-*` name against the §4 search path
+(project `.agents/skills/`, user `~/.agents/skills/`, plugin cache, local index). If a guide is NOT
+found it is silently dropped from the composed `skills:[...]` list — the lane still runs with whatever
+guides resolved (an absent path is never passed, and the per-leaf RELEVANCE GATE skips non-matching
+guides anyway). No flag, no error, no blocked run — the Vercel guides are strictly additive when present.

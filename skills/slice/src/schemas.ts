@@ -11,6 +11,7 @@ export const BASELINE = { type: 'object', required: ['invariants', 'measureComma
   purposeCheck: { type: 'string' },                            // ① how to verify the work ACTUALLY works for the user (PURPOSE) beyond unit tests — e.g. a live integration test / a human action
   inProcessVerifiable: { type: 'boolean' },                    // ① can that purpose be verified deterministically in-process (pure logic / recorded-real bytes), or does it need a real env / human?
   worktreeSetupCommand: { type: 'string' },                    // E: shell command run ONCE per parallel git-worktree immediately after creation (e.g. 'npm ci'); empty/absent = no setup needed
+  rigPresent: { type: 'boolean' },                             // baseliner's explicit judgment: real RUNNABLE test rig? (real test cmd OR test-foundations scripts/verify.sh) — false ONLY if NO verify.sh, NO test files, AND NO test command; the testing-readiness gate halts before any work on `false`
 } }
 // ITEM 10: the per-slice item shape — shared by the DECOMPOSE schema's `slices` array. A slice the
 // merged decompose role emits when it chooses action:'slice' (each carries its own atomic/riskTier so
