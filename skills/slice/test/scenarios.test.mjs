@@ -1230,9 +1230,39 @@ test('GROUP E: worktreeSetupCommand fires exactly once per worktree after wt-add
     `wt-setup must NOT fire when worktreeSetupCommand is absent; got ${wtSetupCallsAbsent.length} calls`)
 })
 
-// Artifact-freshness canary (BACKLOG): the suite executes the BUILT artifact, so editing
-// src/*.ts without rebuilding yields green against stale code. mtime guard with a clear
-// remedy message; RS_SKIP_FRESHNESS=1 opts out (e.g. exotic checkout tools).
+// P2 — pin the compile-bound auto-sharedScratch guard. The structural fix (003a7c2) shipped with NO
+// test, so it could regress silently — the exact gap Lesson 14 warns about. coldBuildCost='expensive'
+// with no explicit sharedScratch MUST auto-enable the shared build dir (so parallel is not silently
+// demoted); an explicit sharedScratch:false MUST opt out and demote to sequential.
+test('compile-bound (coldBuildCost=expensive): sharedScratch AUTO-enables → parallel not demoted', async () => {
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Baseline') return { ...FIX.baseline, coldBuildCost: 'expensive' }
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
+  })
+  const { logs } = await runEngine({ args: ARGS_PARALLEL, dispatch })
+  assert.ok(logs.some((l) => /sharedScratch auto-ENABLED/.test(l)),
+    `auto-ENABLE must fire on coldBuildCost=expensive without an explicit sharedScratch; saw: ${logs.filter((l) => /scratch|SEQUENTIAL/i.test(l)).join(' | ')}`)
+  assert.ok(!logs.some((l) => /skipped → SEQUENTIAL/.test(l)),
+    'must NOT demote to sequential when auto-sharedScratch is active')
+})
+
+test('compile-bound + explicit sharedScratch:false → NO auto-enable, demotes to SEQUENTIAL', async () => {
+  const dispatch = dispatcher((c) => {
+    if (c.opts.phase === 'Baseline') return { ...FIX.baseline, coldBuildCost: 'expensive' }
+    if (c.opts.phase === 'Plan' && !isSh(c) && !has(c, /partition/)) return FIX.decomposeSlice
+  })
+  const { logs } = await runEngine({ args: { ...ARGS_PARALLEL, sharedScratch: false }, dispatch })
+  assert.ok(!logs.some((l) => /sharedScratch auto-ENABLED/.test(l)),
+    'auto-ENABLE must NOT fire when sharedScratch:false is explicitly set')
+  assert.ok(logs.some((l) => /skipped → SEQUENTIAL/.test(l) && /sharedScratch:false/.test(l)),
+    `must demote to SEQUENTIAL citing explicit sharedScratch:false; saw: ${logs.filter((l) => /SEQUENTIAL|scratch/i.test(l)).join(' | ')}`)
+})
+
+// Artifact-freshness canary: the suite executes the BUILT artifact, so editing src/*.ts without
+// rebuilding yields green against stale code. This is the fast MTIME guard (catches "forgot to
+// rebuild"); the CONTENT-reproducibility guard — which catches a hand-edited artifact that diverged
+// from src/ (the P1 drift the mtime check is blind to) — lives in build-engine.sh (git-diff after
+// rebuild; FATAL under RS_BUILD_VERIFY for CI/release). RS_SKIP_FRESHNESS=1 opts out.
 test('artifact freshness: recursive-slice.js is not older than src/*.ts', async () => {
   if (process.env.RS_SKIP_FRESHNESS) return
   const { statSync, readdirSync } = await import('node:fs')

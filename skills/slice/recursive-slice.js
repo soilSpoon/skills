@@ -691,18 +691,13 @@ If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a tes
   }
   phase("Plan");
   let groups = null;
-  // Compile-bound repos (coldBuildCost=expensive, detected by the Baseliner): AUTO-enable the shared
-  // build dir so a forgotten `sharedScratch` no longer silently demotes parallel → sequential. This is
-  // the recurring drift (logged 3× in proportional-ceremony memory: Swift/Rust runs left sharedScratch
-  // off and crawled). Removing the human-memory dependency is the whole point — the engine decides.
-  // SAFE: explicit `sharedScratch:false` still wins, and the <2-independent-groups guard below still
-  // falls back to sequential when slices share files (so this never forces a merge-hazard parallel run).
   const autoSharedScratch = baseline.coldBuildCost === "expensive" && A.sharedScratch !== false;
   const useSharedScratch = SHARED_SCRATCH || autoSharedScratch;
-  if (autoSharedScratch && !SHARED_SCRATCH) log(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`);
+  if (autoSharedScratch && !SHARED_SCRATCH)
+    log(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`);
   const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== "expensive" || FORCE_PARALLEL || useSharedScratch);
   if (PARALLEL && GIT && !goParallel)
-    log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? "main tree is DIRTY (merge would conflict with your work)" : "sharedScratch:false on a compile-bound repo (worktrees would force cold builds → thrashing; drop sharedScratch:false or pass forceParallel:true)"}.`);
+    log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? "main tree is DIRTY (merge would conflict with your work)" : "sharedScratch:false explicitly set on a compile-bound repo (worktrees would force per-checkout cold builds → thrashing, slower than sequential-warm; drop sharedScratch:false to use the auto shared build dir, or forceParallel:true to brute-force)"}.`);
   const SCRATCH = goParallel && useSharedScratch ? `${REPO}/.rs-scratch` : "";
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";

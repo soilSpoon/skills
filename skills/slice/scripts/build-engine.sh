@@ -48,5 +48,23 @@ let s = await readFile('recursive-slice.js', 'utf8')
 s = s.replace(/^export const meta/m, 'const meta').replace(/^export default [^\n]*$/m, '').replace(/^export \{[^}]*\};?$/m, '')
 new AF('agent', 'log', 'phase', 'budget', 'args', 'pipeline', 'parallel', 'workflow', s)  // throws on parse error
 NODE
+
+# Reproducibility guard (Lesson 14: a drift that recurs despite being written down is a MISSING
+# deterministic guard, not a memory problem). The committed recursive-slice.js MUST equal a fresh build
+# of src/ — a direct edit to the ARTIFACT (not src/) passes the mtime freshness canary but is silently
+# erased by this very rebuild (exactly how the sharedScratch auto-enable once shipped into the artifact
+# only). Under RS_BUILD_VERIFY (CI / release) a mismatch is FATAL; otherwise a NOTE, since a normal dev
+# build legitimately changes the artifact before you commit it.
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git diff --quiet -- recursive-slice.js; then
+    if [ -n "$RS_BUILD_VERIFY" ]; then
+      echo "FATAL: recursive-slice.js is not reproducible from src/ — a hand-edited artifact, or a src/ change whose rebuild was never committed. Run 'sh scripts/build-engine.sh' and commit recursive-slice.js."
+      git --no-pager diff --stat -- recursive-slice.js
+      exit 1
+    fi
+    echo "NOTE: recursive-slice.js rebuilt and now differs from the committed copy — 'git add recursive-slice.js' and commit it (the published artifact must stay reproducible from src/; CI runs RS_BUILD_VERIFY=1 to enforce)."
+  fi
+fi
+
 rm -rf build
 echo "OK: recursive-slice.js rebuilt from src/"

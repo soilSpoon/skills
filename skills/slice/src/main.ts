@@ -872,12 +872,20 @@ phase('Plan')
 let groups: Groups | null = null
 // Parallel also needs a CLEAN main tree — the worktree branches merge into it, and a dirty main makes
 // `git merge` abort / risks clobbering the user's uncommitted work.
-const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== 'expensive' || FORCE_PARALLEL || SHARED_SCRATCH)
+// Compile-bound repos (coldBuildCost=expensive, per the Baseliner): AUTO-enable the shared build dir so a
+// forgotten `sharedScratch` no longer silently demotes parallel → sequential (the recurring drift logged
+// in proportional-ceremony memory). Explicit `sharedScratch:false` still wins; the <2-independent-groups
+// guard below still demotes to sequential when slices share files, so no merge hazard is ever forced.
+const autoSharedScratch = baseline.coldBuildCost === 'expensive' && A.sharedScratch !== false
+const useSharedScratch = SHARED_SCRATCH || autoSharedScratch
+if (autoSharedScratch && !SHARED_SCRATCH)
+  log(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`)
+const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== 'expensive' || FORCE_PARALLEL || useSharedScratch)
 if (PARALLEL && GIT && !goParallel)
-  log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? 'main tree is DIRTY (merge would conflict with your work)' : 'coldBuildCost=expensive (compile-bound: worktrees force cold builds → thrashing, slower than sequential-warm; sharedScratch:true to share one build dir, or forceParallel:true to brute-force)'}.`)
+  log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? 'main tree is DIRTY (merge would conflict with your work)' : 'sharedScratch:false explicitly set on a compile-bound repo (worktrees would force per-checkout cold builds → thrashing, slower than sequential-warm; drop sharedScratch:false to use the auto shared build dir, or forceParallel:true to brute-force)'}.`)
 // Shared scratch dir for parallel groups on a compile-bound repo. Lives in the MAIN repo (worktree
 // leaf-cleans run inside their own worktree and cannot touch it; main-repo cleans exclude it).
-const SCRATCH = (goParallel && SHARED_SCRATCH) ? `${REPO}/.rs-scratch` : ''
+const SCRATCH = (goParallel && useSharedScratch) ? `${REPO}/.rs-scratch` : ''
 const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
   ? `\nSHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation ` +
     `(SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their ` +
