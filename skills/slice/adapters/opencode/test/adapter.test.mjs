@@ -13,9 +13,6 @@ import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import { readFileSync, readdirSync, statSync } from "node:fs"
 
-// Capture test-process start time once at module load (before any async work).
-const TEST_START_MS = Date.now()
-
 // Import exported helpers from the adapter (strip-types handles .ts)
 import {
   roleOf,
