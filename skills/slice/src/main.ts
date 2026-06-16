@@ -25,10 +25,36 @@ declare function phase(title: string): void
 declare function log(message: string): void
 declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
-// ITEM 2: the host runs the emitted engine as a Node AsyncFunction body, so Node's `Buffer` global is
-// always present — declared here (erased at build time, like the rest of the PORT) ONLY to base64-encode
-// the owner-briefing text injection-safely before it is handed to the deterministic `sh` write proxy.
-declare const Buffer: { from(s: string, enc: string): { toString(enc: string): string } }
+// ITEM 2 / 2026-06-16 MailKit dogfood: the host runs the emitted engine as a Node AsyncFunction body,
+// but the Workflow runtime sandbox does NOT expose Node's `Buffer` global — `Buffer.from(...)` threw
+// "Buffer is not defined" and SILENTLY degraded the JSONL run-trace + owner-briefing persist (both
+// observability; run unaffected, but the comprehension-debt ledger was lost). Use a dependency-free
+// UTF-8→base64 encoder (no Buffer/btoa/TextEncoder) so both paths survive any host. The base64 alphabet
+// is shell-safe, so arbitrary role/label/briefing text never reaches the deterministic `sh` write proxy
+// verbatim (the keep-text-out-of-shell discipline). Verified byte-identical to Buffer across ASCII /
+// multibyte UTF-8 / surrogate-pair vectors + round-trip through `base64 -d`.
+const b64encode = (str: string): string => {
+  const bytes: number[] = []
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i)
+    if (c < 0x80) bytes.push(c)
+    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f))
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const cp = 0x10000 + ((c & 0x3ff) << 10) + (str.charCodeAt(++i) & 0x3ff)
+      bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f))
+    } else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))
+  }
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 3) {
+    const n = bytes.length - i
+    const b0 = bytes[i], b1 = n > 1 ? bytes[i + 1] : 0, b2 = n > 2 ? bytes[i + 2] : 0
+    out += A[b0 >> 2] + A[((b0 & 3) << 4) | (b1 >> 4)]
+    out += n > 1 ? A[((b1 & 15) << 2) | (b2 >> 6)] : '='
+    out += n > 2 ? A[b2 & 63] : '='
+  }
+  return out
+}
 
 async function __main(): Promise<EngineResult> {
 // Runtime-throw containment: agent() can THROW rather than return null (observed live:
@@ -419,7 +445,7 @@ const trace = async (rec: TraceRecord): Promise<void> => {
     const line: Record<string, unknown> = { baseSha: BASE_SHA || null }
     for (const [k, v] of Object.entries(rec)) if (v !== undefined) line[k] = v
     const json = JSON.stringify(line)
-    const b64 = Buffer.from(json + '\n', 'utf8').toString('base64')
+    const b64 = b64encode(json + '\n')
     // mkdir -p the dir, then base64-decode the line and `>>` APPEND it (one line per call). The b64
     // alphabet is shell-safe, so the arbitrary role/label/model text never reaches the shell verbatim.
     await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, 'trace-append')
@@ -1288,7 +1314,7 @@ if (trusted.length && !QUOTA_HALT) {
       const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : 'briefing'
       const dir = `${REPO}/docs/briefings`
       const file = `${dir}/${ts}.md`
-      const b64 = Buffer.from(String(briefing.briefing), 'utf8').toString('base64')
+      const b64 = b64encode(String(briefing.briefing))
       const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, 'briefing-persist')
       if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`)
       else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`)

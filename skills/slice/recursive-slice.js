@@ -140,6 +140,28 @@ var R_CRITIC = 'You are the Completeness Critic (Beck: the test LIST is the step
 var R_COORD = "You are the Coordinator — the ONLY agent with global context. A conflict has occurred merging one branch of a parallel build. Resolve the hunk by HONORING BOTH slices' stated intent — never silently discard a side's work; if genuinely irreconcilable, keep the lower-indexed slice and record the loss as an issue. Report the conflict resolved and any lost work in issues.";
 
 // src/main.ts
+var b64encode = (str) => {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    if (c < 128) bytes.push(c);
+    else if (c < 2048) bytes.push(192 | c >> 6, 128 | c & 63);
+    else if (c >= 55296 && c <= 56319 && i + 1 < str.length) {
+      const cp = 65536 + ((c & 1023) << 10) + (str.charCodeAt(++i) & 1023);
+      bytes.push(240 | cp >> 18, 128 | cp >> 12 & 63, 128 | cp >> 6 & 63, 128 | cp & 63);
+    } else bytes.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63);
+  }
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const n = bytes.length - i;
+    const b0 = bytes[i], b1 = n > 1 ? bytes[i + 1] : 0, b2 = n > 2 ? bytes[i + 2] : 0;
+    out += A[b0 >> 2] + A[(b0 & 3) << 4 | b1 >> 4];
+    out += n > 1 ? A[(b1 & 15) << 2 | b2 >> 6] : "=";
+    out += n > 2 ? A[b2 & 63] : "=";
+  }
+  return out;
+};
 async function __main() {
   const circuitBreaker = (threshold, classThreshold = 0) => {
     let streak = 0;
@@ -348,7 +370,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       const line = { baseSha: BASE_SHA || null };
       for (const [k, v] of Object.entries(rec)) if (v !== void 0) line[k] = v;
       const json = JSON.stringify(line);
-      const b64 = Buffer.from(json + "\n", "utf8").toString("base64");
+      const b64 = b64encode(json + "\n");
       await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
     } catch (e) {
       log(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
@@ -1011,7 +1033,7 @@ Match the language the task was written in. Be concrete.`,
         const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : "briefing";
         const dir = `${REPO}/docs/briefings`;
         const file = `${dir}/${ts}.md`;
-        const b64 = Buffer.from(String(briefing.briefing), "utf8").toString("base64");
+        const b64 = b64encode(String(briefing.briefing));
         const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
         if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`);
         else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
