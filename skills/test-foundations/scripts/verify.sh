@@ -400,7 +400,14 @@ dispatch_native() {
       mise) mise run "$task" ;;
     esac ) >>"$log" 2>&1
   R_EXIT=$?
-  [ "$R_EXIT" -eq 0 ] && R_PASSED=1 || R_PASSED=0
+  # native task may zero-match INTERNALLY (e.g. a Swift `scripts/test.sh --filter` wrapper
+  # that prints "No matching test cases were run" and exits 1 — a FALSE RED — or a runner
+  # that exits 0 on no-match — a FALSE GREEN). Re-normalize to the contract the same way
+  # every inline dispatcher does: --scope active + a zero-match log line => R_ZEROMATCH
+  # (=> exit 2 graceful-degrade), never a false RED/green. Union of the per-runner "no
+  # tests" phrasings. (Surfaced by the 2026-06-16 MailKit dogfood: scripts/test.sh exits 1.)
+  if [ -n "$OPT_SCOPE" ] && grep -qiE 'no matching test|no tests? (to run|ran|found|collected)|no test files|0 tests? (run|passed|matched|collected)|running 0 tests|collected 0 items|matched zero tests' "$log"; then R_ZEROMATCH=1; fi
+  if [ "$R_EXIT" -eq 0 ] && [ "$R_ZEROMATCH" = 0 ]; then R_PASSED=1; elif [ "$R_ZEROMATCH" = 1 ]; then R_PASSED=1; else R_PASSED=0; fi
 }
 
 # build the scope filter args for a given runner mode (verbatim forward).

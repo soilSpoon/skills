@@ -153,7 +153,11 @@ scripts/verify.sh [--layer l0|l1|l2|l3|all] [--changed] [--scope NAME] [--filter
 
 > **주의** — pytest/vitest/go가 'no tests collected'에 기본 exit 0을 내면, verify.sh가 *직접*
 > exit 2로 변환한다(per-runner author-time 가드). Docker down은 L2를 green skip 시키지 않고 exit
-> 3이다 — fail-loud-on-infra.
+> 3이다 — fail-loud-on-infra. **위임/직접채택 native 엔트리도 동일** — 위임 태스크가 zero-match을
+> exit 0/1로 내도 `dispatch_native`가 exit 2로 재정규화하고(verify-contract §7), verify.sh 없이
+> 자체 filter를 가진 native 엔트리(예: swift `scripts/test.sh --filter`, MailKit)를 baseliner가
+> *직접 채택*할 땐 그 엔트리의 zero-match 코드를 **probe**해 2가 아니면 얇은 verify.sh 래퍼로
+> 정규화한다(§8). 안 하면 slice가 오타 scope를 가짜 RED로 본다.
 
 **NDJSON shape** (downstream 저자가 파싱할 정확한 모양):
 

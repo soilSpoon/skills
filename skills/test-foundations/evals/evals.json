@@ -198,6 +198,31 @@
           "desc": "verify.sh --layer l0 delegates to the committed `verify:l0` npm script (tool=npm:verify:l0) and the script's sentinel file proves it ran (not the inline floor)"
         }
       ]
+    },
+    {
+      "id": 6,
+      "name": "native-delegation-exitcode-normalization",
+      "grounding": "verify-contract.md §7 + dispatch_native: a delegated native entry may zero-match INTERNALLY and report a non-contract code — a Swift `scripts/test.sh --filter` exits 1 on no-match (FALSE RED), or another runner exits 0 (FALSE GREEN). dispatch_native re-normalizes the same way every inline dispatcher does: --scope active + a zero-match log line => R_ZEROMATCH => exit 2 graceful-degrade. Surfaced by the 2026-06-16 MailKit dogfood (scripts/test.sh returns exit 1 on zero-match). The fixture's verify:l1 prints a swift-style 'No matching test cases were run' and exits 1.",
+      "prompt": "N/A — exit-code contract eval. Verified by the checks below.",
+      "files": ["evals/fixtures/eval-native-zeromatch/"],
+      "checks": [
+        {
+          "id": "C0-zeromatch-exit1-normalized-to-2",
+          "grounding": "--scope active: a delegated task that exits 1 with a zero-match log must surface as exit 2 (zeroMatch:1), NOT a false RED that slice would treat as a real leaf failure instead of llm-only graceful-degrade.",
+          "assert": "shell",
+          "cmd": "cd evals/fixtures/eval-native-zeromatch && bash ../../../scripts/verify.sh --layer l1 --scope bogustoken --json | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const s=ls.find(r=>r.summary); if(s.exit!==2) throw new Error('expected exit 2 (graceful zero-match) got '+s.exit); if(s.zeroMatch!==1) throw new Error('expected zeroMatch 1 got '+s.zeroMatch);\"",
+          "exit": 0,
+          "desc": "delegated native task exiting 1 on zero-match is re-normalized to exit 2 (graceful-degrade), not a false RED"
+        },
+        {
+          "id": "C1-guard-genuine-red-preserved",
+          "grounding": "WITHOUT --scope the zero-match grep is gated off (the [ -n $OPT_SCOPE ] guard), so a real non-zero exit stays a genuine RED (exit 1) — the fix must not over-normalize every delegated failure into exit 2.",
+          "assert": "shell",
+          "cmd": "cd evals/fixtures/eval-native-zeromatch && bash ../../../scripts/verify.sh --layer l1 --json | node -e \"const ls=require('fs').readFileSync('/dev/stdin','utf8').trim().split('\\n').map(l=>JSON.parse(l)); const s=ls.find(r=>r.summary); if(s.exit!==1) throw new Error('expected genuine RED exit 1 got '+s.exit); if(s.zeroMatch!==0) throw new Error('expected zeroMatch 0 got '+s.zeroMatch);\"",
+          "exit": 0,
+          "desc": "without --scope, a delegated exit-1 stays a genuine RED (no over-normalization)"
+        }
+      ]
     }
   ]
 }

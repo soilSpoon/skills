@@ -1,0 +1,10 @@
+{
+  "name": "eval-native-zeromatch",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "native-runner-first exit-code normalization fixture. A committed `verify:l1` task that mimics a native test entry (e.g. Swift `scripts/test.sh --filter`) which, on a no-match, prints a zero-match line and exits 1 (a FALSE RED). verify.sh's dispatch_native must re-normalize this to the contract: --scope active + a zero-match log => R_ZEROMATCH (=> exit 2 graceful-degrade), NOT exit 1. Surfaced by the 2026-06-16 MailKit dogfood, where scripts/test.sh returns exit 1 on zero-match.",
+  "scripts": {
+    "verify:l1": "node -e \"console.error('Test run with 0 tests; No matching test cases were run'); process.exit(1)\""
+  }
+}
