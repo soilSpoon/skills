@@ -50,6 +50,8 @@ import { tool } from "@opencode-ai/plugin"
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { execFile } from "node:child_process"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
+import { createOpencodeServer } from "@opencode-ai/sdk/v2/server"
 
 const HOME = process.env.HOME || "~"
 const GLOBAL_CONFIG = `${HOME}/.config/opencode/slice-engine.json`
@@ -74,20 +76,17 @@ const readConfig = (repo: string): Config | null => {
 }
 
 const stripAnsi = (x: string) => x.replace(/\x1b\[[0-9;]*m/g, "")
-// Formatted `opencode run` output contains OTHER brace blobs (tool-call echoes, code fences),
-// so first-{-to-last-} grabbing breaks. Scan balanced {...} candidates from the END; the
-// first that parses is the agent's final JSON answer.
-const lastJson = (out: string): unknown => {
-  const t = stripAnsi(out)
-  for (let end = t.lastIndexOf("}"); end !== -1; end = t.lastIndexOf("}", end - 1)) {
-    let depth = 0
-    for (let i = end; i >= 0; i--) {
-      const c = t[i]
-      if (c === "}") depth++
-      else if (c === "{") { depth--; if (depth === 0) { try { return JSON.parse(t.slice(i, end + 1)) } catch { } break } }
-    }
-  }
-  return null
+
+// ── SDK client factory ────────────────────────────────────────────────────────
+// Lazy singleton: one server+client pair per adapter process lifetime.
+// Guarded by OPENCODE_LIVE=1 so integration tests never hit a live server.
+let _clientPromise: ReturnType<typeof createOpencodeClient> | null = null
+const makeClient = async () => {
+  if (_clientPromise) return _clientPromise
+  const serverUrl = process.env.OPENCODE_SERVER_URL
+  const url = serverUrl ?? (await createOpencodeServer()).url
+  _clientPromise = createOpencodeClient({ baseUrl: url })
+  return _clientPromise
 }
 
 const SH_PREFIX = "Run EXACTLY this shell command"
@@ -208,41 +207,98 @@ export default tool({
       // engine sh() format: "...this one command:\n\n<cmd>" — extract and exec verbatim
       const cmd = prompt.split("\n\n").slice(1).join("\n\n")
       execFile("/bin/sh", ["-c", cmd], { cwd: a.repo, maxBuffer: 32e6, timeout: 30 * 60_000 },
-        (err: (Error & { code?: number }) | null, stdout: string, stderr: string) =>
-          resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: err ? (typeof err.code === "number" ? err.code : 1) : 0 }))
+        (err, stdout, stderr) => {
+          const code = err ? (typeof err.code === "number" ? err.code : 1) : 0
+          resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: code })
+        })
     })
-    const ocRun = (prompt: string, role: Role) => new Promise<string>((resolve, reject) => {
-      const agentName = config!.roles?.[role] || ""
-      const model = config!.models?.[role] || ""
-      const argv = ["run",
-        ...(agentName ? ["--agent", agentName] : []),
-        ...(model ? ["--model", model] : []),
-        prompt]
-      execFile(process.env.OPENCODE_BIN || "opencode", argv,
-        { cwd: a.repo, maxBuffer: 32e6, timeout: 30 * 60_000 },
-        (err, stdout) => (stdout ? resolve(String(stdout)) : err ? reject(err) : resolve("")))
-    })
-    const agent = async (prompt: string, opts?: { schema?: object; label?: string; phase?: string; model?: string }) => {
-      if (prompt.startsWith(SH_PREFIX))
-        return journaled("sh", prompt, () => shNative(prompt))    // tier-0 truth without an LLM
-      const role = roleOf(opts?.label || "", opts?.phase, opts?.model)
-      const p = opts?.schema
-        ? `${prompt}\n\nRespond with ONLY a single JSON object matching this JSON-Schema — no prose, no code fences:\n${JSON.stringify(opts.schema)}`
-        : prompt
-      return journaled(role, p, async () => {
-        for (let attempt = 0; attempt < 2; attempt++) {           // one retry on parse/process failure
-          try {
-            const out = await ocRun(p, role)
-            if (!opts?.schema) return stripAnsi(out).trim()
-            const j = lastJson(out)
-            if (j !== null) return j
-          } catch { /* retry once, then null — the engine treats null as distrust */ }
-        }
+
+    // ── SDK agent call: session.create + session.prompt ───────────────────────
+    // OPENCODE_LIVE=1 guard: agent calls ONLY proceed when the flag is set, preventing
+    // accidental live server calls in CI or smoke tests where no provider is configured.
+    let _tokenInputTotal = 0
+    let _tokenOutputTotal = 0
+    let _tokenReasoningTotal = 0
+    let _tokenCacheReadTotal = 0
+    let _tokenCacheWriteTotal = 0
+
+    const agentCall = async (
+      prompt: string,
+      role: Role,
+      schema?: object,
+      agentName?: string,
+      modelStr?: string,
+    ): Promise<unknown> => {
+      if (!process.env.OPENCODE_LIVE) {
+        // Not live — return null so engine treats it as distrust (same as a failed subprocess)
         return null
+      }
+      const client = await makeClient()
+      const sessionRes = await client.session.create({
+        ...(agentName ? { agent: agentName } : {}),
+        ...(modelStr ? { model: undefined } : {}),   // model passed via prompt opts below
+        directory: a.repo,
       })
+      const sessionID = (sessionRes.data as { id: string }).id
+      const promptRes = await client.session.prompt({
+        sessionID,
+        directory: a.repo,
+        ...(agentName ? { agent: agentName } : {}),
+        ...(modelStr ? { model: { providerID: modelStr.split("/")[0] ?? "", modelID: modelStr.split("/").slice(1).join("/") || modelStr } } : {}),
+        format: schema ? { type: "json_schema" as const, schema: schema as { [key: string]: unknown } } : { type: "text" as const },
+        parts: [{ type: "text" as const, text: prompt }],
+      })
+      // Accumulate tokens from the AssistantMessage
+      const info = (promptRes.data as { info: { tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }; error?: { name: string; data: { statusCode?: number } }; structured?: unknown } }).info
+      _tokenInputTotal += info.tokens.input
+      _tokenOutputTotal += info.tokens.output
+      _tokenReasoningTotal += info.tokens.reasoning
+      _tokenCacheReadTotal += info.tokens.cache.read
+      _tokenCacheWriteTotal += info.tokens.cache.write
+      // Error mapping from AssistantMessage.error discriminated union
+      const err = info.error as { name: string; data: { statusCode?: number } } | undefined
+      if (err) {
+        switch (err.name) {
+          case "StructuredOutputError": return null    // schema — mapped to 'schema' distrust
+          case "MessageAbortedError":   return null    // timeout
+          case "ProviderAuthError":     return null    // model_unavailable
+          case "APIError": {
+            const sc = err.data?.statusCode
+            if (sc === 429 || sc === 503) return null  // quota
+            return null                                 // other APIError → model_unavailable
+          }
+          case "UnknownError":          return null    // null
+          default:                      return null    // any other error → null
+        }
+      }
+      // When a schema was requested, return the structured field (native json_schema support)
+      if (schema) {
+        if (info.structured != null) return info.structured
+        // Fallback: schema was requested but no native structured output — return null (distrust)
+        return null
+      }
+      // Text response: collect text parts
+      const parts = (promptRes.data as { parts: Array<{ type: string; text?: string }> }).parts
+      const text = parts.filter(p => p.type === "text").map(p => p.text ?? "").join("")
+      return stripAnsi(text).trim() || null
+    }
+
+    const agent = async (prompt: string, opts?: { schema?: object; label?: string; phase?: string; model?: string }) => {
+      // tier-0 truth: shell commands run DIRECTLY via execFile, never through an LLM
+      if (prompt.startsWith(SH_PREFIX))
+        return journaled("sh", prompt, () => shNative(prompt))
+      const role = roleOf(opts?.label || "", opts?.phase, opts?.model)
+      const agentName = config!.roles?.[role] || ""
+      const modelStr = config!.models?.[role] || opts?.model || ""
+      return journaled(role, prompt, () => agentCall(prompt, role, opts?.schema, agentName || undefined, modelStr || undefined))
     }
     const parallel = (thunks: Array<() => Promise<unknown>>) => Promise.all(thunks.map(t => t().catch(() => null)))
-    const budget = { total: null as number | null, spent: () => 0, remaining: () => Infinity }
+    const budget = {
+      total: null as number | null,
+      // budget.spent() returns the real token sum accumulated across all agentCall() invocations
+      spent: () => _tokenInputTotal + _tokenOutputTotal + _tokenReasoningTotal + _tokenCacheReadTotal + _tokenCacheWriteTotal,
+      remaining: () => Infinity,
+    }
 
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...a: string[]) => (...v: unknown[]) => Promise<unknown>
     const run = new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "workflow", "args", "budget", code)

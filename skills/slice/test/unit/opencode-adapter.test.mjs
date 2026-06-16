@@ -1,13 +1,10 @@
-// Architecture and readiness tests for adapters/opencode/ — pins four discovered/review-flagged
-// scenarios as explicit failing-loud checks rather than silent assumptions.
-//
-// These tests do NOT modify the adapter package.json — they verify the CURRENT state and
-// document the next-slice requirements so they cannot be silently lost.
+// Architecture and readiness tests for adapters/opencode/ — pins four scenarios as
+// explicit failing-loud checks rather than silent assumptions.
 //
 // Scenario coverage:
-//   1. @types/node is NOT yet in the adapter's devDependencies — documented gap that tsc needs.
+//   1. @types/node IS in the adapter's devDependencies (required for tsc exit-0).
 //   2. host-smoke.mjs EXISTS at adapters/opencode/ and the npm test script points to it.
-//   3. Without @types/node the adapter's tsc exits non-zero (concrete evidence of the gap).
+//   3. With @types/node present, the adapter's tsc --noEmit exits 0 (SDK types resolve cleanly).
 //   4. node host-smoke.mjs runs successfully (passes all 5 smoke assertions) when given the
 //      real artifact path — establishing that the CI gate is exercisable right now.
 import test from 'node:test'
@@ -24,16 +21,16 @@ const ADAPTER_PKG = join(ADAPTER_DIR, 'package.json')
 const SMOKE_PATH = join(ADAPTER_DIR, 'host-smoke.mjs')
 const ARTIFACT = join(SLICE_ROOT, 'recursive-slice.js')
 
-// ── Scenario 1: @types/node is NOT yet in devDependencies ──────────────────────────────────
-// Documents the gap: the next slice that wires the adapter MUST add @types/node so that
-// tsc --noEmit exits 0 cleanly. Pinned here so the requirement is not silently lost.
-test('opencode-adapter: devDependencies @types/node is absent — the gap that blocks tsc exit-0 (next-slice must add it)', () => {
-  // Behavioral claim: adapters/opencode/package.json currently lacks @types/node in devDependencies.
+// ── Scenario 1: @types/node IS in devDependencies (required for tsc exit-0) ────────────────
+// Pins that @types/node is present so node: built-ins (fs/crypto/child_process) and `process`
+// are resolved by the TypeScript compiler. Without it tsc exits non-zero.
+test('opencode-adapter: devDependencies @types/node is present — required for tsc exit-0', () => {
+  // Behavioral claim: adapters/opencode/package.json MUST have @types/node in devDependencies.
   const pkg = JSON.parse(readFileSync(ADAPTER_PKG, 'utf8'))
   const devDeps = pkg.devDependencies || {}
-  assert.equal('@types/node' in devDeps, false,
-    'Expected @types/node to be ABSENT from adapter devDependencies. ' +
-    'If this fails it means @types/node was added — update/remove this test and the tsc-fails test below.')
+  assert.equal('@types/node' in devDeps, true,
+    'Expected @types/node to be PRESENT in adapter devDependencies. ' +
+    'If absent, tsc will fail with TS2591 errors on node: built-ins.')
 })
 
 // ── Scenario 2: host-smoke.mjs exists and is wired as the npm test script ──────────────────
@@ -52,14 +49,15 @@ test('opencode-adapter: package.json scripts.test is "node host-smoke.mjs" (CI g
     'adapter package.json scripts.test must be "node host-smoke.mjs" — the CI gate pointer is wrong or missing')
 })
 
-// ── Scenario 3: tsc --noEmit fails without @types/node ─────────────────────────────────────
-// Concrete evidence of the @types/node gap: run the adapter's typecheck script and assert
-// it exits non-zero, confirming that the missing type definitions produce real errors.
-// This test MUST be updated (to assert exit-0) once @types/node is added.
-test('opencode-adapter: tsc --noEmit exits non-zero without @types/node (concrete evidence of the types gap)', () => {
-  // Behavioral claim: node: builtins (fs/crypto/child_process) and `process` are unresolved
-  // until @types/node is present — tsc reports TS2591 errors and exits non-zero.
+// ── Scenario 3: tsc --noEmit exits 0 with @types/node present ──────────────────────────────
+// Concrete verification that the adapter's TypeScript compiles cleanly: all node: built-ins
+// (fs/crypto/child_process) and `process` are resolved via @types/node, and the SDK imports
+// are well-typed. A non-zero exit here means a new type error was introduced.
+test('opencode-adapter: tsc --noEmit exits 0 — @types/node present and SDK types resolve cleanly', () => {
+  // Behavioral claim: with @types/node in devDependencies and tsconfig.types=["node"],
+  // tsc --noEmit reports no errors and exits 0.
   let exitCode = 0
+  let stderr = ''
   try {
     execFileSync(
       join(ADAPTER_DIR, 'node_modules', '.bin', 'tsc'),
@@ -68,10 +66,10 @@ test('opencode-adapter: tsc --noEmit exits non-zero without @types/node (concret
     )
   } catch (err) {
     exitCode = err.status ?? 1
+    stderr = String(err.stderr || '')
   }
-  assert.ok(exitCode !== 0,
-    'Expected tsc --noEmit to exit non-zero (missing @types/node). ' +
-    'If this passes it means @types/node was added — flip this test to assert exit-0 instead.')
+  assert.equal(exitCode, 0,
+    `Expected tsc --noEmit to exit 0 but got ${exitCode}.\n${stderr}`)
 })
 
 // ── Scenario 4: host-smoke.mjs runs correctly as a CI gate ─────────────────────────────────
