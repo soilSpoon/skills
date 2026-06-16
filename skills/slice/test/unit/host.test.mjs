@@ -20,11 +20,13 @@ test('agentSafe: a session-limit throw flips quota halt; subsequent calls no-op 
   const r1 = await host.agentSafe('x', { label: 'verify:1' })
   assert.equal(r1.ok, false, 'quota-class error → ok:false')
   assert.equal(r1.kind, 'quota', 'quota-class error → kind:quota')
+  assert.ok(r1.detail, 'quota outcome carries a detail string (context for logging)')
   assert.ok(host.getQuotaHalt(), 'quota halt flag set')
   const before = calls
   const r2 = await host.agentSafe('y', { label: 'verify:2' })
   assert.equal(r2.ok, false, 'no-op after halt → ok:false')
   assert.equal(r2.kind, 'null', 'quota-halt no-op → kind:null')
+  assert.ok(r2.detail, 'no-op null outcome also carries a detail string')
   assert.equal(calls, before, 'no further agent spawned after halt (the no-op gate)')
 })
 
@@ -35,6 +37,7 @@ test('agentSafe: model_unavailable throw sets QUOTA_HALT and returns kind:model_
   const r1 = await host.agentSafe('x', { label: 'exec:1' })
   assert.equal(r1.ok, false, 'model_unavailable → ok:false')
   assert.equal(r1.kind, 'model_unavailable', 'model_unavailable error → kind:model_unavailable')
+  assert.ok(r1.detail, 'model_unavailable outcome carries a detail string (context for logging)')
   assert.ok(host.getQuotaHalt(), 'quota halt flag set on model_unavailable')
   // Gate fires: subsequent calls are no-op (same as quota path)
   const before = calls
@@ -126,6 +129,7 @@ test('agentSafe: plain null from agent() returns { ok:false, kind:"null" }', asy
   const r = await host.agentSafe('x', { label: 'exec:1' })
   assert.equal(r.ok, false, 'null agent return → ok:false')
   assert.equal(r.kind, 'null', 'null agent return → kind:null')
+  assert.ok(typeof r.detail === 'string', 'null outcome carries a detail string (has context, never undefined)')
 })
 
 test('agentSafe: successful agent call returns { ok:true, value }', async () => {
