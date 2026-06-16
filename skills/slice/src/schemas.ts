@@ -32,6 +32,7 @@ const SLICE_ITEM = { type: 'object', required: ['desc', 'interface', 'contract']
     symbol: { type: 'string' },                             // function/type/const name at the seam
     currentText: { type: 'string' },                        // short snippet of current text at the seam (for quick visual confirm)
   } } },                                                    // OPTIONAL → backward-compatible; existing slices without this field are unchanged
+  files: { type: 'array', items: { type: 'string' } },       // OPTIONAL: concrete files this slice will touch — leafConcurrency scheduler reads these for file-disjoint scheduling (any slice missing files[] → serial fallback)
 } }
 // ITEM 10: the Assessor folded INTO the Slicer — ONE 'decompose' decision per node, returned by ONE
 // agent. Either a LEAF decision ({action:'execute'|'spike', riskTier}) or a SLICE decision

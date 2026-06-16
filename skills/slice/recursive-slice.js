@@ -63,8 +63,10 @@ var SLICE_ITEM = { type: "object", required: ["desc", "interface", "contract"], 
     // function/type/const name at the seam
     currentText: { type: "string" }
     // short snippet of current text at the seam (for quick visual confirm)
-  } } }
+  } } },
   // OPTIONAL → backward-compatible; existing slices without this field are unchanged
+  files: { type: "array", items: { type: "string" } }
+  // OPTIONAL: concrete files this slice will touch — leafConcurrency scheduler reads these for file-disjoint scheduling (any slice missing files[] → serial fallback)
 } };
 var DECOMPOSE = { type: "object", required: ["action", "reason"], properties: {
   action: { type: "string", enum: ["execute", "slice", "spike"] },
@@ -194,6 +196,21 @@ var classifyFailure = (err) => {
   if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) return "model_unavailable";
   return "null";
 };
+var pickConcurrentLeaves = (leaves, done, inFlight, K, started = /* @__PURE__ */ new Set()) => {
+  const picked = [];
+  const claimed = new Set(inFlight);
+  for (let i = 0; i < leaves.length && picked.length < K; i++) {
+    if (done.has(i) || started.has(i)) continue;
+    const files = leaves[i].files;
+    if (!files || files.length === 0) continue;
+    if ((leaves[i].dependsOn || []).some((dep) => !done.has(dep))) continue;
+    if (files.some((f) => claimed.has(f))) continue;
+    picked.push(i);
+    for (const f of files) claimed.add(f);
+  }
+  return picked;
+};
+var shouldRunConcurrent = (slices, leafConcurrency) => leafConcurrency > 1 && slices.length > 1 && slices.every((s) => s.atomic === true && Array.isArray(s.files) && s.files.length > 0);
 
 // src/phases/verify.ts
 var makeVerifyLeaf = (d) => {
@@ -201,7 +218,7 @@ var makeVerifyLeaf = (d) => {
   const { parallel: parallel2 } = rt;
   const { sh, agentSafe, shUnavailable } = host;
   const { gitVerify, GIT } = git;
-  return async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
+  return async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote, diffRange) => {
     const leafTest = node.kind === "tidy" || tier === "light" || !!engineT0 ? "" : LEAF_TEST(node.testScope);
     const reported = JSON.stringify({
       summary: String(res.summary || "").slice(0, 400),
@@ -219,14 +236,25 @@ TWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C
     let engineDiff = "";
     if (GIT && leafStart && node.kind !== "tidy") {
       const d2 = await sh(
-        `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+        `git -C ${repo} diff ${diffRange || leafStart + "..HEAD"} -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
         `verify-diff:${lbl}`
       );
       if (!shUnavailable(d2)) {
         const body = String(d2.stdout || "");
-        engineDiff = body.length > ENGINE_DIFF_CAP ? `
-ENGINE-DIFF: (diff too large — inspect via git yourself)` : `
+        if (body.length > ENGINE_DIFF_CAP) {
+          const s = await sh(
+            `git -C ${repo} diff --stat ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+            `verify-diffstat:${lbl}`
+          );
+          const stat = shUnavailable(s) ? "" : String(s.stdout || "").trim();
+          engineDiff = stat ? `
+ENGINE-DIFF: (full diff > ${ENGINE_DIFF_CAP} chars — file footprint below; inspect hunks via \`git -C ${repo} diff ${leafStart}..HEAD\`):
+${stat}` : `
+ENGINE-DIFF: (diff too large — inspect via git yourself)`;
+        } else {
+          engineDiff = `
 ENGINE-DIFF: ${body}`;
+        }
       }
     }
     const base = `${R_VERIFY}
@@ -289,9 +317,9 @@ LENS: judge specifically through "${L}".`,
 // src/phases/leaf-loop.ts
 var makeRunWork = (d) => {
   const { rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d;
-  const { agent: agent2, phase: phase2, log: log2, budget: budget2 } = rt;
+  const { agent: agent2, parallel: parallel2, phase: phase2, log: log2, budget: budget2 } = rt;
   const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host;
-  const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg;
+  const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, LEAF_CONCURRENCY } = cfg;
   const { GIT, GIT_EXEC } = git;
   async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
     buildNote = buildNote || "";
@@ -302,6 +330,77 @@ var makeRunWork = (d) => {
     let discovered = 0;
     const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK);
     const keyOf = (s) => String(s).trim().slice(0, 120);
+    let commitChain = Promise.resolve();
+    const withCommit = (fn) => {
+      const run = commitChain.then(fn, fn);
+      commitChain = run.then(() => {
+      }, () => {
+      });
+      return run;
+    };
+    const runConcurrentLeaf = async (cnode, lbl, i) => {
+      const files = (cnode.files || []).filter(Boolean);
+      const tier = cnode.riskTier || "standard";
+      const resR = await agentSafe(
+        `${R_EXEC}
+
+Repo: ${repo}
+Do EXACTLY this one atomic task.
+Task: ${cnode.task}
+${cnode.ctx}
+${INV}${LEAF_TEST(cnode.testScope)}
+Git: do NOT commit — leave your change UNCOMMITTED in the working tree; the engine commits it after verification.${buildNote}`,
+        { phase: "Work", label: `exec:${lbl}`, model: "sonnet", schema: RESULT }
+      );
+      const res = resR.ok ? resR.value : null;
+      await trace({ phase: "Work", role: `exec:${lbl}`, model: "sonnet", leafIndex: i });
+      if (!res) {
+        done.push({ task: cnode.task, passed: false, summary: "executor returned no result (API/rate-limit)", verdict: { trustworthy: false, reason: "executor failed" } });
+        return;
+      }
+      if (!res.passed) {
+        done.push({ task: cnode.task, ...res, verdict: { trustworthy: false, reason: "tier-0 gate: deterministic build/tests RED" }, gateLevel: "llm-only" });
+        return;
+      }
+      let leafSha = "";
+      if (GIT && files.length) {
+        leafSha = await withCommit(async () => {
+          const fl = files.map((f) => `'${f.replace(/'/g, "")}'`).join(" ");
+          const c = await sh(`git -C ${repo} add -- ${fl} && git -C ${repo} commit -q -m ${JSON.stringify("leaf: " + cnode.task.slice(0, 60))} && git -C ${repo} rev-parse HEAD`, `ccommit:${lbl}`);
+          return ((c.stdout || "").match(/[0-9a-f]{40}/i) || [""])[0];
+        });
+      }
+      const verdict = await verifyLeaf(lbl, cnode, res, tier, repo, leafSha ? `${leafSha}~1` : "", "", "", leafSha ? `${leafSha}~1..${leafSha}` : void 0);
+      done.push({ task: cnode.task, ...res, verdict, gateLevel: "llm-only" });
+      log2(`${tag}leaf ${i} ${verdict.trustworthy ? "trusted" : "NOT trusted"} (concurrent): ${cnode.task.slice(0, 36)}`);
+      if (leafSha && !verdict.trustworthy) {
+        await withCommit(async () => {
+          await sh(`git -C ${repo} revert --no-edit ${leafSha}`, `crevert:${lbl}`);
+        });
+        log2(`${tag}leaf ${i} untrusted → reverted ${leafSha.slice(0, 8)} (concurrent, clean disjoint undo commit)`);
+      }
+    };
+    const runConcurrentBatch = async (specs, parentDepth) => {
+      const nodes = specs.map((s) => ({ task: s.desc, ctx: `Contract: ${s.contract}`, kind: s.kind || "behavior", atomic: true, riskTier: s.riskTier, testScope: s.testScope, seamPointers: s.seamPointers, files: s.files, depth: parentDepth + 1, spikes: 0 }));
+      const sched = specs.map((s, idx) => ({ files: nodes[idx].files || [], dependsOn: s.dependsOn || [] }));
+      const doneIdx = /* @__PURE__ */ new Set(), started = /* @__PURE__ */ new Set();
+      log2(`${tag}leafConcurrency: ${specs.length} file-disjoint leaves, K=${LEAF_CONCURRENCY}`);
+      let guard = 0;
+      while (doneIdx.size < nodes.length && guard++ < nodes.length + 2) {
+        const inFlight = /* @__PURE__ */ new Set();
+        for (const idx of started) if (!doneIdx.has(idx)) for (const f of nodes[idx].files || []) inFlight.add(f);
+        const pick = pickConcurrentLeaves(sched, doneIdx, inFlight, LEAF_CONCURRENCY, started);
+        if (!pick.length) {
+          for (let idx = 0; idx < nodes.length; idx++) if (!doneIdx.has(idx) && !started.has(idx)) stack.push(nodes[idx]);
+          break;
+        }
+        await parallel2(pick.map((idx) => async () => {
+          started.add(idx);
+          await runConcurrentLeaf(nodes[idx], `${tag}c${idx}`, idx);
+          doneIdx.add(idx);
+        }));
+      }
+    };
     while (stack.length && done.length < MAX_LEAVES) {
       const node = stack.pop();
       const atFloor = node.depth >= FLOOR;
@@ -365,11 +464,15 @@ ${INV}`,
               return { done: [] };
             }
           }
+          if (shouldRunConcurrent(slices, LEAF_CONCURRENCY)) {
+            await runConcurrentBatch(slices, node.depth);
+            continue;
+          }
           for (let j = slices.length - 1; j >= 0; j--) {
             const iface = slices[j].interface;
             const ifaceCtx = iface && !/^TBD/i.test(iface.trim()) ? `
 Interface (FIXED): ${iface}` : "";
-            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 });
+            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, files: slices[j].files, depth: node.depth + 1, spikes: 0 });
           }
           continue;
         }
@@ -860,7 +963,8 @@ async function __main() {
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
   const ENGINE_DIFF_CAP = 6e3;
-  const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER };
+  const LEAF_CONCURRENCY = Math.max(1, Math.min(4, Math.floor(Number(A.leafConcurrency) || 1)));
+  const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, LEAF_CONCURRENCY };
   phase2("Baseline");
   log2(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baselineR = await agentSafe(

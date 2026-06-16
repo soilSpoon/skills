@@ -79,8 +79,12 @@ const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection â
 const ENGINE_DIFF_CAP = 6000             // ITEM 9: max chars of leaf diff injected as ENGINE-DIFF into a verify
                                          // prompt; above this, point the verifier back at git (gitVerify) rather
                                          // than flood the prompt with a giant diff it would not read anyway
+// leafConcurrency: opt-in (default 1 = OFF). When >1, a batch of file-disjoint atomic sibling leaves runs
+// concurrently (commit-if-trusted, scoped git ops). Clamped to [1,4]; off by default so the concurrent
+// path is dormant unless explicitly enabled (a bug in it can never affect a normal run).
+const LEAF_CONCURRENCY = Math.max(1, Math.min(4, Math.floor(Number(A.leafConcurrency) || 1)))
 // the run's tuning limits, bundled (introduce-parameter-object) â€” threaded as one `cfg` into the leaf loop
-const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER }
+const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, LEAF_CONCURRENCY }
 
 
 // =============================================================================

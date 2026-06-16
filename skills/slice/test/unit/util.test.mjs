@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
-import { circuitBreaker, b64encode, engineRanBlock, classifyFailure } from '../../src/util.ts'
+import { circuitBreaker, b64encode, engineRanBlock, classifyFailure, pickConcurrentLeaves, shouldRunConcurrent } from '../../src/util.ts'
 
 test('circuitBreaker: trips at threshold when classThreshold is 0 (the t0red/untrusted shape)', () => {
   const b = circuitBreaker(2)
@@ -159,4 +159,62 @@ test('classifyFailure: budget/ceiling error → null (classifier is blind; agent
   assert.equal(classifyFailure(new Error('budget ceiling exceeded')), 'null')
   assert.equal(classifyFailure(new Error('budget limit reached')), 'null')
   assert.equal(classifyFailure(new Error('ceiling hit for this project')), 'null')
+})
+
+// ── pickConcurrentLeaves: the leafConcurrency scheduler core (PURE) ───────────
+test('pickConcurrentLeaves: picks deps-satisfied, file-disjoint leaves up to K', () => {
+  const leaves = [
+    { files: ['a.ts'], dependsOn: [] },   // 0
+    { files: ['b.ts'], dependsOn: [] },   // 1 — disjoint with 0
+    { files: ['a.ts'], dependsOn: [] },   // 2 — conflicts a.ts with 0
+    { files: ['c.ts'], dependsOn: [1] },  // 3 — prereq 1 not done
+  ]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set(), new Set(), 3), [0, 1])
+})
+
+test('pickConcurrentLeaves: honors the K cap', () => {
+  const leaves = [{ files: ['a'] }, { files: ['b'] }, { files: ['c'] }]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set(), new Set(), 2), [0, 1])
+})
+
+test('pickConcurrentLeaves: excludes leaves whose files clash with the in-flight set', () => {
+  const leaves = [{ files: ['a'] }, { files: ['b'] }]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set(), new Set(['a']), 3), [1])
+})
+
+test('pickConcurrentLeaves: a prereq being done unblocks its dependents', () => {
+  const leaves = [{ files: ['a'], dependsOn: [] }, { files: ['b'], dependsOn: [0] }]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set([0]), new Set(), 3, new Set([0])), [1])
+})
+
+test('pickConcurrentLeaves: a leaf with no declared files is NOT concurrency-safe (excluded)', () => {
+  const leaves = [{ files: [] }, { files: ['b'] }]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set(), new Set(), 3), [1])
+})
+
+test('pickConcurrentLeaves: two batch-mates never share a file (greedy claims within the batch)', () => {
+  const leaves = [{ files: ['a', 'shared'] }, { files: ['shared', 'b'] }, { files: ['c'] }]
+  assert.deepEqual(pickConcurrentLeaves(leaves, new Set(), new Set(), 3), [0, 2])
+})
+
+// ── shouldRunConcurrent: the concurrent-vs-serial gate (PURE) ─────────────────
+test('shouldRunConcurrent: true when opt-in>1, >1 slice, all atomic + all have files', () => {
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }, { atomic: true, files: ['b'] }], 3), true)
+})
+
+test('shouldRunConcurrent: false when leafConcurrency <= 1 (opt-in off, the default)', () => {
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }, { atomic: true, files: ['b'] }], 1), false)
+})
+
+test('shouldRunConcurrent: false when ANY slice lacks files[] (serial fallback)', () => {
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }, { atomic: true, files: [] }], 3), false)
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }, { atomic: true }], 3), false)
+})
+
+test('shouldRunConcurrent: false when ANY slice is non-atomic (needs decomposition, not a leaf)', () => {
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }, { atomic: false, files: ['b'] }], 3), false)
+})
+
+test('shouldRunConcurrent: false for a single slice (nothing to parallelize)', () => {
+  assert.equal(shouldRunConcurrent([{ atomic: true, files: ['a'] }], 3), false)
 })

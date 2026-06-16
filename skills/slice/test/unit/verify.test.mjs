@@ -113,3 +113,32 @@ test('heavy lens: null slot from parallel() (thunk-level throw, api death) count
   assert.equal(out.trustworthy, false, 'null slot from parallel() → distrusting Verdict → not unanimous')
   assert.match(out.reason, /heavy verify: 3 lenses, 1 distrusted/, 'exactly 1 lens distrusted via null-slot path')
 })
+
+test('ENGINE-DIFF over-cap: keeps the git diff --stat footprint so a large change cannot go opaque', async () => {
+  // BACKLOG diffstat-inline: when the full diff exceeds ENGINE_DIFF_CAP the engine used to drop it
+  // entirely ("inspect via git yourself"), leaving the verifier ZERO file-level signal. The --stat
+  // footprint is tiny and keeps "which files, how much" visible — a large change can't hide past the cap.
+  const bigDiff = 'x'.repeat(7000)   // > ENGINE_DIFF_CAP (6000)
+  const STAT = ' src/a.ts | 200 ++++\n src/b.ts | 50 +-\n 2 files changed, 220 insertions(+), 30 deletions(-)'
+  let prompt = ''
+  const v = makeVerifyLeaf({
+    rt: { parallel: async (thunks) => Promise.all(thunks.map((t) => t())) },
+    host: {
+      sh: async (cmd) => {
+        if (/--stat/.test(cmd)) return { exitCode: 0, stdout: STAT }   // check --stat BEFORE ' diff ' (both match)
+        if (/ diff /.test(cmd)) return { exitCode: 0, stdout: bigDiff }
+        return { exitCode: 0, stdout: '' }
+      },
+      agentSafe: async (p) => { prompt = p; return ok({ trustworthy: true, reason: 'ok' }) },
+      shUnavailable: () => false,
+    },
+    git: { GIT: true, gitVerify: () => '' },   // GIT:true → engine-diff git fetch runs
+    LEAF_TEST: () => '',
+    INV: '',
+    ENGINE_DIFF_CAP: 6000,
+  })
+  await v('L', node(), res, undefined, '/r', 'sha', '', '')
+  assert.match(prompt, /ENGINE-DIFF/, 'ENGINE-DIFF block present')
+  assert.match(prompt, /2 files changed, 220 insertions/, 'over-cap diff must still carry the --stat footprint')
+  assert.doesNotMatch(prompt, /x{7000}/, 'over-cap must NOT inline the full over-cap diff body')
+})

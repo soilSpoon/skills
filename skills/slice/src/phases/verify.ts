@@ -20,7 +20,7 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
   const { parallel } = rt
   const { sh, agentSafe, shUnavailable } = host
   const { gitVerify, GIT } = git
-  return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
+  return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string, diffRange?: string): Promise<Verdict> => {
   // ④ tidy: engine already ran the full suite (ENGINE-RAN); light: diff-audit path — no filter-run;
   // engineT0 non-empty: engine already ran filtered gate — injecting LEAF_TEST is contradictory noise.
   const leafTest = (node.kind === 'tidy' || tier === 'light' || !!engineT0) ? '' : LEAF_TEST(node.testScope)
@@ -43,17 +43,30 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
   // way the wiring-audit does), NOT a sibling model's claim — so executor!=verifier still holds: the verifier
   // KEEPS its full duty and ability to re-run / widen the range (gitVerify already tells it how). Skip for
   // tidy leaves: their behavior-preservation gate has its own flow and a diff fetch only complicates it.
-  // Capped at ENGINE_DIFF_CAP chars — above the cap, point the verifier back at git rather than flood the prompt.
+  // Capped at ENGINE_DIFF_CAP chars — above the cap, send the `git diff --stat` footprint (not the full
+  // diff) so the change's file-level shape stays visible without flooding the prompt.
   let engineDiff = ''
   if (GIT && leafStart && node.kind !== 'tidy') {
     const d = await sh(
-      `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+      `git -C ${repo} diff ${diffRange || (leafStart + '..HEAD')} -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
       `verify-diff:${lbl}`)
     if (!shUnavailable(d)) {
       const body = String(d.stdout || '')
-      engineDiff = body.length > ENGINE_DIFF_CAP
-        ? `\nENGINE-DIFF: (diff too large — inspect via git yourself)`
-        : `\nENGINE-DIFF: ${body}`
+      if (body.length > ENGINE_DIFF_CAP) {
+        // Over cap: don't flood the prompt with the full diff — but don't go OPAQUE either. The file
+        // footprint (`git diff --stat`) is tiny and keeps "which files, how much" visible, so a large
+        // change can't hide past the cap (a verifier handed zero signal can't scope-check). Full hunks
+        // stay one `git diff` away (gitVerify already told it how). --stat unavailable → prior message.
+        const s = await sh(
+          `git -C ${repo} diff --stat ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+          `verify-diffstat:${lbl}`)
+        const stat = shUnavailable(s) ? '' : String(s.stdout || '').trim()
+        engineDiff = stat
+          ? `\nENGINE-DIFF: (full diff > ${ENGINE_DIFF_CAP} chars — file footprint below; inspect hunks via \`git -C ${repo} diff ${leafStart}..HEAD\`):\n${stat}`
+          : `\nENGINE-DIFF: (diff too large — inspect via git yourself)`
+      } else {
+        engineDiff = `\nENGINE-DIFF: ${body}`
+      }
     }
   }
   const base = `${R_VERIFY}\n\nRepo: ${repo}\nAdversarially verify this finished leaf.\nTask: ${node.task}\n` +
