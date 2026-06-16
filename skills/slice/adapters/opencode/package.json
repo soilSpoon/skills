@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node host-smoke.mjs",
+    "test": "node --experimental-strip-types --test test/adapter.test.mjs",
+    "smoke": "node host-smoke.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

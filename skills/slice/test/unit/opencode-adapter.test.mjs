@@ -42,11 +42,15 @@ test('opencode-adapter: host-smoke.mjs exists at adapters/opencode/host-smoke.mj
     `host-smoke.mjs not found at ${SMOKE_PATH} — the CI gate entry point is missing`)
 })
 
-test('opencode-adapter: package.json scripts.test is "node host-smoke.mjs" (CI gate wired correctly)', () => {
-  // Behavioral claim: npm test in the adapter directory invokes host-smoke.mjs, not something else.
+test('opencode-adapter: package.json scripts.test runs the Node --test suite (CI gate wired correctly)', () => {
+  // Behavioral claim: npm test in the adapter directory runs test/adapter.test.mjs via node --test.
+  // The smoke file is preserved as scripts.smoke for manual use; test/ is the real CI gate.
   const pkg = JSON.parse(readFileSync(ADAPTER_PKG, 'utf8'))
-  assert.equal(pkg.scripts?.test, 'node host-smoke.mjs',
-    'adapter package.json scripts.test must be "node host-smoke.mjs" — the CI gate pointer is wrong or missing')
+  const testScript = pkg.scripts?.test ?? ''
+  assert.ok(
+    testScript.includes('--test') && testScript.includes('adapter.test.mjs'),
+    `adapter package.json scripts.test must invoke node --test test/adapter.test.mjs, got: "${testScript}"`,
+  )
 })
 
 // ── Scenario 3: tsc --noEmit exits 0 with @types/node present ──────────────────────────────

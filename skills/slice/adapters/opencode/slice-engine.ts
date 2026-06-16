@@ -89,8 +89,8 @@ const makeClient = async () => {
   return _clientPromise
 }
 
-const SH_PREFIX = "Run EXACTLY this shell command"
-const roleOf = (label: string, phase?: string, model?: string): Role => {
+export const SH_PREFIX = "Run EXACTLY this shell command"
+export const roleOf = (label: string, phase?: string, model?: string): Role => {
   const l = label.replace(/^(g\d+|seq\d+):/, "")           // strip parallel-group tags
   if (phase === "Baseline") return "baseliner"
   if (/^assess/.test(l)) return "assessor"
@@ -104,6 +104,100 @@ const roleOf = (label: string, phase?: string, model?: string): Role => {
   if (model === "opus") return "heavyLens"
   if (/^(verify|merge-verify|integration)/.test(l) || phase === "Integrate" || phase === "Coordinate") return "verifier"
   return "default"
+}
+
+// ── Exported helpers (for testing) ───────────────────────────────────────────
+// shNative: runs a shell command directly (no LLM). cwd defaults to process.cwd().
+export const shNative = (prompt: string, cwd?: string) => new Promise<{ stdout: string; exitCode: number }>(resolve => {
+  const cmd = prompt.split("\n\n").slice(1).join("\n\n")
+  execFile("/bin/sh", ["-c", cmd], { cwd: cwd || process.cwd(), maxBuffer: 32e6, timeout: 30 * 60_000 },
+    (err, stdout, stderr) => {
+      const code = err ? (typeof err.code === "number" ? err.code : 1) : 0
+      resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: code })
+    })
+})
+
+// AgentOutcome: discriminated union returned by agentCall for tests
+export type AgentOutcome =
+  | { kind: "ok"; value: unknown }
+  | { kind: "null" }
+
+// Minimal client interface needed by agentCall (injectable for tests)
+export type PromptTokens = { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
+export type PromptError = { name: string; data?: { statusCode?: number } }
+export type PromptInfo = { tokens: PromptTokens; error?: PromptError; structured?: unknown }
+export type PromptPart = { type: string; text?: string }
+export type PromptResponse = { data: { info: PromptInfo; parts: PromptPart[] } }
+export type CreateResponse = { data: { id: string } }
+export interface OpencodeClientLike {
+  session: {
+    create(params?: Record<string, unknown>): Promise<CreateResponse>
+    prompt(params: Record<string, unknown>): Promise<PromptResponse>
+  }
+}
+
+// Budget accumulator — tracks token totals across agentCall() invocations
+export type BudgetAccumulator = {
+  add(t: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }): void
+  spent(): number
+}
+export const makeBudgetAccumulator = (): BudgetAccumulator => {
+  let total = 0
+  return {
+    add: (t) => { total += t.input + t.output + t.reasoning + t.cache.read + t.cache.write },
+    spent: () => total,
+  }
+}
+
+// agentCall: calls opencode SDK session.create + session.prompt; injectable client for tests.
+// Returns null (distrust) when OPENCODE_LIVE is not set, or on any error variant.
+export const agentCall = async (
+  prompt: string,
+  role: Role,
+  opts: {
+    repo: string
+    schema?: object
+    agentName?: string
+    modelStr?: string
+    client: OpencodeClientLike
+    budget?: BudgetAccumulator
+  },
+): Promise<unknown> => {
+  if (!process.env.OPENCODE_LIVE) return null
+  const { client, repo, schema, agentName, modelStr, budget } = opts
+  const sessionRes = await client.session.create({
+    ...(agentName ? { agent: agentName } : {}),
+    directory: repo,
+  })
+  const sessionID = sessionRes.data.id
+  const promptRes = await client.session.prompt({
+    sessionID,
+    directory: repo,
+    ...(agentName ? { agent: agentName } : {}),
+    ...(modelStr ? { model: { providerID: modelStr.split("/")[0] ?? "", modelID: modelStr.split("/").slice(1).join("/") || modelStr } } : {}),
+    format: schema ? { type: "json_schema" as const, schema: schema as { [key: string]: unknown } } : { type: "text" as const },
+    parts: [{ type: "text" as const, text: prompt }],
+  })
+  const info = promptRes.data.info
+  if (budget) budget.add(info.tokens)
+  const err = info.error
+  if (err) {
+    switch (err.name) {
+      case "StructuredOutputError": return null
+      case "MessageAbortedError":   return null
+      case "ProviderAuthError":     return null
+      case "APIError": return null
+      case "UnknownError":          return null
+      default:                      return null
+    }
+  }
+  if (schema) {
+    if (info.structured != null) return info.structured
+    return null
+  }
+  const parts = promptRes.data.parts
+  const text = parts.filter((p: { type: string; text?: string }) => p.type === "text").map((p: { type: string; text?: string }) => p.text ?? "").join("")
+  return stripAnsi(text).trim() || null
 }
 
 export default tool({
@@ -203,100 +297,26 @@ export default tool({
       return result
     }
 
-    const shNative = (prompt: string) => new Promise<{ stdout: string; exitCode: number }>(resolve => {
-      // engine sh() format: "...this one command:\n\n<cmd>" — extract and exec verbatim
-      const cmd = prompt.split("\n\n").slice(1).join("\n\n")
-      execFile("/bin/sh", ["-c", cmd], { cwd: a.repo, maxBuffer: 32e6, timeout: 30 * 60_000 },
-        (err, stdout, stderr) => {
-          const code = err ? (typeof err.code === "number" ? err.code : 1) : 0
-          resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: code })
-        })
-    })
-
-    // ── SDK agent call: session.create + session.prompt ───────────────────────
-    // OPENCODE_LIVE=1 guard: agent calls ONLY proceed when the flag is set, preventing
-    // accidental live server calls in CI or smoke tests where no provider is configured.
-    let _tokenInputTotal = 0
-    let _tokenOutputTotal = 0
-    let _tokenReasoningTotal = 0
-    let _tokenCacheReadTotal = 0
-    let _tokenCacheWriteTotal = 0
-
-    const agentCall = async (
-      prompt: string,
-      role: Role,
-      schema?: object,
-      agentName?: string,
-      modelStr?: string,
-    ): Promise<unknown> => {
-      if (!process.env.OPENCODE_LIVE) {
-        // Not live — return null so engine treats it as distrust (same as a failed subprocess)
-        return null
-      }
-      const client = await makeClient()
-      const sessionRes = await client.session.create({
-        ...(agentName ? { agent: agentName } : {}),
-        ...(modelStr ? { model: undefined } : {}),   // model passed via prompt opts below
-        directory: a.repo,
-      })
-      const sessionID = (sessionRes.data as { id: string }).id
-      const promptRes = await client.session.prompt({
-        sessionID,
-        directory: a.repo,
-        ...(agentName ? { agent: agentName } : {}),
-        ...(modelStr ? { model: { providerID: modelStr.split("/")[0] ?? "", modelID: modelStr.split("/").slice(1).join("/") || modelStr } } : {}),
-        format: schema ? { type: "json_schema" as const, schema: schema as { [key: string]: unknown } } : { type: "text" as const },
-        parts: [{ type: "text" as const, text: prompt }],
-      })
-      // Accumulate tokens from the AssistantMessage
-      const info = (promptRes.data as { info: { tokens: { input: number; output: number; reasoning: number; cache: { read: number; write: number } }; error?: { name: string; data: { statusCode?: number } }; structured?: unknown } }).info
-      _tokenInputTotal += info.tokens.input
-      _tokenOutputTotal += info.tokens.output
-      _tokenReasoningTotal += info.tokens.reasoning
-      _tokenCacheReadTotal += info.tokens.cache.read
-      _tokenCacheWriteTotal += info.tokens.cache.write
-      // Error mapping from AssistantMessage.error discriminated union
-      const err = info.error as { name: string; data: { statusCode?: number } } | undefined
-      if (err) {
-        switch (err.name) {
-          case "StructuredOutputError": return null    // schema — mapped to 'schema' distrust
-          case "MessageAbortedError":   return null    // timeout
-          case "ProviderAuthError":     return null    // model_unavailable
-          case "APIError": {
-            const sc = err.data?.statusCode
-            if (sc === 429 || sc === 503) return null  // quota
-            return null                                 // other APIError → model_unavailable
-          }
-          case "UnknownError":          return null    // null
-          default:                      return null    // any other error → null
-        }
-      }
-      // When a schema was requested, return the structured field (native json_schema support)
-      if (schema) {
-        if (info.structured != null) return info.structured
-        // Fallback: schema was requested but no native structured output — return null (distrust)
-        return null
-      }
-      // Text response: collect text parts
-      const parts = (promptRes.data as { parts: Array<{ type: string; text?: string }> }).parts
-      const text = parts.filter(p => p.type === "text").map(p => p.text ?? "").join("")
-      return stripAnsi(text).trim() || null
-    }
+    const budgetAcc = makeBudgetAccumulator()
 
     const agent = async (prompt: string, opts?: { schema?: object; label?: string; phase?: string; model?: string }) => {
       // tier-0 truth: shell commands run DIRECTLY via execFile, never through an LLM
       if (prompt.startsWith(SH_PREFIX))
-        return journaled("sh", prompt, () => shNative(prompt))
+        return journaled("sh", prompt, () => shNative(prompt, a.repo))
       const role = roleOf(opts?.label || "", opts?.phase, opts?.model)
       const agentName = config!.roles?.[role] || ""
       const modelStr = config!.models?.[role] || opts?.model || ""
-      return journaled(role, prompt, () => agentCall(prompt, role, opts?.schema, agentName || undefined, modelStr || undefined))
+      const client = await makeClient()
+      return journaled(role, prompt, () => agentCall(prompt, role, {
+        repo: a.repo, schema: opts?.schema, agentName: agentName || undefined,
+        modelStr: modelStr || undefined, client: client as unknown as OpencodeClientLike, budget: budgetAcc,
+      }))
     }
     const parallel = (thunks: Array<() => Promise<unknown>>) => Promise.all(thunks.map(t => t().catch(() => null)))
     const budget = {
       total: null as number | null,
       // budget.spent() returns the real token sum accumulated across all agentCall() invocations
-      spent: () => _tokenInputTotal + _tokenOutputTotal + _tokenReasoningTotal + _tokenCacheReadTotal + _tokenCacheWriteTotal,
+      spent: () => budgetAcc.spent(),
       remaining: () => Infinity,
     }
 
