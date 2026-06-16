@@ -1,3 +1,6 @@
 {
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "node --import ./test/ts-hooks.mjs --test test/scenarios.test.mjs test/unit/*.test.mjs"
+  }
 }
