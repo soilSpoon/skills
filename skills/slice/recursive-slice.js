@@ -527,8 +527,8 @@ If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a tes
   return runWork;
 };
 
-// src/main.ts
-async function __main() {
+// src/host.ts
+var makeHost = () => {
   let QUOTA_HALT = "";
   const quotaBreaker = circuitBreaker(3, 2);
   const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
@@ -569,28 +569,6 @@ async function __main() {
       return null;
     }
   };
-  const A = typeof args === "string" ? JSON.parse(args) : args || {};
-  if (!A.task) {
-    log("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
-    return { error: "no task provided — pass args.task (a resume must pass the original args)" };
-  }
-  const TASK = A.task;
-  const REPO = A.repo || ".";
-  const FLOOR = A.maxDepth || 3;
-  const PARALLEL = A.parallel !== false;
-  const FORCE_PARALLEL = A.forceParallel === true;
-  const CONFIRM_TIER = A.confirmTier === true;
-  const CONFIRM_NO_RIG = A.confirmNoRig === true;
-  const SHARED_SCRATCH = A.sharedScratch === true;
-  const MAX_LEAVES = 24;
-  const overTier = { stop: "", slices: 0 };
-  const MAX_DISCOVERED = 8;
-  const MAX_SPIKES = 1;
-  const MAX_REPAIR = 1;
-  const MAX_REPAIR_HARD = 3;
-  const MAX_WORKERS = 4;
-  const MAX_UNTRUSTED_STREAK = 3;
-  const ENGINE_DIFF_CAP = 6e3;
   const SH_UNAVAILABLE = { exitCode: -2, stdout: "\0SH_UNAVAILABLE" };
   const shUnavailable = (r) => r === SH_UNAVAILABLE || !!r && r.exitCode === -2 && String(r.stdout).startsWith("\0SH_UNAVAILABLE");
   const SH = { type: "object", required: ["exitCode"], properties: { stdout: { type: "string" }, exitCode: { type: "integer" } } };
@@ -636,6 +614,34 @@ ${cmd}`,
     }
     return { raw, get: (name) => map.get(name) || null };
   };
+  return { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt: () => QUOTA_HALT };
+};
+
+// src/main.ts
+async function __main() {
+  const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = makeHost();
+  const A = typeof args === "string" ? JSON.parse(args) : args || {};
+  if (!A.task) {
+    log("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
+    return { error: "no task provided — pass args.task (a resume must pass the original args)" };
+  }
+  const TASK = A.task;
+  const REPO = A.repo || ".";
+  const FLOOR = A.maxDepth || 3;
+  const PARALLEL = A.parallel !== false;
+  const FORCE_PARALLEL = A.forceParallel === true;
+  const CONFIRM_TIER = A.confirmTier === true;
+  const CONFIRM_NO_RIG = A.confirmNoRig === true;
+  const SHARED_SCRATCH = A.sharedScratch === true;
+  const MAX_LEAVES = 24;
+  const overTier = { stop: "", slices: 0 };
+  const MAX_DISCOVERED = 8;
+  const MAX_SPIKES = 1;
+  const MAX_REPAIR = 1;
+  const MAX_REPAIR_HARD = 3;
+  const MAX_WORKERS = 4;
+  const MAX_UNTRUSTED_STREAK = 3;
+  const ENGINE_DIFF_CAP = 6e3;
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
@@ -776,7 +782,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   const SCRATCH = goParallel && useSharedScratch ? `${REPO}/.rs-scratch` : "";
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
-  const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt: () => QUOTA_HALT });
+  const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt });
   if (goParallel) {
     const a0 = await agentSafe(
       `${R_SLICE}
@@ -861,7 +867,7 @@ Interface: ${s.interface}`, repo, 1, idx, true, s.kind, buildNoteFor(repo));
       if (r && r.done) done.push(...r.done);
     });
     phase("Coordinate");
-    if (QUOTA_HALT) {
+    if (getQuotaHalt()) {
       log(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`);
     } else {
       let conflicts = 0;
@@ -929,8 +935,8 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
   phase("Integrate");
   let finalRun = { exitCode: -1, stdout: "" };
   let integration = null;
-  if (QUOTA_HALT) {
-    ABORTS.push(`quota-halt: ${QUOTA_HALT} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
+  if (getQuotaHalt()) {
+    ABORTS.push(`quota-halt: ${getQuotaHalt()} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
     log("quota halt — skipping integrate/wiring/briefing (resume to run them)");
   } else try {
     finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite");
@@ -967,7 +973,7 @@ ${INV}`,
   const degradations = trusted.filter((d) => d.gateLevel === "llm-only").map((d) => `gate=llm-only (no deterministic gate ran): ${String(d.task).slice(0, 80)}`);
   if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
   let wiringGaps = [];
-  if (GIT && trusted.length && !QUOTA_HALT) {
+  if (GIT && trusted.length && !getQuotaHalt()) {
     try {
       const newPub = await sh(
         `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | sed -E 's/^\\+\\s*//' | head -40`,
@@ -1007,7 +1013,7 @@ Judge from those counts — re-grep a symbol yourself ONLY when its count is amb
     ...integration && integration.purposeGap ? [integration.purposeGap] : []
   ];
   let briefing = null;
-  if (trusted.length && !QUOTA_HALT) {
+  if (trusted.length && !getQuotaHalt()) {
     const ledgerForBriefing = done.map((d, j) => ({
       i: j,
       task: String(d.task).slice(0, 140),

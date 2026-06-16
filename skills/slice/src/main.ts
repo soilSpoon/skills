@@ -7,6 +7,7 @@ import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, S
 import { b64encode, circuitBreaker, engineRanBlock } from './util'
 import { makeVerifyLeaf } from './phases/verify'
 import { makeRunWork } from './phases/leaf-loop'
+import { makeHost } from './host'
 
 // ===== Workflow runtime ambient contract (the PORT) ==========================
 // Any host that injects these globals can run the emitted engine unchanged:
@@ -33,50 +34,7 @@ async function __main(): Promise<EngineResult> {
 // "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
 // cause) flips QUOTA_HALT; from then on agentSafe no-ops, loops stop cleanly, and the run
 // ends resumable instead of burning attempts until the harness gives up.
-let QUOTA_HALT = ''
-// SESSION-scope breaker: 3 consecutive null/failed agent results spanning ≥2 distinct call-classes.
-// A6: same-class-only streaks arise by design (heavy 3-lens loop), so ≥2 distinct classes are
-// required before treating the streak as a session-instability signal (not one role's transient flake).
-const quotaBreaker = circuitBreaker(3, 2)
-// A6: extract the call class from opts — the prefix before ':' or '·'.
-const callClass = (opts?: AgentOpts) => ((opts && (opts.label || opts.phase)) || '').replace(/[:·].*/u, '').trim() || 'unknown'
-const quotaHalt = (why: string) => {
-  QUOTA_HALT = why
-  log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`)
-}
-// A6: shared bump used in both null-return and catch paths — keeps the class-gate condition DRY.
-const bumpNullStreak = (opts?: AgentOpts) => {
-  quotaBreaker.record(callClass(opts))
-  if (quotaBreaker.tripped()) quotaHalt(`${quotaBreaker.streak} consecutive agent failures (API/session quota suspected)`)
-}
-const agentSafe: typeof agent = async (prompt, opts) => {
-  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
-  try {
-    const r = await agent(prompt, opts)
-    if (r === null) { bumpNullStreak(opts) }
-    else { quotaBreaker.reset() }
-    return r
-  }
-  catch (e: any) {
-    const m = String((e && e.message) || e)
-    if (/budget|ceiling/i.test(m)) throw e
-    if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
-    // Model-access failure = INFRA, not a work verdict. Observed live: the session model
-    // (claude-fable-5) was not subagent-spawnable; the VERIFY/INTEGRATE/BRIEFING roles INHERIT
-    // the session model, so they died with "issue with the selected model … may not have access".
-    // Without this branch the null fell through to distrust → 3 untrusted verify-class leaves →
-    // untrusted-streak HALT, misreading an infra outage as "the approach failed" (and losing the
-    // briefing). Treat it like quota: an immediate resumable pause, not a grind. Resume after the
-    // transient clears OR after switching the session model to a subagent-spawnable one.
-    if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) {
-      quotaHalt(`model unavailable to subagents (verify/integrate/briefing inherit the session model): ${m.slice(0, 90)}`)
-      return null
-    }
-    log(`agent threw (treated as null): ${m.slice(0, 140)}`)
-    bumpNullStreak(opts)
-    return null
-  }
-}
+const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = makeHost()
 // ---- args: { task, repo, maxDepth?, parallel? } -----------------------------
 const A = ((typeof args === 'string') ? JSON.parse(args) : (args || {})) as EngineArgs   // tolerate stringified args
 // I7: refuse to run without a task — a resume that forgot the original args once ran a full
@@ -121,87 +79,6 @@ const ENGINE_DIFF_CAP = 6000             // ITEM 9: max chars of leaf diff injec
                                          // prompt; above this, point the verifier back at git (gitVerify) rather
                                          // than flood the prompt with a giant diff it would not read anyway
 
-// ---- sh(): deterministic shell escape. The COMMAND is computed in JS (deterministic); the
-// agent is reduced to a verbatim `bash -c` proxy with zero latitude. Used for all purely-
-// MECHANICAL git (no judgment) so it is not left to a non-deterministic LLM. The sandbox has
-// no real exec(); this is the closest approximation — deterministic command, LLM as transport.
-//
-// A1/A7: When agentSafe returns null (sh proxy died — non-quota), we MUST NOT silently return
-// { stdout:'', exitCode:1 } — that disguises the outage as "command ran but failed", which at
-// decision points (git-sha / git-clean / lock-check) produces false reads (BASE_SHA='',
-// gitClean=true, held=''). Instead we return SH_UNAVAILABLE so callers can detect the outage.
-const SH_UNAVAILABLE: ShResult = { exitCode: -2, stdout: '\x00SH_UNAVAILABLE' }
-// Shape-match fallback: reference equality breaks silently if a future refactor clones/serializes
-// results between sh() and a decision site. exitCode -2 is unreachable from a real shell (0-255)
-// and the \x00 prefix is unprintable — only the sentinel (or a lying proxy, fail-safe) matches.
-const shUnavailable = (r: ShResult) =>
-  r === SH_UNAVAILABLE || (!!r && r.exitCode === -2 && String(r.stdout).startsWith('\x00SH_UNAVAILABLE'))
-const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { type: 'string' }, exitCode: { type: 'integer' } } }
-const sh = async (cmd: string, label?: string): Promise<ShResult> => {
-  const r = (await agentSafe(
-    `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
-    `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
-    { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null
-  return r ?? SH_UNAVAILABLE
-}
-// A2: shForce — mechanical cleanup path that bypasses QUOTA_HALT. Use ONLY for lock-clear (rm -f
-// <lockfile>) — a purely deterministic, file-system-only operation that touches no user work and
-// must run even after quota death so the stale lock doesn't block the user's guided resume. NEVER
-// use for reset/merge/checkout or any command that could mutate user work: agentSafe is the gate
-// for those so QUOTA_HALT correctly prevents runaway mutations; shForce is the narrow exception
-// where NOT running would leave the repo in a permanently broken state (stale lock).
-const shForce = async (cmd: string, label?: string): Promise<ShResult> => {
-  try {
-    const r = (await agent(
-      `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
-      `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
-      { label: label || 'sh-force', model: 'haiku', schema: SH })) as ShResult | null
-    return r ?? SH_UNAVAILABLE
-  } catch (e: any) {
-    log(`shForce failed (${label || 'sh-force'}): ${String((e && e.message) || e).slice(0, 120)}`)
-    return SH_UNAVAILABLE
-  }
-}
-
-// ITEM 6 (LATENCY): each sh() is a full agent round-trip. Independent / sequential-deterministic git
-// is BATCHED into ONE sh() script per logical phase to pay one spawn instead of N serial spawns. The
-// NON-NEGOTIABLE invariant: per-command outcome detection survives byte-for-byte. Every sub-command is
-// followed by an EXIT MARKER `<<RS:name:$?>>` on its own line; its stdout precedes the marker. shBatch()
-// parses those markers so a RED/failure in ANY sub-command is detected EXACTLY as before. The whole
-// batch still goes through sh(), so a dead shell proxy returns SH_UNAVAILABLE for the WHOLE batch — and
-// shUnavailable(raw) on the raw result stays FATAL (a dead proxy never silently reads as "no git").
-//
-// Authoring contract for the script passed to shBatch:
-//   <command> ; printf '<<RS:NAME:%s>>\n' "$?"      ← stdout of <command>, then the marker line
-// NAME must be a stable [A-Za-z0-9_-] token. parseBatch returns, per NAME: { code, out } where `out`
-// is the captured stdout that PRECEDED that marker (between the previous marker and this one), trimmed
-// of the trailing newline only — so `git status --porcelain` empties and SHAs are read verbatim.
-const MARKER = /<<RS:([A-Za-z0-9_-]+):(-?\d+)>>/
-// shBatch: run a marker-delimited multi-command script in ONE sh() round-trip; parse per-command
-// {code,out}. Returns { raw, get(name) }. raw is the underlying ShResult so callers keep the
-// shUnavailable() FATAL check verbatim (a dead proxy → raw is the sentinel → get() returns null for
-// every name → callers detect the outage exactly as a single-command sh() death would surface it).
-const shBatch = async (script: string, label?: string): Promise<{ raw: ShResult; get: (name: string) => { code: number; out: string } | null }> => {
-  const raw = await sh(script, label)
-  const dead = shUnavailable(raw)
-  const stdout = raw.stdout || ''
-  // Split on marker lines; segment i's stdout is everything before marker i since the previous marker.
-  const map = new Map<string, { code: number; out: string }>()
-  if (!dead) {
-    let rest = stdout
-    let m: RegExpMatchArray | null
-    // Walk markers left-to-right; the text before each marker is that command's stdout.
-    while ((m = rest.match(new RegExp(MARKER.source)))) {
-      const idx = m.index || 0
-      const before = rest.slice(0, idx)
-      // Strip exactly one trailing newline that the `printf` line introduces; keep inner content verbatim.
-      const out = before.replace(/\n$/, '')
-      map.set(m[1], { code: parseInt(m[2], 10), out })
-      rest = rest.slice(idx + m[0].length).replace(/^\n/, '')
-    }
-  }
-  return { raw, get: (name: string) => map.get(name) || null }
-}
 
 // =============================================================================
 phase('Baseline')
@@ -512,7 +389,7 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 // The leaf loop (src/phases/leaf-loop.ts) — wired here, AFTER SCRATCH is known, with all its shared services.
-const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline: baseline!, getQuotaHalt: () => QUOTA_HALT })
+const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline: baseline!, getQuotaHalt })
 if (goParallel) {
   // ITEM 10: the merged decompose role gates the partition — does the ROOT split (action:'slice') or is
   // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
@@ -623,7 +500,7 @@ if (groups) {
   // the merge verdict would be null/ISSUES and the wt-post clearWorktrees would delete the
   // worktree branches that a resume needs, causing the next run's wt-pre branch -D to abort on
   // non-existent refs and the merge step to re-do all the parallel work from scratch.
-  if (QUOTA_HALT) {
+  if (getQuotaHalt()) {
     log(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`)
   } else {
   let conflicts = 0
@@ -690,8 +567,8 @@ phase('Integrate')
 // final payload (all `done` results) AND leak the repo lock. exitCode -1 = the net never ran (distinct from RED).
 let finalRun: ShResult = { exitCode: -1, stdout: '' }
 let integration: Verdict | null = null
-if (QUOTA_HALT) {
-  ABORTS.push(`quota-halt: ${QUOTA_HALT} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`)
+if (getQuotaHalt()) {
+  ABORTS.push(`quota-halt: ${getQuotaHalt()} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`)
   log('quota halt — skipping integrate/wiring/briefing (resume to run them)')
 } else try {
   finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'integrate-fullsuite')
@@ -738,7 +615,7 @@ if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION
 // cannot see this). Deterministic extraction (diff → new exported symbols) + one agent judging call
 // sites. ADVISORY: surfaces in the payload/log, never gates the run.
 let wiringGaps: string[] = []
-if (GIT && trusted.length && !QUOTA_HALT) {
+if (GIT && trusted.length && !getQuotaHalt()) {
   try {
     const newPub = await sh(
       `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | ` +
@@ -796,7 +673,7 @@ let briefing: Briefing | null = null
 // A4: explicit QUOTA_HALT gate — even if trusted.length > 0 (e.g. some leaves trusted before the
 // halt fired), skip the briefing agent entirely; the halt log already carries the resume instruction
 // and spawning another agent would re-trip the same quota immediately.
-if (trusted.length && !QUOTA_HALT) {
+if (trusted.length && !getQuotaHalt()) {
   const ledgerForBriefing = done.map((d, j) => ({
     i: j, task: String(d.task).slice(0, 140), trusted: !!(d.verdict && d.verdict.trustworthy),
     commits: d.commits || [], files: d.filesChanged || [],
