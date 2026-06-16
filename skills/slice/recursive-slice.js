@@ -224,9 +224,20 @@ TWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C
       );
       if (!shUnavailable(d2)) {
         const body = String(d2.stdout || "");
-        engineDiff = body.length > ENGINE_DIFF_CAP ? `
-ENGINE-DIFF: (diff too large — inspect via git yourself)` : `
+        if (body.length > ENGINE_DIFF_CAP) {
+          const s = await sh(
+            `git -C ${repo} diff --stat ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+            `verify-diffstat:${lbl}`
+          );
+          const stat = shUnavailable(s) ? "" : String(s.stdout || "").trim();
+          engineDiff = stat ? `
+ENGINE-DIFF: (full diff > ${ENGINE_DIFF_CAP} chars — file footprint below; inspect hunks via \`git -C ${repo} diff ${leafStart}..HEAD\`):
+${stat}` : `
+ENGINE-DIFF: (diff too large — inspect via git yourself)`;
+        } else {
+          engineDiff = `
 ENGINE-DIFF: ${body}`;
+        }
       }
     }
     const base = `${R_VERIFY}
