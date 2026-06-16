@@ -3,25 +3,14 @@
 
 import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
 import { R_BASELINE, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
-import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel, AgentOpts, TraceRecord } from './types'
+import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel, TraceRecord } from './types'
 import { b64encode, circuitBreaker, engineRanBlock } from './util'
 import { makeVerifyLeaf } from './phases/verify'
 import { makeRunWork } from './phases/leaf-loop'
 import { makeHost } from './host'
+import { makeWorkflowRuntime } from './runtime'
 import { makeLeafTest } from './leaf-prompt'
 import { integratePhase } from './phases/integrate'
-
-// ===== Workflow runtime ambient contract (the PORT) ==========================
-// Any host that injects these globals can run the emitted engine unchanged:
-// Claude Code's Workflow tool provides them natively; other harnesses can adapt
-// by implementing this exact surface (see references/portable-orchestration.md).
-// All declarations below are erased at build time.
-declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
-declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
-declare function phase(title: string): void
-declare function log(message: string): void
-declare const args: unknown
-declare const budget: { total: number | null; spent(): number; remaining(): number }
 // ARCHITECTURE (full: references/architecture.md · ENFORCED: test/unit/architecture.test.mjs) — the engine
 // src is a strict layered DAG, imports flowing DOWN: L0 pure leaves (types/util/prompts/schemas/leaf-prompt)
 // → L1 host (I/O) → L2 phases/* (verify·leaf-loop·integrate, each a cohesive logic unit reached only by
@@ -41,7 +30,11 @@ async function __main(): Promise<EngineResult> {
 // "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
 // cause) flips QUOTA_HALT; from then on agentSafe no-ops, loops stop cleanly, and the run
 // ends resumable instead of burning attempts until the harness gives up.
-const host = makeHost()   // cohesive host-services bundle — passed WHOLE to phases (one param); destructured here for main's own use
+// The injected platform Runtime (Claude Code Workflow adapter). makeHost builds the engine's I/O services
+// over it; each phase receives `rt` too. The opencode adapter supplies its own Runtime — same engine core.
+const rt = makeWorkflowRuntime()
+const { agent, parallel, phase, log, args } = rt   // the platform primitives main itself calls
+const host = makeHost(rt)   // cohesive host-services bundle — passed WHOLE to phases (one param); destructured here for main's own use
 const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = host
 // ---- args: { task, repo, maxDepth?, parallel? } -----------------------------
 const A = ((typeof args === 'string') ? JSON.parse(args) : (args || {})) as EngineArgs   // tolerate stringified args
@@ -345,7 +338,7 @@ if (GIT) {
 //   heavy (hard)    → 3 perspective-diverse skeptics (PARALLEL — runtime queues concurrent calls safely); UNANIMOUS trust required
 // the git/repo context, bundled — all members final by here (BASE_SHA, GIT_EXEC, gitVerify, LOCKFILE all set above)
 const git = { BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify }   // GIT-mode state only; REPO threaded separately (git-independent)
-const verifyLeaf = makeVerifyLeaf({ host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP })
+const verifyLeaf = makeVerifyLeaf({ rt, host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP })
 
 // ---- runWork: the recursive decomposition+execution loop for ONE work unit, in ONE repo
 // (the main checkout, or a group's worktree). Sequential + Canon-TDD discover-as-you-go.
@@ -392,7 +385,7 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 // The leaf loop (src/phases/leaf-loop.ts) — wired here, AFTER SCRATCH is known, with all its shared services.
-const runWork = makeRunWork({ host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline: baseline! })
+const runWork = makeRunWork({ rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline: baseline! })
 if (goParallel) {
   // ITEM 10: the merged decompose role gates the partition — does the ROOT split (action:'slice') or is
   // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
@@ -559,6 +552,6 @@ if (overTier.stop) {
 }
 
 // =============================================================================
-return await integratePhase({ host, git, REPO, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
+return await integratePhase({ rt, host, git, REPO, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
 
 }

@@ -5,16 +5,11 @@
 import { BRIEFING, VERDICT } from '../schemas'
 import { R_VERIFY } from '../prompts'
 import { b64encode, engineRanBlock } from '../util'
-import type { ShResult, AgentOpts, Baseline, Verdict, LeafRecord, EngineResult, Briefing, Groups, GitCtx } from '../types'
+import type { ShResult, Baseline, Verdict, LeafRecord, EngineResult, Briefing, Groups, GitCtx, Runtime } from '../types'
 import type { Host } from '../host'
 
-declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
-declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
-declare function phase(title: string): void
-declare function log(message: string): void
-declare const budget: { total: number | null; spent(): number; remaining(): number }
-
 export type IntegrateDeps = {
+  rt: Runtime
   host: Host
   git: GitCtx
   REPO: string
@@ -28,7 +23,8 @@ export type IntegrateDeps = {
 }
 
 export const integratePhase = async (d: IntegrateDeps): Promise<EngineResult> => {
-const { host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d
+const { rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d
+const { agent, phase, log } = rt
 const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host
 const { BASE_SHA, GIT, LOCKFILE } = git
 phase('Integrate')

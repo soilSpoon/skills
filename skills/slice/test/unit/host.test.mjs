@@ -7,11 +7,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { makeHost } from '../../src/host.ts'
 
-// host.ts references ambient `agent`/`log` as free globals — provide them per test.
+// makeHost(rt) takes the two platform primitives it uses (agent/log) from the injected Runtime —
+// no ambient globals anymore, so the mock is just an object with those two fields.
 function withHost(agentImpl) {
-  globalThis.log = () => {}
-  globalThis.agent = agentImpl
-  return makeHost()
+  return makeHost({ agent: agentImpl, log: () => {} })
 }
 
 test('agentSafe: a session-limit throw flips quota halt; subsequent calls no-op without spawning', async () => {

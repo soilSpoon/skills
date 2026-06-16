@@ -19,7 +19,7 @@ import { posix, dirname, join } from 'node:path'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src')
 const LAYER = {
   'types.ts': 0, 'util.ts': 0, 'prompts.ts': 0, 'schemas.ts': 0, 'leaf-prompt.ts': 0,
-  'host.ts': 1,
+  'host.ts': 1, 'runtime.ts': 1,
   'phases/verify.ts': 2, 'phases/leaf-loop.ts': 2, 'phases/integrate.ts': 2,
   'main.ts': 3,
 }
@@ -58,4 +58,17 @@ test('main.ts is the spine — imported by NO other module', () => {
 test('phases are leaves of the logic layer — no phase imports another phase (they compose via deps, not imports)', () => {
   for (const f of srcFiles()) if (f.startsWith('phases/'))
     for (const dep of relImports(f)) assert.ok(!dep.startsWith('phases/'), `${f} imports sibling phase ${dep} — phases compose through main's dep-wiring, never directly`)
+})
+
+// The Workflow ambient globals (agent/parallel/phase/log/budget/args) are the PORT to one harness. They
+// live in EXACTLY ONE adapter (runtime.ts); the engine core depends on the injected Runtime type instead.
+// This test fails if any other file re-grows a `declare`d global — so a second host (opencode) can't be
+// undercut by the core quietly re-coupling to Claude Code's runtime.
+test('the ambient-global PORT lives ONLY in runtime.ts — no core file re-grows the seam', () => {
+  const AMBIENT = /\bdeclare\s+(?:function\s+(?:agent|parallel|phase|log)\b|const\s+(?:budget|args)\b)/
+  for (const f of srcFiles()) {
+    if (f === 'runtime.ts') continue
+    assert.ok(!AMBIENT.test(readFileSync(join(SRC, f), 'utf8')),
+      `${f} declares a Workflow ambient global — the core must depend on the injected Runtime, not globals. Route it through runtime.ts.`)
+  }
 })

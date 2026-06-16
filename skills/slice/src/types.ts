@@ -139,6 +139,18 @@ export interface AgentOpts {
   isolation?: 'worktree'
   agentType?: string
 }
+// The injected platform contract — the ONE seam each host satisfies (Claude Code Workflow, opencode).
+// The engine core (main/phases/host) depends ONLY on this type; no ambient globals. The Claude Code
+// adapter (runtime.ts → makeWorkflowRuntime) binds it to the Workflow runtime's injected globals; a
+// future opencode adapter supplies its own Runtime over the SDK — same engine, different transport.
+export interface Runtime {
+  agent(prompt: string, opts?: AgentOpts): Promise<any>
+  parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
+  phase(title: string): void
+  log(message: string): void
+  budget: { total: number | null; spent(): number; remaining(): number }
+  args: unknown
+}
 // One JSONL run-trace line (shared by main.ts's `trace` + extracted phases that emit traces).
 export type TraceRecord = {
   phase: string

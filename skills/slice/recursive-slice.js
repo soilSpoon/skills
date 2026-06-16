@@ -191,7 +191,8 @@ ${duty}`;
 
 // src/phases/verify.ts
 var makeVerifyLeaf = (d) => {
-  const { host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d;
+  const { rt, host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d;
+  const { parallel: parallel2 } = rt;
   const { sh, agentSafe, shUnavailable } = host;
   const { gitVerify, GIT } = git;
   return async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
@@ -249,7 +250,7 @@ ${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNot
     }
     if (tier === "heavy") {
       const lenses = ["correctness & reproduce the green", "security: secrets/credentials NEVER logged or leaked", "interface & cross-module drift"];
-      const rawVotes = await parallel(lenses.map((L, li) => async () => {
+      const rawVotes = await parallel2(lenses.map((L, li) => async () => {
         const v = await agentSafe(
           `${base}
 LENS: judge specifically through "${L}".`,
@@ -278,7 +279,8 @@ LENS: judge specifically through "${L}".`,
 
 // src/phases/leaf-loop.ts
 var makeRunWork = (d) => {
-  const { host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d;
+  const { rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d;
+  const { agent: agent2, phase: phase2, log: log2, budget: budget2 } = rt;
   const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host;
   const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg;
   const { GIT, GIT_EXEC } = git;
@@ -309,7 +311,7 @@ ${INV}
 If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, independently-verifiable slices with a self-contained contract each (group near-identical units; 2-5 slices; isolate any risky seam first).`,
           { phase: "Work", label: `${tag}decompose:d${node.depth}`, model: "sonnet", schema: DECOMPOSE }
         );
-        if (!d2) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`);
+        if (!d2) log2(`${tag}decompose failed [d${node.depth}] — defaulting to execute`);
         action = atFloor || !d2 ? "execute" : d2.action;
         if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
       }
@@ -334,21 +336,21 @@ ${INV}`,
           );
           if (crit && crit.missing && crit.missing.length) {
             slices = slices.concat(crit.missing.map((m) => ({ ...m, kind: "behavior" })));
-            log(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`);
+            log2(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`);
           }
         }
         if (slices.length <= 1) {
-          log(`${tag}non-reducing slice [d${node.depth}] → execute`);
+          log2(`${tag}non-reducing slice [d${node.depth}] → execute`);
           action = "execute";
         } else {
-          log(`${tag}slice [d${node.depth}] → ${slices.length}`);
+          log2(`${tag}slice [d${node.depth}] → ${slices.length}`);
           if (node.depth === 0) {
             const compileBound = baseline.coldBuildCost === "expensive";
-            log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? "; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count" : ""}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`);
+            log2(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? "; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count" : ""}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`);
             if (compileBound && slices.length <= 3 && slices.every((s) => s.riskTier === "light") && !CONFIRM_TIER) {
               overTier.stop = `compile-bound repo, ${slices.length} low-risk slice(s) — inline T1 work`;
               overTier.slices = slices.length;
-              log(`${tag}⟂ OVER-TIER STOP: this looks like inline-T1 work (compile-bound + ${slices.length} all-light slice(s)). Doing it inline is faster. To force the engine anyway, re-run with confirmTier:true. (No leaves ran; nothing changed.)`);
+              log2(`${tag}⟂ OVER-TIER STOP: this looks like inline-T1 work (compile-bound + ${slices.length} all-light slice(s)). Doing it inline is faster. To force the engine anyway, re-run with confirmTier:true. (No leaves ran; nothing changed.)`);
               return { done: [] };
             }
           }
@@ -371,11 +373,11 @@ ${node.ctx}`,
         );
         stack.push({ ...node, ctx: `${node.ctx}
 LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.spikes + 1 });
-        log(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`);
+        log2(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`);
         continue;
       }
-      if (getQuotaHalt() || budget.total && budget.remaining() < 12e4) {
-        log(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping after ${done.length} leaves`);
+      if (getQuotaHalt() || budget2.total && budget2.remaining() < 12e4) {
+        log2(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping after ${done.length} leaves`);
         break;
       }
       const k = keyOf(node.task);
@@ -425,14 +427,14 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
           const gateScope = okScope(node.testScope) ? node.testScope : okScope(res.testScope) ? res.testScope : "";
           const t0cmd = node.kind !== "tidy" && gateScope && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", gateScope) : "";
           if (!t0cmd && node.kind !== "tidy") {
-            log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
+            log2(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
           }
           if (t0cmd) {
             const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
             if (t0.exitCode !== 0) {
               const t0tail = String(t0.stdout || "");
               if (RE_ZERO_TESTS.test(t0tail)) {
-                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
+                log2(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
                 engineT0 = engineRanBlock({
                   cmd: t0cmd,
                   note: "(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)",
@@ -444,7 +446,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
                 t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] };
                 if (t0redBreaker.record(), t0redBreaker.tripped()) {
                   baseline.filterCommand = "";
-                  log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
+                  log2(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
                 }
               }
             } else {
@@ -479,37 +481,37 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
         const issueCount = (verdict.issues || []).length || 1;
         const converging = issueCount < prevIssueCount;
         if (attempt >= MAX_REPAIR && !(converging && attempt < MAX_REPAIR_HARD)) break;
-        if (getQuotaHalt() || budget.total && budget.remaining() < 12e4) {
-          log(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping repairs (leaf ${i} stays untrusted → reverted)`);
+        if (getQuotaHalt() || budget2.total && budget2.remaining() < 12e4) {
+          log2(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping repairs (leaf ${i} stays untrusted → reverted)`);
           break;
         }
         prevIssueCount = attempt === 0 && tier === "light" ? Infinity : issueCount;
-        log(`${tag}leaf ${i} untrusted (tier=${res.passed ? tier : "tier0-red"}, ${issueCount} issue(s)${attempt > 0 && converging ? ", converging" : ""}) → self-repair ${attempt + 1}/${converging ? MAX_REPAIR_HARD : MAX_REPAIR}`);
+        log2(`${tag}leaf ${i} untrusted (tier=${res.passed ? tier : "tier0-red"}, ${issueCount} issue(s)${attempt > 0 && converging ? ", converging" : ""}) → self-repair ${attempt + 1}/${converging ? MAX_REPAIR_HARD : MAX_REPAIR}`);
         attempt++;
       }
       if (!res) {
-        log(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`);
+        log2(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`);
         await restore();
         done.push({ task: node.task, passed: false, summary: "executor returned no result (API/rate-limit)", verdict: { trustworthy: false, reason: "executor failed" } });
         if (untrustedBreaker.record(), untrustedBreaker.tripped()) {
           ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
-          log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`);
+          log2(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`);
           break;
         }
         continue;
       }
       done.push({ task: node.task, ...res, verdict, gateLevel });
-      log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
+      log2(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
       await trace({ phase: "Work", role: `leaf-verify:${lbl}`, model: "verify", leafIndex: i, gateLevel, trustworthy: verdict.trustworthy, repairAttempt: attempt });
       if (GIT && !verdict.trustworthy) {
         const restored = await restore();
-        log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
+        log2(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
       }
       if (verdict.trustworthy) untrustedBreaker.reset();
       else untrustedBreaker.record();
       if (untrustedBreaker.tripped()) {
         ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
-        log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`);
+        log2(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`);
         break;
       }
       const feed = verdict.trustworthy ? [...res.discovered || [], ...verdict.followUps || []] : [];
@@ -522,24 +524,25 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
 - ${fresh.join("\n- ")}
 If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a test), do NOT force it — note it in \`discovered\` for a focused follow-up.`;
           stack.push({ task: batchTask, ctx: `Discovered while doing "${node.task.slice(0, 40)}".`, kind: "behavior", atomic: true, riskTier: "standard", testScope: node.testScope, depth: node.depth, spikes: 0 });
-          log(`${tag}+${fresh.length} discovered → 1 batched follow-up leaf`);
+          log2(`${tag}+${fresh.length} discovered → 1 batched follow-up leaf`);
         }
       }
     }
-    if (done.length >= MAX_LEAVES) log(`${tag}NOTE: hit MAX_LEAVES — work truncated`);
+    if (done.length >= MAX_LEAVES) log2(`${tag}NOTE: hit MAX_LEAVES — work truncated`);
     return { done };
   }
   return runWork;
 };
 
 // src/host.ts
-var makeHost = () => {
+var makeHost = (rt) => {
+  const { agent: agent2, log: log2 } = rt;
   let QUOTA_HALT = "";
   const quotaBreaker = circuitBreaker(3, 2);
   const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
   const quotaHalt = (why) => {
     QUOTA_HALT = why;
-    log(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`);
+    log2(`⛔ QUOTA HALT: ${why} — no further agents will be spawned; relaunch with resumeFromRunId after the cause clears (limit reset / model switch) — cached leaves replay free.`);
   };
   const bumpNullStreak = (opts) => {
     quotaBreaker.record(callClass(opts));
@@ -547,11 +550,11 @@ var makeHost = () => {
   };
   const agentSafe = async (prompt, opts) => {
     if (QUOTA_HALT) {
-      log(`agent skipped (quota halt): ${opts && (opts.label || opts.phase) || ""}`);
+      log2(`agent skipped (quota halt): ${opts && (opts.label || opts.phase) || ""}`);
       return null;
     }
     try {
-      const r = await agent(prompt, opts);
+      const r = await agent2(prompt, opts);
       if (r === null) {
         bumpNullStreak(opts);
       } else {
@@ -569,7 +572,7 @@ var makeHost = () => {
         quotaHalt(`model unavailable to subagents (verify/integrate/briefing inherit the session model): ${m.slice(0, 90)}`);
         return null;
       }
-      log(`agent threw (treated as null): ${m.slice(0, 140)}`);
+      log2(`agent threw (treated as null): ${m.slice(0, 140)}`);
       bumpNullStreak(opts);
       return null;
     }
@@ -588,7 +591,7 @@ ${cmd}`,
   };
   const shForce = async (cmd, label) => {
     try {
-      const r = await agent(
+      const r = await agent2(
         `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, modify, interpret, explain, or run anything besides this one command:
 
 ${cmd}`,
@@ -596,7 +599,7 @@ ${cmd}`,
       );
       return r ?? SH_UNAVAILABLE;
     } catch (e) {
-      log(`shForce failed (${label || "sh-force"}): ${String(e && e.message || e).slice(0, 120)}`);
+      log2(`shForce failed (${label || "sh-force"}): ${String(e && e.message || e).slice(0, 120)}`);
       return SH_UNAVAILABLE;
     }
   };
@@ -622,28 +625,32 @@ ${cmd}`,
   return { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt: () => QUOTA_HALT };
 };
 
+// src/runtime.ts
+var makeWorkflowRuntime = () => ({ agent, parallel, phase, log, budget, args });
+
 // src/leaf-prompt.ts
 var makeLeafTest = (measureCommand) => (scope) => `
 LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test you add so this EXACT token matches the runner's filter. Know your runner: many match a FUNCTION/TEST-NAME substring (Swift Testing \`--filter\`, pytest \`-k\`) — for those put \`${scope}\` IN the @Test/test-function name, NOT a suite path; suite-path runners match the suite/class name. (The engine re-runs this filter as the deterministic gate; a name mismatch = zero tests matched, which now degrades THIS leaf to LLM-verify — a FINDING, not a false RED.) ` : `Filter to the test you add or touch — match the runner's filter syntax (function-name substring for Swift Testing/pytest; suite path otherwise). `) + `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize. REPORT \`testScope\` in your result: the SINGLE bare token (a suite name, or a shared substring of the test names you added — matching /^[A-Za-z0-9_.-]+$/; NO spaces/slashes/'|') under which the project-card filter form runs EXACTLY the test(s) you added/touched and nothing unrelated. The engine re-runs that filter as the deterministic per-leaf gate — so it MUST match the names you actually used (a wrong token zero-matches → this leaf degrades to LLM-verify, never a false RED). This is what binds the deterministic gate when no scope was handed to you above; without it the leaf rests on the LLM verifier alone.`;
 
 // src/phases/integrate.ts
 var integratePhase = async (d) => {
-  const { host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d;
+  const { rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d;
+  const { agent: agent2, phase: phase2, log: log2 } = rt;
   const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host;
   const { BASE_SHA, GIT, LOCKFILE } = git;
-  phase("Integrate");
+  phase2("Integrate");
   let finalRun = { exitCode: -1, stdout: "" };
   let integration = null;
   if (getQuotaHalt()) {
     ABORTS.push(`quota-halt: ${getQuotaHalt()} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
-    log("quota halt — skipping integrate/wiring/briefing (resume to run them)");
+    log2("quota halt — skipping integrate/wiring/briefing (resume to run them)");
   } else try {
     finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite");
     if (finalRun.exitCode === 137) {
-      log("integrate full suite timed out (exit 137) — one automatic retry (known flake class)");
+      log2("integrate full suite timed out (exit 137) — one automatic retry (known flake class)");
       finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite-retry");
     }
-    if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`);
+    if (finalRun.exitCode !== 0) log2(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`);
     integration = await agentSafe(
       `${R_VERIFY}
 
@@ -654,7 +661,7 @@ Also summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..
       { phase: "Integrate", schema: VERDICT }
     );
     if (!integration) {
-      log("integration agent unavailable (API error) — one retry");
+      log2("integration agent unavailable (API error) — one retry");
       integration = await agentSafe(
         `${R_VERIFY}
 
@@ -665,12 +672,12 @@ ${INV}`,
       );
     }
   } catch (e) {
-    log(`integrate phase error (budget ceiling / API): ${e && e.message ? e.message : e} — returning partial results; the full-suite net DID NOT RUN.`);
+    log2(`integrate phase error (budget ceiling / API): ${e && e.message ? e.message : e} — returning partial results; the full-suite net DID NOT RUN.`);
   }
   const fullSuiteGreen = finalRun.exitCode === 0;
   const trusted = done.filter((d2) => d2.verdict && d2.verdict.trustworthy);
   const degradations = trusted.filter((d2) => d2.gateLevel === "llm-only").map((d2) => `gate=llm-only (no deterministic gate ran): ${String(d2.task).slice(0, 80)}`);
-  if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
+  if (degradations.length) log2(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
   let wiringGaps = [];
   if (GIT && trusted.length && !getQuotaHalt()) {
     try {
@@ -697,11 +704,11 @@ Judge from those counts — re-grep a symbol yourself ONLY when its count is amb
           { phase: "Integrate", label: "wiring-audit", schema: { type: "object", required: ["gaps"], properties: { gaps: { type: "array", items: { type: "string" } } } } }
         );
         wiringGaps = w && w.gaps || [];
-        if (wiringGaps.length) log(`⚠ wiring-audit: ${wiringGaps.length} new symbol(s) with NO production call site (built-tested-unwired class)`);
-        else log("wiring-audit: all new exported symbols reachable from production code");
+        if (wiringGaps.length) log2(`⚠ wiring-audit: ${wiringGaps.length} new symbol(s) with NO production call site (built-tested-unwired class)`);
+        else log2("wiring-audit: all new exported symbols reachable from production code");
       }
     } catch (e) {
-      log(`wiring-audit skipped: ${e && e.message ? e.message : e}`);
+      log2(`wiring-audit skipped: ${e && e.message ? e.message : e}`);
     }
   }
   const purposeGaps = [
@@ -739,7 +746,7 @@ Be concrete: real paths, commit SHAs, line pointers where it matters. Match the 
         { phase: "Integrate", label: "owner-briefing", schema: BRIEFING }
       );
       if (!briefing) {
-        log("owner-briefing agent unavailable (API error) — one retry");
+        log2("owner-briefing agent unavailable (API error) — one retry");
         briefing = await agentSafe(
           `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : "") + `
 Ledger: ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
@@ -748,7 +755,7 @@ Match the language the task was written in. Be concrete.`,
         );
       }
     } catch (e) {
-      log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`);
+      log2(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`);
     }
     if (briefing && briefing.briefing) {
       try {
@@ -757,10 +764,10 @@ Match the language the task was written in. Be concrete.`,
         const file = `${dir}/${ts}.md`;
         const b64 = b64encode(String(briefing.briefing));
         const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
-        if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`);
-        else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
+        if (!shUnavailable(w) && w.exitCode === 0) log2(`owner briefing persisted → ${file}`);
+        else log2(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
       } catch (e) {
-        log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
+        log2(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
       }
     }
   }
@@ -768,12 +775,12 @@ Match the language the task was written in. Be concrete.`,
     try {
       await shForce(`rm -f ${LOCKFILE}`, "lock-clear");
     } catch (e) {
-      log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`);
+      log2(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`);
     }
   }
-  if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
-  log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
-  if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
+  if (ABORTS.length) log2(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
+  log2(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
+  if (purposeGaps.length) log2(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
   const allLeavesTrusted = trusted.length === done.length;
   const mergeOk = !merge || merge.trustworthy;
   const integrationOk = !!(integration && integration.trustworthy);
@@ -782,7 +789,7 @@ Match the language the task was written in. Be concrete.`,
   const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} · integration ${integrationOk ? "OK" : integration ? "DISTRUSTED" : "UNKNOWN"} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? "" : "s"}${merge ? ` · merge ${mergeOk ? "OK" : "ISSUES"}` : ""}`;
   const firstFailure = !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted` : !mergeOk ? "parallel merge NOT trustworthy" : !fullSuiteGreen ? finalRun.exitCode === -1 ? "integrate full-suite DID NOT RUN" : `integrate full-suite RED (exit ${finalRun.exitCode})` : !integrationOk ? integration ? "integration verdict DISTRUSTED" : "integration verdict UNKNOWN (never ran)" : !noDegradations ? `${degradations.length} trust-floor degradation(s)` : "";
   const ownersHeadline = overallTrust ? `TRUSTED — ${headlineCounts}` : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`;
-  log(`Overall verdict: ${ownersHeadline}`);
+  log2(`Overall verdict: ${ownersHeadline}`);
   return {
     task: TASK,
     mode: groups ? "parallel" : "sequential",
@@ -808,11 +815,13 @@ Match the language the task was written in. Be concrete.`,
 
 // src/main.ts
 async function __main() {
-  const host = makeHost();
+  const rt = makeWorkflowRuntime();
+  const { agent: agent2, parallel: parallel2, phase: phase2, log: log2, args: args2 } = rt;
+  const host = makeHost(rt);
   const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = host;
-  const A = typeof args === "string" ? JSON.parse(args) : args || {};
+  const A = typeof args2 === "string" ? JSON.parse(args2) : args2 || {};
   if (!A.task) {
-    log("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
+    log2("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
     return { error: "no task provided — pass args.task (a resume must pass the original args)" };
   }
   const TASK = A.task;
@@ -833,8 +842,8 @@ async function __main() {
   const MAX_UNTRUSTED_STREAK = 3;
   const ENGINE_DIFF_CAP = 6e3;
   const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER };
-  phase("Baseline");
-  log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
+  phase2("Baseline");
+  log2(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
     `${R_BASELINE}
 
@@ -844,16 +853,16 @@ Establish the trust invariant BEFORE any change. Find the measurement command, r
     { phase: "Baseline", model: "sonnet", schema: BASELINE }
   );
   if (!baseline) {
-    log("FATAL: baseline agent returned no result (API/rate-limit) — aborting before any change.");
+    log2("FATAL: baseline agent returned no result (API/rate-limit) — aborting before any change.");
     return { error: "baseline failed", task: TASK };
   }
-  log(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`);
+  log2(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`);
   const rigMeasure = String(baseline.measureCommand || "").trim();
   const rigTrivial = rigMeasure === "" || /^(true|:|echo|exit\s+0)\b/.test(rigMeasure);
-  if (baseline.rigPresent === false && !rigTrivial) log(`⚠ rig cross-check: rigPresent:false but measureCommand looks real (\`${rigMeasure}\`) — possible baseliner under-judgment. If the rig is real, fix the baseliner or re-run with confirmNoRig:true.`);
-  if (baseline.rigPresent === true && rigTrivial) log(`⚠ rig cross-check: rigPresent:true but measureCommand is trivial (\`${rigMeasure || "(empty)"}\`) — possible vacuous floor (false-green risk): per-leaf gates degrade to llm-only and the integrate net cannot go red.`);
+  if (baseline.rigPresent === false && !rigTrivial) log2(`⚠ rig cross-check: rigPresent:false but measureCommand looks real (\`${rigMeasure}\`) — possible baseliner under-judgment. If the rig is real, fix the baseliner or re-run with confirmNoRig:true.`);
+  if (baseline.rigPresent === true && rigTrivial) log2(`⚠ rig cross-check: rigPresent:true but measureCommand is trivial (\`${rigMeasure || "(empty)"}\`) — possible vacuous floor (false-green risk): per-leaf gates degrade to llm-only and the integrate net cannot go red.`);
   if (baseline.rigPresent === false && !CONFIRM_NO_RIG) {
-    log(`TESTING-READINESS STOP: baseliner judged NO runnable test rig (no scripts/verify.sh, no test files, no test command). The trust floor would be empty — 'still works' would be unverifiable. Scaffold a rig (test-foundations: add scripts/verify.sh or a real test command), then re-run. To proceed anyway, re-run with confirmNoRig:true. (No lock taken; nothing changed.)`);
+    log2(`TESTING-READINESS STOP: baseliner judged NO runnable test rig (no scripts/verify.sh, no test files, no test command). The trust floor would be empty — 'still works' would be unverifiable. Scaffold a rig (test-foundations: add scripts/verify.sh or a real test command), then re-run. To proceed anyway, re-run with confirmNoRig:true. (No lock taken; nothing changed.)`);
     return { error: `no runnable test rig — baseliner reported rigPresent:false; add a test rig (test-foundations: scripts/verify.sh or a real test command) or re-run with confirmNoRig:true`, task: TASK, baseline, noRigStop: true };
   }
   const CARD = baseline.projectCard ? `
@@ -873,24 +882,24 @@ Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const probe = `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`;
   let prologue = await shBatch(probe, "prologue");
   if (shUnavailable(prologue.raw)) {
-    log("shell-proxy returned no result for prologue (git-sha/clean/lock) — retrying once …");
+    log2("shell-proxy returned no result for prologue (git-sha/clean/lock) — retrying once …");
     prologue = await shBatch(probe, "prologue-retry");
   }
   if (shUnavailable(prologue.raw)) {
-    log("FATAL: shell-proxy agent returned no result for prologue (git-sha/git-clean/lock) — cannot determine git state; aborting.");
+    log2("FATAL: shell-proxy agent returned no result for prologue (git-sha/git-clean/lock) — cannot determine git state; aborting.");
     return { error: "shell-proxy unavailable at prologue decision point", task: TASK };
   }
   const shaSeg = prologue.get("git-sha");
   const cleanSeg = prologue.get("git-clean");
   if (!shaSeg) {
-    log("FATAL: prologue batch produced no git-sha marker — cannot determine git state; aborting.");
+    log2("FATAL: prologue batch produced no git-sha marker — cannot determine git state; aborting.");
     return { error: "shell-proxy unavailable at git-sha decision point", task: TASK };
   }
   const headOut = shaSeg.out;
   const BASE_SHA = (headOut.match(/[0-9a-f]{40}/i) || [""])[0];
   const GIT = !!BASE_SHA;
   if (GIT && !cleanSeg) {
-    log("FATAL: prologue batch produced no git-clean marker — cannot determine working tree state; aborting.");
+    log2("FATAL: prologue batch produced no git-clean marker — cannot determine working tree state; aborting.");
     return { error: "shell-proxy unavailable at git-clean decision point", task: TASK };
   }
   const gitClean = GIT ? cleanSeg.out.trim() === "" : false;
@@ -898,9 +907,9 @@ Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
 Git: after GREEN, commit the behavior step (\`git add -A && git commit -m "test: ..."\`); after any refactor, a SEPARATE commit (two hats). Commit ONLY in-scope files. Report SHAs in \`commits\`.` : "";
   const gitVerify = (repo, from) => GIT ? `
 Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HEAD\` and \`git -C ${repo} status\` — confirm ONLY in-scope files changed within this range (it starts at this work's pre-state; precise drift detection).` : "";
-  if (GIT) log(`git mode ON — baseline pinned at ${BASE_SHA.slice(0, 8)} (clean=${gitClean}) [deterministic capture]`);
-  else log("git mode OFF (no .git) — sequential only, no per-leaf commits/reversibility/worktrees");
-  if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
+  if (GIT) log2(`git mode ON — baseline pinned at ${BASE_SHA.slice(0, 8)} (clean=${gitClean}) [deterministic capture]`);
+  else log2("git mode OFF (no .git) — sequential only, no per-leaf commits/reversibility/worktrees");
+  if (GIT && gitClean === false) log2(`⚠ DIRTY baseline tree — uncommitted edits will look like invariant violations (noisy false-negatives). Prefer a clean tree.`);
   const TRACE_FILE = `${REPO}/docs/run-traces/${BASE_SHA ? BASE_SHA.slice(0, 12) : "no-git"}.jsonl`;
   const trace = async (rec) => {
     try {
@@ -910,14 +919,14 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       const b64 = b64encode(json + "\n");
       await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
     } catch (e) {
-      log(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
+      log2(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
     }
   };
   let LOCKFILE = "";
   if (GIT) {
     const lockDirSeg = prologue.get("lock-dir");
     if (!lockDirSeg) {
-      log("FATAL: prologue batch produced no lock-dir marker — cannot establish mutual exclusion; aborting.");
+      log2("FATAL: prologue batch produced no lock-dir marker — cannot establish mutual exclusion; aborting.");
       return { error: "shell-proxy unavailable at lock-dir decision point", task: TASK };
     }
     const gd = lockDirSeg.out.trim().split("\n").pop() || "";
@@ -925,12 +934,12 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       LOCKFILE = `${gd}/rs-lock`;
       const lockCheckSeg = prologue.get("lock-check");
       if (!lockCheckSeg) {
-        log("FATAL: prologue batch produced no lock-check marker — cannot verify mutual exclusion; aborting.");
+        log2("FATAL: prologue batch produced no lock-check marker — cannot verify mutual exclusion; aborting.");
         return { error: "shell-proxy unavailable at lock-check decision point", task: TASK };
       }
       const held = lockCheckSeg.out.trim();
       if (held) {
-        log(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`);
+        log2(`FATAL: another recursive-slice run holds this working tree (lock: ${held}). If that run crashed/was killed, remove ${LOCKFILE} and relaunch.`);
         return { error: "working tree locked by another recursive-slice run", lock: held, lockFile: LOCKFILE, task: TASK };
       }
       const writeBatch = await shBatch(
@@ -938,42 +947,42 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
         "lock-write"
       );
       if (shUnavailable(writeBatch.raw)) {
-        log("FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.");
+        log2("FATAL: shell-proxy unavailable at lock-write — lock file not written; cannot guarantee mutual exclusion; aborting.");
         return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
       }
       if (/<<RS-RACE:lock-write>>/.test(writeBatch.raw.stdout || "")) {
-        log(`FATAL: another recursive-slice run grabbed this working tree between lock-check and lock-write. Remove ${LOCKFILE} if that run is dead, then relaunch.`);
+        log2(`FATAL: another recursive-slice run grabbed this working tree between lock-check and lock-write. Remove ${LOCKFILE} if that run is dead, then relaunch.`);
         return { error: "working tree locked by a concurrent recursive-slice run (lock-write race)", lockFile: LOCKFILE, task: TASK };
       }
       const writeSeg = writeBatch.get("lock-write");
       if (!writeSeg) {
-        log("FATAL: lock-write batch produced no lock-write marker — lock not confirmed; aborting.");
+        log2("FATAL: lock-write batch produced no lock-write marker — lock not confirmed; aborting.");
         return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
       }
       if (writeSeg.code !== 0) {
-        log(`FATAL: lock-write failed (exit ${writeSeg.code}) — lock file not written; cannot guarantee mutual exclusion; aborting.`);
+        log2(`FATAL: lock-write failed (exit ${writeSeg.code}) — lock file not written; cannot guarantee mutual exclusion; aborting.`);
         return { error: "shell-proxy unavailable at lock-write decision point", task: TASK };
       }
     }
   }
   const git = { BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify };
-  const verifyLeaf = makeVerifyLeaf({ host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP });
+  const verifyLeaf = makeVerifyLeaf({ rt, host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP });
   const t0redBreaker = circuitBreaker(2);
   const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i;
   const ABORTS = [];
-  phase("Plan");
+  phase2("Plan");
   let groups = null;
   const autoSharedScratch = baseline.coldBuildCost === "expensive" && A.sharedScratch !== false;
   const useSharedScratch = SHARED_SCRATCH || autoSharedScratch;
   if (autoSharedScratch && !SHARED_SCRATCH)
-    log(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`);
+    log2(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`);
   const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== "expensive" || FORCE_PARALLEL || useSharedScratch);
   if (PARALLEL && GIT && !goParallel)
-    log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? "main tree is DIRTY (merge would conflict with your work)" : "sharedScratch:false explicitly set on a compile-bound repo (worktrees would force per-checkout cold builds → thrashing, slower than sequential-warm; drop sharedScratch:false to use the auto shared build dir, or forceParallel:true to brute-force)"}.`);
+    log2(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? "main tree is DIRTY (merge would conflict with your work)" : "sharedScratch:false explicitly set on a compile-bound repo (worktrees would force per-checkout cold builds → thrashing, slower than sequential-warm; drop sharedScratch:false to use the auto shared build dir, or forceParallel:true to brute-force)"}.`);
   const SCRATCH = goParallel && useSharedScratch ? `${REPO}/.rs-scratch` : "";
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
-  const runWork = makeRunWork({ host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline });
+  const runWork = makeRunWork({ rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline });
   if (goParallel) {
     const a0 = await agentSafe(
       `${R_SLICE}
@@ -999,11 +1008,11 @@ ${INV}`,
       const indep = all.filter((s) => s.independent);
       if (indep.length >= 2) {
         groups = { indep, seq: all.filter((s) => !s.independent), all };
-        log(`parallel plan: ${indep.length} independent group(s) + ${groups.seq.length} sequential`);
-      } else log(`parallel requested but <2 independent top slices — falling back to sequential`);
-    } else log(`parallel requested but root is not big enough to slice — falling back to sequential`);
+        log2(`parallel plan: ${indep.length} independent group(s) + ${groups.seq.length} sequential`);
+      } else log2(`parallel requested but <2 independent top slices — falling back to sequential`);
+    } else log2(`parallel requested but root is not big enough to slice — falling back to sequential`);
   }
-  phase("Work");
+  phase2("Work");
   let done = [];
   let merge = null;
   if (groups) {
@@ -1033,19 +1042,19 @@ ${INV}`,
         if (baseline.worktreeSetupCommand) {
           const setupR = await sh(`cd ${wtPaths[i]} && ${baseline.worktreeSetupCommand}`, `wt-setup:${i}`);
           if (setupR.exitCode !== 0) {
-            log(`worktree g${i} setup command failed (exit ${setupR.exitCode}) — skipping group (no worktree/setup failed)`);
+            log2(`worktree g${i} setup command failed (exit ${setupR.exitCode}) — skipping group (no worktree/setup failed)`);
             delete paths[i];
           }
         }
-      } else log(`worktree g${i} setup failed (exit ${r.exitCode})`);
+      } else log2(`worktree g${i} setup failed (exit ${r.exitCode})`);
     }
     const built = [];
     for (let b = 0; b < groups.indep.length; b += MAX_WORKERS) {
-      const rs = await parallel(groups.indep.slice(b, b + MAX_WORKERS).map((s, j) => async () => {
+      const rs = await parallel2(groups.indep.slice(b, b + MAX_WORKERS).map((s, j) => async () => {
         const idx = b + j;
         const repo = paths[idx];
         if (!repo) {
-          log(`group g${idx} has no worktree — skipped`);
+          log2(`group g${idx} has no worktree — skipped`);
           return { done: [{ task: s.desc, passed: false, verdict: { trustworthy: false, reason: "no worktree" } }] };
         }
         return runWork(`${s.desc}
@@ -1057,9 +1066,9 @@ Interface: ${s.interface}`, repo, 1, idx, true, s.kind, buildNoteFor(repo));
     built.forEach((r) => {
       if (r && r.done) done.push(...r.done);
     });
-    phase("Coordinate");
+    phase2("Coordinate");
     if (getQuotaHalt()) {
-      log(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`);
+      log2(`Coordinate skipped — quota halt active; worktrees preserved for resume (relaunch with resumeFromRunId after the limit resets)`);
     } else {
       let conflicts = 0;
       for (let i = 0; i < N; i++) {
@@ -1086,7 +1095,7 @@ ${N} parallel branches were merged into the working branch (${conflicts} needed 
 ${INV}`,
         { phase: "Coordinate", label: "merge-verify", schema: VERDICT }
       );
-      log(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? "OK" : "ISSUES"}`);
+      log2(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? "OK" : "ISSUES"}`);
       await clearWorktrees("wt-post");
     }
     const all = groups.all, seq = groups.seq;
@@ -1113,16 +1122,16 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
     done = r.done;
   }
   if (overTier.stop) {
-    log(`over-tier stop — skipping integrate/wiring/briefing (nothing was executed)`);
+    log2(`over-tier stop — skipping integrate/wiring/briefing (nothing was executed)`);
     if (LOCKFILE) {
       try {
         await shForce(`rm -f ${LOCKFILE}`, "lock-clear");
       } catch (e) {
-        log(`lock-clear failed — stale lock at ${LOCKFILE}; remove before next run.`);
+        log2(`lock-clear failed — stale lock at ${LOCKFILE}; remove before next run.`);
       }
     }
     return { error: `over-tiered: ${overTier.stop} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: overTier.slices };
   }
-  return await integratePhase({ host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups });
+  return await integratePhase({ rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups });
 }
 return await __main()

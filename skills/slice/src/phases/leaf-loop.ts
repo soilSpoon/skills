@@ -8,15 +8,10 @@ import { R_SLICE, R_EXEC, R_CRITIC } from '../prompts'
 import { circuitBreaker, engineRanBlock } from '../util'
 import type { Breaker } from '../util'
 import type { Host } from '../host'
-import type { ShResult, TraceRecord, AgentOpts, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx } from '../types'
-
-declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
-declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
-declare function phase(title: string): void
-declare function log(message: string): void
-declare const budget: { total: number | null; spent(): number; remaining(): number }
+import type { ShResult, TraceRecord, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx, Runtime } from '../types'
 
 export type RunWorkDeps = {
+  rt: Runtime
   host: Host
   cfg: Limits
   git: GitCtx
@@ -34,7 +29,8 @@ export type RunWorkDeps = {
 }
 
 export const makeRunWork = (d: RunWorkDeps) => {
-const { host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
+const { rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
+const { agent, phase, log, budget } = rt
 const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host
 const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg
 const { GIT, GIT_EXEC } = git

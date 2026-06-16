@@ -6,10 +6,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { makeVerifyLeaf } from '../../src/phases/verify.ts'
 
-globalThis.parallel = async (thunks) => Promise.all(thunks.map((t) => t()))
-
 function mk(agentImpl) {
   return makeVerifyLeaf({
+    rt: { parallel: async (thunks) => Promise.all(thunks.map((t) => t())) },
     host: { sh: async () => ({ exitCode: 0, stdout: '' }), agentSafe: agentImpl, shUnavailable: () => false },
     git: { GIT: false, gitVerify: () => '' },   // GIT:false skips the engine-diff git fetch
     LEAF_TEST: () => '',

@@ -1,14 +1,13 @@
 // Host I/O layer: the agent+quota wrapper (agentSafe) and the deterministic shell proxies (sh/shForce/
-// shBatch). Extracted from main.ts VERBATIM into a zero-dependency factory makeHost() — the whole layer
-// closes over only ambient globals (agent/log) + its OWN quota state (QUOTA_HALT), nothing from config or
-// git, so it lifts out cleanly. main.ts calls makeHost() once and threads these services into every phase.
+// shBatch). Extracted from main.ts VERBATIM into a factory makeHost(rt) — it takes the two platform
+// primitives it uses (agent/log) from the injected Runtime, plus its OWN quota state (QUOTA_HALT);
+// nothing from config or git, so it lifts out cleanly. main.ts calls makeHost(rt) once and threads
+// these services into every phase. No ambient globals — the core depends only on the Runtime type.
 import { circuitBreaker } from './util'
-import type { ShResult, AgentOpts } from './types'
+import type { ShResult, AgentOpts, Runtime } from './types'
 
-declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
-declare function log(message: string): void
-
-export const makeHost = () => {
+export const makeHost = (rt: Pick<Runtime, 'agent' | 'log'>) => {
+const { agent, log } = rt
 let QUOTA_HALT = ''
 // SESSION-scope breaker: 3 consecutive null/failed agent results spanning ≥2 distinct call-classes.
 // A6: same-class-only streaks arise by design (heavy 3-lens loop), so ≥2 distinct classes are

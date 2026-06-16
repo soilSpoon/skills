@@ -3,12 +3,11 @@
 // UNCHANGED — only the closed-over deps are now destructured from `d`. The tsup bundle re-inlines this.
 import { VERDICT } from '../schemas'
 import { R_VERIFY, R_VERIFY_LIGHT } from '../prompts'
-import type { WorkNode, ExecResult, Verdict, RiskTier, ShResult, AgentOpts, GitCtx } from '../types'
+import type { WorkNode, ExecResult, Verdict, RiskTier, ShResult, GitCtx, Runtime } from '../types'
 import type { Host } from '../host'
 
-declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
-
 export type VerifyDeps = {
+  rt: Runtime
   host: Host
   git: GitCtx
   LEAF_TEST: (scope?: string) => string
@@ -17,7 +16,8 @@ export type VerifyDeps = {
 }
 
 export const makeVerifyLeaf = (d: VerifyDeps) => {
-  const { host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d
+  const { rt, host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d
+  const { parallel } = rt
   const { sh, agentSafe, shUnavailable } = host
   const { gitVerify, GIT } = git
   return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
