@@ -16,6 +16,22 @@ function mk(agentImpl) {
     ENGINE_DIFF_CAP: 6000,
   })
 }
+
+// mkNullParallel: simulates the real Workflow runtime's parallel() that catches thunk throws
+// and returns null for that slot (T|null per thunk). Used to test the null-from-throw path
+// (line 88: `v ?? fallback`) independently from the ok:false path (line 85: `r.ok ? r.value : fallback`).
+function mkNullParallel(agentImpl) {
+  return makeVerifyLeaf({
+    rt: {
+      parallel: async (thunks) => Promise.all(thunks.map((t) => t().catch(() => null))),
+    },
+    host: { sh: async () => ({ exitCode: 0, stdout: '' }), agentSafe: agentImpl, shUnavailable: () => false },
+    git: { GIT: false, gitVerify: () => '' },
+    LEAF_TEST: () => '',
+    INV: '',
+    ENGINE_DIFF_CAP: 6000,
+  })
+}
 const node = (over = {}) => ({ task: 't', kind: 'behavior', testScope: 's', ...over })
 const res = { summary: 's', passed: true, evidence: 'e' }
 
@@ -67,4 +83,33 @@ test('standard leaf: a null verdict → untrusted (verification unavailable)', a
   const out = await v('L', node(), res, undefined, '/r', 'sha', '', '')
   assert.equal(out.trustworthy, false)
   assert.match(out.reason, /unavailable|untrusted/)
+})
+
+test('heavy lens: ok:false (api death, any kind) from agentSafe fails unanimity — kind:quota not just kind:null', async () => {
+  // Pins the r.ok branch (line 85 of verify.ts): any ok:false outcome — regardless of kind
+  // (quota/model_unavailable/timeout/refusal/null) — converts to a distrusting Verdict inside the thunk,
+  // before parallel() even sees it. The null-coalesce on line 88 is not reached; the distrust
+  // comes from the explicit fallback in the thunk body. Both code paths must count as distrust.
+  let n = 0
+  const failQuota = () => ({ ok: false, kind: 'quota', detail: 'rate limit' })
+  const v = mk(async () => { n++; return n === 2 ? failQuota() : ok({ trustworthy: true, reason: 'ok' }) })
+  const out = await v('L', node(), res, 'heavy', '/r', 'sha', '', '')
+  assert.equal(out.trustworthy, false, 'ok:false with kind:quota → distrusting Verdict → not unanimous')
+  assert.match(out.reason, /heavy verify: 3 lenses, 1 distrusted/, 'exactly 1 lens distrusted')
+})
+
+test('heavy lens: null slot from parallel() (thunk-level throw, api death) counts as distrust — not a bypass', async () => {
+  // Pins the null-coalesce branch (line 88 of verify.ts): when parallel() catches a thunk throw
+  // and returns null for that slot, the `v ?? fallback` guard converts it to a distrusting Verdict.
+  // This is the "null-from-throw" path — distinct from ok:false (which the thunk itself converts).
+  // Uses mkNullParallel whose parallel() silently catches thunk throws → null (same as real runtime).
+  let n = 0
+  const v = mkNullParallel(async () => {
+    n++
+    if (n === 3) throw new Error('simulated api death at thunk boundary')
+    return ok({ trustworthy: true, reason: 'ok' })
+  })
+  const out = await v('L', node(), res, 'heavy', '/r', 'sha', '', '')
+  assert.equal(out.trustworthy, false, 'null slot from parallel() → distrusting Verdict → not unanimous')
+  assert.match(out.reason, /heavy verify: 3 lenses, 1 distrusted/, 'exactly 1 lens distrusted via null-slot path')
 })
