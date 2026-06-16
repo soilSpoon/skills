@@ -19,8 +19,9 @@
 // momus on the heavy lens preserves the engine's cross-model-diversity goal (GPT vs Claude).
 //
 // NATIVE sh() — the engine's deterministic shell proxy ("Run EXACTLY this shell command…")
-// is executed DIRECTLY via /bin/sh, no LLM at all: free, instant, and MORE deterministic
-// than any agent transport. (On opencode the tier-0 gates are therefore truly deterministic.)
+// is executed DIRECTLY via execFile(/bin/sh) (no LLM at all): free, instant, and MORE
+// deterministic than any agent transport. (On opencode the tier-0 gates are therefore truly
+// deterministic.) execFile remains the underlying call — not spawn, not exec.
 //
 // FIRST RUN — if no config exists the tool does NOT guess silently: it returns a
 // `needsSetup` payload (with a recommended mapping and how it was derived) and instructs the
@@ -44,8 +45,16 @@
 // through the native sh() path. oh-my-openagent's team_* tools are session-internal (not
 // reachable from `opencode run`); wiring them up needs the SDK-plugin form of this adapter.
 //
-// Known degradations (documented, not silent): budget is unlimited (watch your provider
-// quota); each live agent call is a fresh subprocess session (no cross-call provider cache).
+// SDK PATH — createOpencodeServer (or OPENCODE_SERVER_URL env override) +
+// createOpencodeClient from @opencode-ai/sdk v2. Each agentCall() calls session.create then
+// session.prompt with format:{type:"json_schema"} when a schema is provided, or
+// format:{type:"text"} otherwise. The server+client pair is a lazy singleton per process.
+//
+// Known degradations (documented, not silent):
+//   • GUARDED json-repair fallback: active only when schema=undefined (providers lacking
+//     native format support); documented in agentCall() — see the schema branch above.
+//   • parallel() is Promise.all — no real worktree-parallel SDK support; same constraint
+//     as before (OMO team_* tools are session-internal, not reachable from opencode run).
 import { tool } from "@opencode-ai/plugin"
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs"
 import { createHash } from "node:crypto"
