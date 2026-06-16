@@ -177,3 +177,26 @@ test('shBatch: dead proxy → get() null for every name (whole-batch outage dete
   assert.ok(host.shUnavailable(b.raw), 'raw is the sentinel')
   assert.equal(b.get('anything'), null)
 })
+
+test('shUnavailable: value-equality branch detects byte-identical clone even when reference differs', async () => {
+  // Pins the sentinel's value-equality fallback: a clone of SH_UNAVAILABLE (same bytes, different
+  // object identity) must still satisfy shUnavailable(). This remains correct after the AgentOutcome
+  // refactor because sh() unwraps r.value (not the raw outcome) — a serialized/cloned sentinel must
+  // not slip through a reference-only check at any call site (git-sha, gitClean, lock reads etc.).
+  const host = withHost(async () => ({ exitCode: 0, stdout: 'anything' }))
+  const clone = { exitCode: -2, stdout: '\x00SH_UNAVAILABLE' }
+  assert.ok(host.shUnavailable(clone), 'value-equality branch: byte-identical clone is detected as unavailable sentinel')
+  assert.equal(host.shUnavailable({ exitCode: -2, stdout: 'not-sentinel' }), false, 'wrong stdout: not a sentinel')
+  assert.equal(host.shUnavailable({ exitCode: 0, stdout: '\x00SH_UNAVAILABLE' }), false, 'wrong exitCode: not a sentinel')
+})
+
+test('sh: null agentSafe (agent returns null) → SH_UNAVAILABLE returned and shUnavailable is true', async () => {
+  // Pins the full sh() path after AgentOutcome type change: agentSafe wraps null as { ok:false,
+  // kind:'null' }; sh() must unwrap and return SH_UNAVAILABLE (not the outcome), so shUnavailable()
+  // still fires correctly at decision sites (git-sha / gitClean / lock reads).
+  const host = withHost(async () => null)
+  const r = await host.sh('git rev-parse HEAD')
+  assert.ok(host.shUnavailable(r), 'sh() with null agent → shUnavailable(result) is true')
+  assert.equal(r.exitCode, -2, 'exitCode is the sentinel value -2')
+  assert.ok(r.stdout.startsWith('\x00SH_UNAVAILABLE'), 'stdout starts with the sentinel prefix')
+})
