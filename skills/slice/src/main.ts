@@ -4,6 +4,7 @@
 import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
 import { R_BASELINE, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
 import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel } from './types'
+import { b64encode, circuitBreaker, engineRanBlock } from './util'
 
 // ===== Workflow runtime ambient contract (the PORT) ==========================
 // Any host that injects these globals can run the emitted engine unchanged:
@@ -25,65 +26,15 @@ declare function phase(title: string): void
 declare function log(message: string): void
 declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
-// ITEM 2 / 2026-06-16 MailKit dogfood: the host runs the emitted engine as a Node AsyncFunction body,
-// but the Workflow runtime sandbox does NOT expose Node's `Buffer` global — `Buffer.from(...)` threw
-// "Buffer is not defined" and SILENTLY degraded the JSONL run-trace + owner-briefing persist (both
-// observability; run unaffected, but the comprehension-debt ledger was lost). Use a dependency-free
-// UTF-8→base64 encoder (no Buffer/btoa/TextEncoder) so both paths survive any host. The base64 alphabet
-// is shell-safe, so arbitrary role/label/briefing text never reaches the deterministic `sh` write proxy
-// verbatim (the keep-text-out-of-shell discipline). Verified byte-identical to Buffer across ASCII /
-// multibyte UTF-8 / surrogate-pair vectors + round-trip through `base64 -d`.
-const b64encode = (str: string): string => {
-  const bytes: number[] = []
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i)
-    if (c < 0x80) bytes.push(c)
-    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f))
-    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
-      const cp = 0x10000 + ((c & 0x3ff) << 10) + (str.charCodeAt(++i) & 0x3ff)
-      bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f))
-    } else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))
-  }
-  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 3) {
-    const n = bytes.length - i
-    const b0 = bytes[i], b1 = n > 1 ? bytes[i + 1] : 0, b2 = n > 2 ? bytes[i + 2] : 0
-    out += A[b0 >> 2] + A[((b0 & 3) << 4) | (b1 >> 4)]
-    out += n > 1 ? A[((b1 & 15) << 2) | (b2 >> 6)] : '='
-    out += n > 2 ? A[b2 & 63] : '='
-  }
-  return out
-}
-
 async function __main(): Promise<EngineResult> {
 // Runtime-throw containment: agent() can THROW rather than return null (observed live:
 // "subagent completed without calling StructuredOutput" killed a 50-agent, 5-hour run that
 // the null path would have survived — the engine already treats null as distrust/retry at
 // every call site). Convert throws to null; budget/ceiling throws stay fatal — they mean
 // STOP, and the Integrate try/catch owns that cleanup path.
-// ITEM 11a: ONE circuit-breaker abstraction, instantiated three ways (this engine had three ad-hoc
-// counter+constant+comment clusters that are the SAME breaker at different (class, scope)). A breaker
-// counts a consecutive failure streak and, optionally, the DISTINCT call-classes seen during it; it
-// trips when streak ≥ `threshold` AND the distinct-class count ≥ `classThreshold` (default 0 = no
-// class gate — `record()` is called with no class and the gate is vacuously true). The three guards
-// below parameterize it: quota = circuitBreaker(3, 2) at SESSION scope (≥2 distinct classes is part of
-// its trip rule), untrusted = circuitBreaker(MAX_UNTRUSTED_STREAK) at UNIT scope, t0red =
-// circuitBreaker(2) at RUN scope. Behavior-preserving: thresholds, scopes, halt/disable ACTIONS, and
-// resumability are UNCHANGED — only the three counters are replaced by named parameterizations.
-//   • `.record(klass?)` bumps the streak (and adds the class when given), returns the new streak;
-//   • `.streak` exposes the live count (some ACTION log lines embed it verbatim);
-//   • `.tripped()` is the trip predicate (threshold + class gate); `.reset()` clears streak+classes.
-const circuitBreaker = (threshold: number, classThreshold = 0) => {
-  let streak = 0
-  const classes = new Set<string>()
-  return {
-    record(klass?: string) { streak++; if (klass !== undefined) classes.add(klass); return streak },
-    get streak() { return streak },
-    tripped() { return streak >= threshold && classes.size >= classThreshold },
-    reset() { streak = 0; classes.clear() },
-  }
-}
+// circuitBreaker (the ONE breaker abstraction) → src/util.ts. Instantiated three ways below: quota =
+// circuitBreaker(3, 2) at SESSION scope, untrusted = circuitBreaker(MAX_UNTRUSTED_STREAK) at UNIT scope,
+// t0red = circuitBreaker(2) at RUN scope. Behavior-preserving: thresholds/scopes/ACTIONS/resumability UNCHANGED.
 // Quota circuit breaker: a session/usage-limit death is NOT a one-off null — left alone it
 // kills every subsequent agent serially (observed live: 12 consecutive corpses after one
 // "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
@@ -336,8 +287,7 @@ const LEAF_TEST = (scope?: string) =>
 // gate runs and how RED is handled legitimately differs per site and stays inline; only this shared STRING is
 // extracted here. (The merge/integrate nets use a different surface form — `exit=N (GREEN/RED)` mid-prose, no
 // ENGINE-RAN prefix / no tail — so they are NOT folded in: that would change the byte-text the verifier sees.)
-const engineRanBlock = ({ cmd, note, exitCode, tail, duty }: { cmd: string; note?: string; exitCode: number; tail: string; duty: string }): string =>
-  `\nENGINE-RAN: \`${cmd}\`${note ? ' ' + note : ''} exited ${exitCode}. Output tail: ${tail}\n${duty}`
+// engineRanBlock (shell-truth→ENGINE-RAN→judge string) → src/util.ts.
 
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
 // didn't, disabling git mode). A fixed `git rev-parse HEAD`, run verbatim, owns this.

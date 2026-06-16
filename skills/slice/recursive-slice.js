@@ -141,7 +141,7 @@ var R_VERIFY_LIGHT = "You are the Verifier in LIGHT mode (low-risk leaf). No ful
 var R_CRITIC = 'You are the Completeness Critic (Beck: the test LIST is the step everyone skips). Given a task and a proposed list of slices/scenarios, find what is MISSING — boundary inputs, empty/null, error paths, the one edge case most likely to break trust that nobody listed. Return ONLY genuinely missing, independently-verifiable items with a contract each. Do NOT pad or restate existing items; if complete, return an empty array. ACCEPTANCE COVERAGE (spec-first handoff): if the TASK carries an "ACCEPTANCE VARIANTS" block (lines like "[now] token (Ln) criterion" handed in by spec-first), ALSO audit COVERAGE — for each NOW acceptance variant, check whether some proposed slice addresses it; report any UNCOVERED variant as a missing item (cite its token). A named acceptance variant that no slice covers is exactly the gap this audit exists to catch.';
 var R_COORD = "You are the Coordinator — the ONLY agent with global context. A conflict has occurred merging one branch of a parallel build. Resolve the hunk by HONORING BOTH slices' stated intent — never silently discard a side's work; if genuinely irreconcilable, keep the lower-indexed slice and record the loss as an issue. Report the conflict resolved and any lost work in issues.";
 
-// src/main.ts
+// src/util.ts
 var b64encode = (str) => {
   const bytes = [];
   for (let i = 0; i < str.length; i++) {
@@ -164,28 +164,33 @@ var b64encode = (str) => {
   }
   return out;
 };
-async function __main() {
-  const circuitBreaker = (threshold, classThreshold = 0) => {
-    let streak = 0;
-    const classes = /* @__PURE__ */ new Set();
-    return {
-      record(klass) {
-        streak++;
-        if (klass !== void 0) classes.add(klass);
-        return streak;
-      },
-      get streak() {
-        return streak;
-      },
-      tripped() {
-        return streak >= threshold && classes.size >= classThreshold;
-      },
-      reset() {
-        streak = 0;
-        classes.clear();
-      }
-    };
+var circuitBreaker = (threshold, classThreshold = 0) => {
+  let streak = 0;
+  const classes = /* @__PURE__ */ new Set();
+  return {
+    record(klass) {
+      streak++;
+      if (klass !== void 0) classes.add(klass);
+      return streak;
+    },
+    get streak() {
+      return streak;
+    },
+    tripped() {
+      return streak >= threshold && classes.size >= classThreshold;
+    },
+    reset() {
+      streak = 0;
+      classes.clear();
+    }
   };
+};
+var engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
+ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
+${duty}`;
+
+// src/main.ts
+async function __main() {
   let QUOTA_HALT = "";
   const quotaBreaker = circuitBreaker(3, 2);
   const callClass = (opts) => (opts && (opts.label || opts.phase) || "").replace(/[:·].*/u, "").trim() || "unknown";
@@ -332,9 +337,6 @@ Executors apply them; verifiers treat clear violations as issues (a skipped non-
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const LEAF_TEST = (scope) => `
 LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test you add so this EXACT token matches the runner's filter. Know your runner: many match a FUNCTION/TEST-NAME substring (Swift Testing \`--filter\`, pytest \`-k\`) — for those put \`${scope}\` IN the @Test/test-function name, NOT a suite path; suite-path runners match the suite/class name. (The engine re-runs this filter as the deterministic gate; a name mismatch = zero tests matched, which now degrades THIS leaf to LLM-verify — a FINDING, not a false RED.) ` : `Filter to the test you add or touch — match the runner's filter syntax (function-name substring for Swift Testing/pytest; suite path otherwise). `) + `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize. REPORT \`testScope\` in your result: the SINGLE bare token (a suite name, or a shared substring of the test names you added — matching /^[A-Za-z0-9_.-]+$/; NO spaces/slashes/'|') under which the project-card filter form runs EXACTLY the test(s) you added/touched and nothing unrelated. The engine re-runs that filter as the deterministic per-leaf gate — so it MUST match the names you actually used (a wrong token zero-matches → this leaf degrades to LLM-verify, never a false RED). This is what binds the deterministic gate when no scope was handed to you above; without it the leaf rests on the LLM verifier alone.`;
-  const engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
-ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
-${duty}`;
   const probe = `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`;
   let prologue = await shBatch(probe, "prologue");
   if (shUnavailable(prologue.raw)) {
