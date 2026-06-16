@@ -54,6 +54,7 @@ export interface SliceSpec {
   riskTier?: RiskTier
   testScope?: string
   seamPointers?: SeamPointer[]  // OPTIONAL: seams the Slicer already resolved — threaded to Executor as anchors
+  files?: string[]              // OPTIONAL: concrete files this slice will touch — leafConcurrency scheduler reads these for file-disjoint scheduling
 }
 export interface ExecResult {
   summary: string
@@ -88,6 +89,7 @@ export interface WorkNode {
   riskTier?: RiskTier
   testScope?: string
   seamPointers?: SeamPointer[]  // OPTIONAL: seams already resolved by the Slicer — passed through to exec prompt as anchors
+  files?: string[]              // OPTIONAL: concrete files this leaf will touch — leafConcurrency scheduler reads these (absent → serial fallback)
 }
 /** Which deterministic trust-floor gate actually ran for a leaf before the LLM verifier.
  *  'deterministic-filtered' = engine ran the filtered tier-0 (green); 'full-suite' = tidy leaf,

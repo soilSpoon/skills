@@ -69,3 +69,30 @@ export const classifyFailure = (err: unknown): 'quota' | 'model_unavailable' | '
   if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) return 'model_unavailable'
   return 'null'
 }
+
+// leafConcurrency scheduler core (PURE). Given sibling leaves that EACH declare their `files` (the
+// caller falls back to fully-serial if ANY leaf lacks files[], so a missing/empty files[] here is
+// treated as not-concurrency-safe and skipped), return the indices that can START NOW: their
+// `dependsOn` are ALL done, and their files are disjoint from the in-flight set AND from each other.
+// Greedy scan in index order (deterministic), capped at K. `done` = completed indices (also satisfies
+// deps); `started` = already-launched indices to skip; `inFlight` = files of started-but-unfinished leaves.
+export const pickConcurrentLeaves = (
+  leaves: ReadonlyArray<{ files?: string[]; dependsOn?: number[] }>,
+  done: ReadonlySet<number>,
+  inFlight: ReadonlySet<string>,
+  K: number,
+  started: ReadonlySet<number> = new Set<number>(),
+): number[] => {
+  const picked: number[] = []
+  const claimed = new Set<string>(inFlight)
+  for (let i = 0; i < leaves.length && picked.length < K; i++) {
+    if (done.has(i) || started.has(i)) continue
+    const files = leaves[i].files
+    if (!files || files.length === 0) continue                              // no declared files → not concurrency-safe
+    if ((leaves[i].dependsOn || []).some((dep) => !done.has(dep))) continue  // a prerequisite is not done yet
+    if (files.some((f) => claimed.has(f))) continue                         // file clash (in-flight or a batch-mate)
+    picked.push(i)
+    for (const f of files) claimed.add(f)
+  }
+  return picked
+}

@@ -63,8 +63,10 @@ var SLICE_ITEM = { type: "object", required: ["desc", "interface", "contract"], 
     // function/type/const name at the seam
     currentText: { type: "string" }
     // short snippet of current text at the seam (for quick visual confirm)
-  } } }
+  } } },
   // OPTIONAL → backward-compatible; existing slices without this field are unchanged
+  files: { type: "array", items: { type: "string" } }
+  // OPTIONAL: concrete files this slice will touch — leafConcurrency scheduler reads these for file-disjoint scheduling (any slice missing files[] → serial fallback)
 } };
 var DECOMPOSE = { type: "object", required: ["action", "reason"], properties: {
   action: { type: "string", enum: ["execute", "slice", "spike"] },
@@ -193,6 +195,20 @@ var classifyFailure = (err) => {
   if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) return "quota";
   if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) return "model_unavailable";
   return "null";
+};
+var pickConcurrentLeaves = (leaves, done, inFlight, K, started = /* @__PURE__ */ new Set()) => {
+  const picked = [];
+  const claimed = new Set(inFlight);
+  for (let i = 0; i < leaves.length && picked.length < K; i++) {
+    if (done.has(i) || started.has(i)) continue;
+    const files = leaves[i].files;
+    if (!files || files.length === 0) continue;
+    if ((leaves[i].dependsOn || []).some((dep) => !done.has(dep))) continue;
+    if (files.some((f) => claimed.has(f))) continue;
+    picked.push(i);
+    for (const f of files) claimed.add(f);
+  }
+  return picked;
 };
 
 // src/phases/verify.ts
@@ -380,7 +396,7 @@ ${INV}`,
             const iface = slices[j].interface;
             const ifaceCtx = iface && !/^TBD/i.test(iface.trim()) ? `
 Interface (FIXED): ${iface}` : "";
-            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 });
+            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, files: slices[j].files, depth: node.depth + 1, spikes: 0 });
           }
           continue;
         }
