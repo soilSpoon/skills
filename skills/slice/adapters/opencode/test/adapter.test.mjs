@@ -20,6 +20,7 @@ import {
   agentCall,
   makeBudgetAccumulator,
   SH_PREFIX,
+  classifySdkError,
 } from "../slice-engine.ts"
 
 // ── A: type-check ─────────────────────────────────────────────────────────────
@@ -540,6 +541,77 @@ describe("adapter artifact-freshness-canary", () => {
         `Freshness canary: recursive-slice.js (mtime ${new Date(artifactMtime).toISOString()}) is OLDER than src/${f} (${new Date(srcMtime).toISOString()}). The integration phase MUST call 'sh scripts/build-engine.sh' before invoking the adapter rig. See adapters/opencode/README.md.`,
       )
     }
+  })
+})
+
+// ── I: classifySdkError — SDK error name → AgentOutcome kind mapping ──────────
+// Behavioral claim: classifySdkError() maps each SDK PromptError.name (and optional statusCode)
+// to an AgentOutcome<T> {ok:false, kind, detail} — the opencode adapter's SDK-to-engine bridge.
+// The L0 classifyFailure in util.ts is PURE (message-pattern only); this adapter-local function
+// is the SDK-error-to-kind extension (schema/timeout/refusal are opencode-specific kinds).
+describe("adapter classifySdkError", () => {
+  it("StructuredOutputError → {ok:false, kind:'schema', detail:string}", () => {
+    // Behavioral claim: schema parse failure from the SDK maps to the schema kind.
+    const result = classifySdkError("StructuredOutputError")
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "schema")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0,
+      `expected non-empty detail string, got: ${result.detail}`)
+  })
+
+  it("MessageAbortedError → {ok:false, kind:'timeout', detail:string}", () => {
+    // Behavioral claim: session abort (timeout/cancel) from the SDK maps to the timeout kind.
+    const result = classifySdkError("MessageAbortedError")
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "timeout")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0)
+  })
+
+  it("ProviderAuthError → {ok:false, kind:'refusal', detail:string}", () => {
+    // Behavioral claim: auth rejection (content flag / credentials) maps to the refusal kind.
+    const result = classifySdkError("ProviderAuthError")
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "refusal")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0)
+  })
+
+  it("APIError with statusCode 429 → {ok:false, kind:'quota', detail:string}", () => {
+    // Behavioral claim: HTTP 429 (rate-limit / quota) from APIError maps to quota kind.
+    const result = classifySdkError("APIError", 429)
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "quota")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0)
+  })
+
+  it("APIError with statusCode 503 → {ok:false, kind:'model_unavailable', detail:string}", () => {
+    // Behavioral claim: HTTP 503 (service unavailable) from APIError maps to model_unavailable kind.
+    const result = classifySdkError("APIError", 503)
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "model_unavailable")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0)
+  })
+
+  it("APIError with statusCode 401 → {ok:false, kind:'refusal', detail:string}", () => {
+    // Behavioral claim: HTTP 401 (auth) from APIError maps to refusal kind.
+    const result = classifySdkError("APIError", 401)
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "refusal")
+    assert.ok(typeof result.detail === "string" && result.detail.length > 0)
+  })
+
+  it("UnknownError → {ok:false, kind:'null', detail:string}", () => {
+    // Behavioral claim: unrecognised SDK error names fall through to the null kind (same as L0 classifyFailure).
+    const result = classifySdkError("UnknownError")
+    assert.strictEqual(result.ok, false)
+    assert.strictEqual(result.kind, "null")
+    assert.ok(typeof result.detail === "string")
+  })
+
+  it("classifySdkError accepts an optional detail string and includes it verbatim", () => {
+    // Behavioral claim: when a detail hint is supplied (e.g. err.message), it is embedded in result.detail.
+    const result = classifySdkError("StructuredOutputError", undefined, "schema parse failed: missing role")
+    assert.ok(result.detail.includes("schema parse failed: missing role"),
+      `expected detail to include supplied hint, got: ${result.detail}`)
   })
 })
 

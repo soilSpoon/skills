@@ -131,6 +131,42 @@ export type AgentOutcome =
   | { kind: "ok"; value: unknown }
   | { kind: "null" }
 
+// classifySdkError: maps an SDK PromptError name (and optional HTTP statusCode) to an
+// AgentOutcome<unknown> {ok:false, kind, detail} — the opencode adapter's SDK-error-to-kind
+// bridge. The L0 classifyFailure in util.ts is PURE (message-pattern only); this function
+// is the opencode-specific extension adding schema/timeout/refusal kinds.
+//   StructuredOutputError → schema   (JSON parse / schema validation failure)
+//   MessageAbortedError   → timeout  (session abort / cancel / timeout)
+//   ProviderAuthError     → refusal  (content flag or auth rejection)
+//   APIError 429/quota    → quota    (rate-limit / quota exhaustion)
+//   APIError 401/403      → refusal  (auth/forbidden)
+//   APIError 5xx          → model_unavailable (server-side unavailability)
+//   anything else         → null     (unrecognised; same default as L0 classifyFailure)
+export const classifySdkError = (
+  errorName: string,
+  statusCode?: number,
+  hint?: string,
+): { ok: false; kind: "schema" | "quota" | "model_unavailable" | "timeout" | "refusal" | "null"; detail: string } => {
+  const base = hint ?? errorName
+  if (errorName === "StructuredOutputError")
+    return { ok: false, kind: "schema", detail: `SDK StructuredOutputError: ${base}` }
+  if (errorName === "MessageAbortedError")
+    return { ok: false, kind: "timeout", detail: `SDK MessageAbortedError: ${base}` }
+  if (errorName === "ProviderAuthError")
+    return { ok: false, kind: "refusal", detail: `SDK ProviderAuthError: ${base}` }
+  if (errorName === "APIError") {
+    if (statusCode === 429 || statusCode === 402)
+      return { ok: false, kind: "quota", detail: `SDK APIError HTTP ${statusCode ?? ""}: ${base}` }
+    if (statusCode === 401 || statusCode === 403)
+      return { ok: false, kind: "refusal", detail: `SDK APIError HTTP ${statusCode ?? ""}: ${base}` }
+    if (statusCode != null && statusCode >= 500)
+      return { ok: false, kind: "model_unavailable", detail: `SDK APIError HTTP ${statusCode}: ${base}` }
+    // APIError with unknown/missing status → quota (safe default for billing errors)
+    return { ok: false, kind: "quota", detail: `SDK APIError HTTP ${statusCode ?? "?"}: ${base}` }
+  }
+  return { ok: false, kind: "null", detail: `SDK ${errorName}: ${base}` }
+}
+
 // Minimal client interface needed by agentCall (injectable for tests)
 export type PromptTokens = { input: number; output: number; reasoning: number; cache: { read: number; write: number } }
 export type PromptError = { name: string; data?: { statusCode?: number } }
