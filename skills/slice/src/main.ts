@@ -337,7 +337,7 @@ if (GIT) {
 //   standard        → one independent reproduction
 //   heavy (hard)    → 3 perspective-diverse skeptics (PARALLEL — runtime queues concurrent calls safely); UNANIMOUS trust required
 // the git/repo context, bundled — all members final by here (BASE_SHA, GIT_EXEC, gitVerify, LOCKFILE all set above)
-const git = { REPO, BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify }
+const git = { BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify }   // GIT-mode state only; REPO threaded separately (git-independent)
 const verifyLeaf = makeVerifyLeaf({ host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP })
 
 // ---- runWork: the recursive decomposition+execution loop for ONE work unit, in ONE repo
@@ -385,7 +385,7 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 // The leaf loop (src/phases/leaf-loop.ts) — wired here, AFTER SCRATCH is known, with all its shared services.
-const runWork = makeRunWork({ host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline: baseline! })
+const runWork = makeRunWork({ host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline: baseline! })
 if (goParallel) {
   // ITEM 10: the merged decompose role gates the partition — does the ROOT split (action:'slice') or is
   // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
@@ -552,6 +552,6 @@ if (overTier.stop) {
 }
 
 // =============================================================================
-return await integratePhase({ host, git, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
+return await integratePhase({ host, git, REPO, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
 
 }

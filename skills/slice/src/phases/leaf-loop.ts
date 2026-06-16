@@ -20,6 +20,7 @@ export type RunWorkDeps = {
   host: Host
   cfg: Limits
   git: GitCtx
+  REPO: string
   SCRATCH: string
   trace: (rec: TraceRecord) => Promise<void>
   verifyLeaf: (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string) => Promise<Verdict>
@@ -33,10 +34,10 @@ export type RunWorkDeps = {
 }
 
 export const makeRunWork = (d: RunWorkDeps) => {
-const { host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
+const { host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
 const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host
 const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg
-const { REPO, GIT, GIT_EXEC } = git
+const { GIT, GIT_EXEC } = git
 async function runWork(rootTask: string, repo: string, startDepth: number, gid?: number | string, cleanOK?: boolean, kind?: SliceKind, buildNote?: string): Promise<{ done: LeafRecord[] }> {
   buildNote = buildNote || ''
   const tag = gid != null ? `g${gid}:` : ''

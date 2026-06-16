@@ -161,8 +161,9 @@ export type Limits = {
   MAX_UNTRUSTED_STREAK: number
   CONFIRM_TIER: boolean
 }
+// GitCtx = the target repo's GIT-mode state (all members are git-gated). REPO (the repo path, used
+// git-independently) is threaded SEPARATELY so the bundle name doesn't over-imply git-gating.
 export type GitCtx = {
-  REPO: string
   BASE_SHA: string
   GIT: boolean
   GIT_EXEC: string

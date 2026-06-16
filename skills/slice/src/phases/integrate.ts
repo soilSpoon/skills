@@ -17,6 +17,7 @@ declare const budget: { total: number | null; spent(): number; remaining(): numb
 export type IntegrateDeps = {
   host: Host
   git: GitCtx
+  REPO: string
   INV: string
   TASK: string
   baseline: Baseline
@@ -27,9 +28,9 @@ export type IntegrateDeps = {
 }
 
 export const integratePhase = async (d: IntegrateDeps): Promise<EngineResult> => {
-const { host, git, INV, TASK, baseline, ABORTS, done, merge, groups } = d
+const { host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d
 const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host
-const { REPO, BASE_SHA, GIT, LOCKFILE } = git
+const { BASE_SHA, GIT, LOCKFILE } = git
 phase('Integrate')
 // DETERMINISTIC system-level net (④): per-leaf full-suite runs were removed, so the whole-system regression
 // gate must NOT rest on a single soft LLM call (a late budget cutoff could starve it to null, leaving committed
