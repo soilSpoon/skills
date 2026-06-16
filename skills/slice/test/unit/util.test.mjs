@@ -98,3 +98,22 @@ test('classifyFailure: non-Error object → null', () => {
   // host.ts: String(e && e.message || e) — non-Error coerces to message-less string → null
   assert.equal(classifyFailure({ code: 42 }), 'null')
 })
+
+// classifyFailure falsy-input contract: `(err as any) && (err as any).message` short-circuits to
+// the falsy value itself for null/0/false — String(null||null)→'null', String(0||0)→'0',
+// String(false||false)→'false' — none match quota or model_unavailable, so all return 'null'.
+// Pins: "what does classifyFailure(null) return?" is 'null' (the kind string, not JS null).
+test('classifier: classifyFailure(null) returns the kind-string null, not JS null', () => {
+  // The `&&` short-circuit exits at null; String(null || null) = 'null'; matches no regex → 'null'.
+  assert.equal(classifyFailure(null), 'null')
+})
+
+test('classifier: classifyFailure(0) returns null kind (falsy non-Error short-circuit)', () => {
+  // `0 && 0.message` → 0; String(0 || 0) = '0'; matches no quota/model regex → 'null'.
+  assert.equal(classifyFailure(0), 'null')
+})
+
+test('classifier: classifyFailure(false) returns null kind (falsy non-Error short-circuit)', () => {
+  // `false && false.message` → false; String(false || false) = 'false'; matches no regex → 'null'.
+  assert.equal(classifyFailure(false), 'null')
+})
