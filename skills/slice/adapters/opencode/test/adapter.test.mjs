@@ -344,6 +344,164 @@ describe("adapter I7-guard-smoke", () => {
   })
 })
 
+// ── G: json_schema happy-path + schema error injection ────────────────────────
+// Behavioral claim: when a schema is provided agentCall() uses json_schema format and
+// returns info.structured on success; returns null on schema violation or when
+// info.structured is missing despite the schema flag.
+describe("adapter json-schema-path", () => {
+  // Helper: set OPENCODE_LIVE=1, call agentCall with a mock client, then restore env.
+  const withLive = async (clientOrFn) => {
+    const prev = process.env.OPENCODE_LIVE
+    process.env.OPENCODE_LIVE = "1"
+    try {
+      const client = typeof clientOrFn === "function" ? clientOrFn() : clientOrFn
+      return await agentCall("route this task", "executor", {
+        repo: "/tmp",
+        schema: { type: "object", properties: { role: { type: "string" } }, required: ["role"] },
+        client,
+      })
+    } finally {
+      if (prev === undefined) delete process.env.OPENCODE_LIVE
+      else process.env.OPENCODE_LIVE = prev
+    }
+  }
+
+  it("happy-path: info.structured non-null with schema → returns structured value (AgentOutcome ok)", async () => {
+    // Behavioral claim: json_schema success path returns info.structured directly.
+    const expected = { role: "executor" }
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "s1" } }),
+        prompt: async (params) => {
+          // Verify format is json_schema
+          assert.deepEqual(params.format, { type: "json_schema", schema: { type: "object", properties: { role: { type: "string" } }, required: ["role"] } })
+          return {
+            data: {
+              info: {
+                tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+                structured: expected,
+              },
+              parts: [],
+            },
+          }
+        },
+      },
+    }
+    const result = await withLive(client)
+    assert.deepEqual(result, expected, `expected structured value ${JSON.stringify(expected)}, got: ${JSON.stringify(result)}`)
+  })
+
+  it("schema present but info.structured is null → returns null (distrust)", async () => {
+    // Behavioral claim: structured output missing despite schema flag → null (engine treats as distrust).
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "s2" } }),
+        prompt: async () => ({
+          data: {
+            info: {
+              tokens: { input: 5, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+              structured: null,
+            },
+            parts: [{ type: "text", text: "some text" }],
+          },
+        }),
+      },
+    }
+    assert.strictEqual(await withLive(client), null)
+  })
+
+  it("StructuredOutputError with schema → null (schema violation error injection)", async () => {
+    // Behavioral claim: schema violation error from server maps to null via the error branch.
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "s3" } }),
+        prompt: async () => ({
+          data: {
+            info: {
+              tokens: { input: 5, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              error: { name: "StructuredOutputError", data: { statusCode: 422 } },
+            },
+            parts: [],
+          },
+        }),
+      },
+    }
+    assert.strictEqual(await withLive(client), null)
+  })
+
+  it("MessageAbortedError with schema → null (timeout error injection)", async () => {
+    // Behavioral claim: timeout/abort on a schema call also maps to null (not thrown).
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "s4" } }),
+        prompt: async () => ({
+          data: {
+            info: {
+              tokens: { input: 5, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              error: { name: "MessageAbortedError" },
+            },
+            parts: [],
+          },
+        }),
+      },
+    }
+    assert.strictEqual(await withLive(client), null)
+  })
+
+  it("ProviderAuthError with schema → null (refusal/auth error injection)", async () => {
+    // Behavioral claim: auth errors on schema calls are treated as refusals → null.
+    const client = {
+      session: {
+        create: async () => ({ data: { id: "s5" } }),
+        prompt: async () => ({
+          data: {
+            info: {
+              tokens: { input: 5, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+              error: { name: "ProviderAuthError" },
+            },
+            parts: [],
+          },
+        }),
+      },
+    }
+    assert.strictEqual(await withLive(client), null)
+  })
+
+  it("happy-path: session.create uses agentName when config has a role mapping", async () => {
+    // Behavioral claim: executor role maps to the right agentName in session.create params.
+    let capturedCreateParams
+    const client = {
+      session: {
+        create: async (params) => { capturedCreateParams = params; return { data: { id: "s6" } } },
+        prompt: async () => ({
+          data: {
+            info: {
+              tokens: { input: 5, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+              structured: { role: "executor" },
+            },
+            parts: [],
+          },
+        }),
+      },
+    }
+    const prev = process.env.OPENCODE_LIVE
+    process.env.OPENCODE_LIVE = "1"
+    try {
+      await agentCall("do work", "executor", {
+        repo: "/tmp",
+        schema: { type: "object", properties: { role: { type: "string" } }, required: ["role"] },
+        agentName: "sisyphus-junior",
+        client,
+      })
+      assert.strictEqual(capturedCreateParams.agent, "sisyphus-junior", "agentName should be forwarded to session.create")
+      assert.strictEqual(capturedCreateParams.directory, "/tmp", "repo should be forwarded as directory")
+    } finally {
+      if (prev === undefined) delete process.env.OPENCODE_LIVE
+      else process.env.OPENCODE_LIVE = prev
+    }
+  })
+})
+
 // ── LIVE round-trip gate (opt-in: OPENCODE_LIVE=1) ───────────────────────────
 // Behavioral claim: a real opencode session returns a non-null string for a trivial prompt.
 if (process.env.OPENCODE_LIVE) {
