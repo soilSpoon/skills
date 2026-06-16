@@ -6,3 +6,5 @@ build-config-drift-workspace/
 # outer-loop runtime artifacts (scripts/outer-loop.mjs): per-lane worktrees + the status ledger.
 .loop/
 docs/loop-status.jsonl
+docs/run-traces/
+docs/briefings/
