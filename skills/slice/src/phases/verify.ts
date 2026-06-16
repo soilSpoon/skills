@@ -20,7 +20,7 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
   const { parallel } = rt
   const { sh, agentSafe, shUnavailable } = host
   const { gitVerify, GIT } = git
-  return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
+  return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string, diffRange?: string): Promise<Verdict> => {
   // ④ tidy: engine already ran the full suite (ENGINE-RAN); light: diff-audit path — no filter-run;
   // engineT0 non-empty: engine already ran filtered gate — injecting LEAF_TEST is contradictory noise.
   const leafTest = (node.kind === 'tidy' || tier === 'light' || !!engineT0) ? '' : LEAF_TEST(node.testScope)
@@ -48,7 +48,7 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
   let engineDiff = ''
   if (GIT && leafStart && node.kind !== 'tidy') {
     const d = await sh(
-      `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+      `git -C ${repo} diff ${diffRange || (leafStart + '..HEAD')} -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
       `verify-diff:${lbl}`)
     if (!shUnavailable(d)) {
       const body = String(d.stdout || '')

@@ -13,6 +13,7 @@ export interface EngineArgs {
   confirmTier?: boolean      // opt-in ack: proceed with the engine even when the depth-0 over-tier gate fires (compile-bound + breadth<=3 + every slice explicitly riskTier:'light')
   confirmNoRig?: boolean     // opt-in ack: proceed even when the post-baseline testing-readiness gate fires (baseliner judged no runnable test rig → empty trust floor)
   skills?: unknown          // validated at use: string[] of guide-file paths
+  leafConcurrency?: number  // opt-in (default 1 = OFF): run file-disjoint atomic sibling leaves concurrently (K=2-4, commit-if-trusted)
 }
 /** Baseliner output (BASELINE schema). filterCommand is mutable: the engine kills a broken template at runtime. */
 export interface Baseline {
@@ -174,6 +175,7 @@ export type Limits = {
   MAX_REPAIR_HARD: number
   MAX_UNTRUSTED_STREAK: number
   CONFIRM_TIER: boolean
+  LEAF_CONCURRENCY: number   // opt-in leaf concurrency (1 = OFF, the default); >1 enables the file-disjoint concurrent leaf scheduler
 }
 // GitCtx = the target repo's GIT-mode state (all members are git-gated). REPO (the repo path, used
 // git-independently) is threaded SEPARATELY so the bundle name doesn't over-imply git-gating.

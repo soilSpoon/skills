@@ -5,7 +5,7 @@
 // `function runWork` self-references within the factory scope. The tsup bundle re-inlines this module.
 import { DECOMPOSE, SLICES, LEARNING, RESULT, MISSING } from '../schemas'
 import { R_SLICE, R_EXEC, R_CRITIC } from '../prompts'
-import { circuitBreaker, engineRanBlock } from '../util'
+import { circuitBreaker, engineRanBlock, shouldRunConcurrent, pickConcurrentLeaves } from '../util'
 import type { Breaker } from '../util'
 import type { Host } from '../host'
 import type { ShResult, TraceRecord, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx, Runtime, AgentOutcome } from '../types'
@@ -18,7 +18,7 @@ export type RunWorkDeps = {
   REPO: string
   SCRATCH: string
   trace: (rec: TraceRecord) => Promise<void>
-  verifyLeaf: (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string) => Promise<Verdict>
+  verifyLeaf: (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string, diffRange?: string) => Promise<Verdict>
   t0redBreaker: Breaker
   LEAF_TEST: (scope?: string) => string
   INV: string
@@ -30,9 +30,9 @@ export type RunWorkDeps = {
 
 export const makeRunWork = (d: RunWorkDeps) => {
 const { rt, host, cfg, git, REPO, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
-const { agent, phase, log, budget } = rt
+const { agent, parallel, phase, log, budget } = rt
 const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host
-const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg
+const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, LEAF_CONCURRENCY } = cfg
 const { GIT, GIT_EXEC } = git
 async function runWork(rootTask: string, repo: string, startDepth: number, gid?: number | string, cleanOK?: boolean, kind?: SliceKind, buildNote?: string): Promise<{ done: LeafRecord[] }> {
   buildNote = buildNote || ''
@@ -45,6 +45,68 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
   // the APPROACH is failing; halt this unit instead of grinding the budget into more reverts. No class gate.
   const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK)
   const keyOf = (s: unknown) => String(s).trim().slice(0, 120)
+
+  // ── leafConcurrency: file-disjoint atomic sibling leaves run concurrently (opt-in, default OFF) ──
+  // COMMIT-IF-TRUSTED: the executor leaves its change UNCOMMITTED; the engine commits it SCOPED to the
+  // leaf's files under a mutex (so `leafSha~1..leafSha` is EXACTLY that leaf's diff, disjoint from siblings),
+  // verifies THAT commit, and `git revert`s an untrusted leaf (a clean undo — disjoint files never conflict).
+  // No repair loop (v1): an untrusted concurrent leaf is reverted + recorded, not re-attempted. gate=llm-only
+  // (no engine t0 here — the LLM verifier re-runs, and the SERIAL integrate net is the deterministic backstop).
+  let commitChain: Promise<unknown> = Promise.resolve()
+  const withCommit = <T>(fn: () => Promise<T>): Promise<T> => {   // serialize HEAD-mutating git so concurrent commits never interleave
+    const run = commitChain.then(fn, fn)
+    commitChain = run.then(() => {}, () => {})
+    return run
+  }
+  const runConcurrentLeaf = async (cnode: WorkNode, lbl: string, i: number): Promise<void> => {
+    const files = (cnode.files || []).filter(Boolean)
+    const tier: RiskTier = cnode.riskTier || 'standard'
+    const resR = await agentSafe<ExecResult>(
+      `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${cnode.task}\n${cnode.ctx}\n${INV}${LEAF_TEST(cnode.testScope)}` +
+      `\nGit: do NOT commit — leave your change UNCOMMITTED in the working tree; the engine commits it after verification.${buildNote}`,
+      { phase: 'Work', label: `exec:${lbl}`, model: 'sonnet', schema: RESULT })
+    const res = resR.ok ? resR.value : null
+    await trace({ phase: 'Work', role: `exec:${lbl}`, model: 'sonnet', leafIndex: i })
+    if (!res) { done.push({ task: cnode.task, passed: false, summary: 'executor returned no result (API/rate-limit)', verdict: { trustworthy: false, reason: 'executor failed' } }); return }
+    if (!res.passed) { done.push({ task: cnode.task, ...res, verdict: { trustworthy: false, reason: 'tier-0 gate: deterministic build/tests RED' }, gateLevel: 'llm-only' }); return }
+    let leafSha = ''
+    if (GIT && files.length) {
+      leafSha = await withCommit(async () => {
+        const fl = files.map(f => `'${f.replace(/'/g, '')}'`).join(' ')   // scoped commit: ONLY this leaf's files (disjoint with siblings)
+        const c = await sh(`git -C ${repo} add -- ${fl} && git -C ${repo} commit -q -m ${JSON.stringify('leaf: ' + cnode.task.slice(0, 60))} && git -C ${repo} rev-parse HEAD`, `ccommit:${lbl}`)
+        return ((c.stdout || '').match(/[0-9a-f]{40}/i) || [''])[0]
+      })
+    }
+    // verify the leaf's OWN commit (a closed range — concurrent-safe, never sees a sibling's commit)
+    const verdict = await verifyLeaf(lbl, cnode, res, tier, repo, leafSha ? `${leafSha}~1` : '', '', '', leafSha ? `${leafSha}~1..${leafSha}` : undefined)
+    done.push({ task: cnode.task, ...res, verdict, gateLevel: 'llm-only' })
+    log(`${tag}leaf ${i} ${verdict.trustworthy ? 'trusted' : 'NOT trusted'} (concurrent): ${cnode.task.slice(0, 36)}`)
+    if (leafSha && !verdict.trustworthy) {
+      await withCommit(async () => { await sh(`git -C ${repo} revert --no-edit ${leafSha}`, `crevert:${lbl}`) })   // clean undo; disjoint files → no conflict
+      log(`${tag}leaf ${i} untrusted → reverted ${leafSha.slice(0, 8)} (concurrent, clean disjoint undo commit)`)
+    }
+  }
+  const runConcurrentBatch = async (specs: SliceSpec[], parentDepth: number): Promise<void> => {
+    const nodes: WorkNode[] = specs.map(s => ({ task: s.desc, ctx: `Contract: ${s.contract}`, kind: s.kind || 'behavior', atomic: true, riskTier: s.riskTier, testScope: s.testScope, seamPointers: s.seamPointers, files: s.files, depth: parentDepth + 1, spikes: 0 }))
+    const sched = specs.map((s, idx) => ({ files: nodes[idx].files || [], dependsOn: s.dependsOn || [] }))
+    const doneIdx = new Set<number>(), started = new Set<number>()
+    log(`${tag}leafConcurrency: ${specs.length} file-disjoint leaves, K=${LEAF_CONCURRENCY}`)
+    let guard = 0
+    while (doneIdx.size < nodes.length && guard++ < nodes.length + 2) {
+      const inFlight = new Set<string>()
+      for (const idx of started) if (!doneIdx.has(idx)) for (const f of (nodes[idx].files || [])) inFlight.add(f)
+      const pick = pickConcurrentLeaves(sched, doneIdx, inFlight, LEAF_CONCURRENCY, started)
+      if (!pick.length) {   // nothing schedulable (a dependsOn cycle, or all in-flight already drained) → serial-fallback the remainder
+        for (let idx = 0; idx < nodes.length; idx++) if (!doneIdx.has(idx) && !started.has(idx)) stack.push(nodes[idx])
+        break
+      }
+      await parallel(pick.map(idx => async () => {
+        started.add(idx)
+        await runConcurrentLeaf(nodes[idx], `${tag}c${idx}`, idx)
+        doneIdx.add(idx)
+      }))
+    }
+  }
 
   while (stack.length && done.length < MAX_LEAVES) {
     const node = stack.pop()!   // loop condition guarantees a non-empty stack
@@ -121,6 +183,10 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             return { done: [] }
           }
         }
+        // leafConcurrency: when opted-in AND every child is an atomic, file-disjoint leaf, run the batch
+        // concurrently (commit-if-trusted) instead of pushing onto the serial stack. Any child missing
+        // files[] / non-atomic → shouldRunConcurrent is false → the unchanged serial path below.
+        if (shouldRunConcurrent(slices, LEAF_CONCURRENCY)) { await runConcurrentBatch(slices, node.depth); continue }
         for (let j = slices.length - 1; j >= 0; j--) {
           const iface = slices[j].interface
           const ifaceCtx = (iface && !/^TBD/i.test(iface.trim())) ? `\nInterface (FIXED): ${iface}` : ''
