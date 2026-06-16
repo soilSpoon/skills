@@ -222,3 +222,22 @@ test('sh: null agentSafe (agent returns null) → SH_UNAVAILABLE returned and sh
   assert.equal(r.exitCode, -2, 'exitCode is the sentinel value -2')
   assert.ok(r.stdout.startsWith('\x00SH_UNAVAILABLE'), 'stdout starts with the sentinel prefix')
 })
+
+test('same-class-null-kind-streak: 3 generic-catch (kind:null) outcomes from the SAME call-class do NOT trip quota breaker', async () => {
+  // Pins the distinction between null-kind and quota/model_unavailable-kind for the circuit breaker.
+  // The quota breaker requires >=2 DISTINCT call-classes before tripping — 3 nulls from one class
+  // (e.g. the 3-lens verify loop all throwing generic errors) must not be mistaken for a session
+  // instability signal. Only cross-class null streaks indicate session-scope trouble.
+  // The catch fallthrough path (non-quota, non-model_unavailable throw) produces kind:'null' and
+  // calls bumpNullStreak — but the class-gate (>=2 distinct classes) must prevent the trip.
+  const host = withHost(async () => { throw new Error('ECONNRESET: connection reset by peer') })
+  const r1 = await host.agentSafe('a', { label: 'verify:lens1' })
+  const r2 = await host.agentSafe('a', { label: 'verify:lens2' })
+  const r3 = await host.agentSafe('a', { label: 'verify:lens3' })
+  // All three outcomes must be kind:'null' (generic catch, not quota or model_unavailable)
+  assert.equal(r1.kind, 'null', 'generic-throw outcome 1 → kind:null')
+  assert.equal(r2.kind, 'null', 'generic-throw outcome 2 → kind:null')
+  assert.equal(r3.kind, 'null', 'generic-throw outcome 3 → kind:null')
+  // The quota breaker must NOT have tripped — QUOTA_HALT remains empty
+  assert.equal(host.getQuotaHalt(), '', '3 same-class null-kind outcomes do NOT trip the quota breaker (class-gate requires >=2 distinct classes)')
+})
