@@ -210,6 +210,7 @@ var pickConcurrentLeaves = (leaves, done, inFlight, K, started = /* @__PURE__ */
   }
   return picked;
 };
+var shouldRunConcurrent = (slices, leafConcurrency) => leafConcurrency > 1 && slices.length > 1 && slices.every((s) => s.atomic === true && Array.isArray(s.files) && s.files.length > 0);
 
 // src/phases/verify.ts
 var makeVerifyLeaf = (d) => {

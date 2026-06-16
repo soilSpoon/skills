@@ -96,3 +96,16 @@ export const pickConcurrentLeaves = (
   }
   return picked
 }
+
+// leafConcurrency gate (PURE): may this batch of sibling slices run with the concurrent scheduler, or
+// must it fall back to fully-serial? Concurrent ONLY when the opt-in is >1, there is more than one slice,
+// EVERY slice is an atomic leaf (a non-atomic child needs further decomposition — not a leaf to batch),
+// and EVERY slice declares a non-empty files[] (the scheduler needs every file set to prove disjointness;
+// a single missing files[] forces serial — the BACKLOG "any slice missing files[] → serial fallback").
+export const shouldRunConcurrent = (
+  slices: ReadonlyArray<{ atomic?: boolean; files?: string[] }>,
+  leafConcurrency: number,
+): boolean =>
+  leafConcurrency > 1 &&
+  slices.length > 1 &&
+  slices.every((s) => s.atomic === true && Array.isArray(s.files) && s.files.length > 0)
