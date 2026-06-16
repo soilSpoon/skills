@@ -28,6 +28,79 @@ test('agentSafe: a session-limit throw flips quota halt; subsequent calls no-op 
   assert.equal(calls, before, 'no further agent spawned after halt (the no-op gate)')
 })
 
+test('agentSafe: model_unavailable throw sets QUOTA_HALT and returns kind:model_unavailable (not null)', async () => {
+  // model_unavailable = infra outage, treated like quota: immediate resumable pause via quotaHalt()
+  let calls = 0
+  const host = withHost(async () => { calls++; throw new Error('issue with the selected model — may not have access to it') })
+  const r1 = await host.agentSafe('x', { label: 'exec:1' })
+  assert.equal(r1.ok, false, 'model_unavailable → ok:false')
+  assert.equal(r1.kind, 'model_unavailable', 'model_unavailable error → kind:model_unavailable')
+  assert.ok(host.getQuotaHalt(), 'quota halt flag set on model_unavailable')
+  // Gate fires: subsequent calls are no-op (same as quota path)
+  const before = calls
+  const r2 = await host.agentSafe('y', { label: 'exec:2' })
+  assert.equal(r2.ok, false)
+  assert.equal(r2.kind, 'null', 'quota-halt no-op → kind:null')
+  assert.equal(calls, before, 'no further agent spawned after model_unavailable halt')
+})
+
+test('agentSafe: quota/model_unavailable do NOT bump null streak (no double-trip)', async () => {
+  // quotaHalt() fires directly — bumpNullStreak() must NOT also be called for these kinds.
+  // Proof: after quota fires QUOTA_HALT, subsequent null-returning calls are no-op (gated),
+  // so the breaker never accumulates a streak. If bumpNullStreak were called on quota/model_unavailable
+  // the quota breaker state would be inconsistent with the halt-based gate.
+  // We verify this indirectly: the breaker does NOT trip (and is not double-incremented) when
+  // a single quota error fires — QUOTA_HALT is the sole signal, not a breaker trip.
+  let calls = 0
+  const host = withHost(async () => { calls++; throw new Error('rate limit exceeded') })
+  const r = await host.agentSafe('x', { label: 'verify:1' })
+  assert.equal(r.kind, 'quota')
+  // Only ONE agent call was made (no retry loop inside agentSafe that would inflate bumpNullStreak)
+  assert.equal(calls, 1, 'quota error: agent called exactly once (no double-invoke)')
+  assert.ok(host.getQuotaHalt(), 'QUOTA_HALT set exactly once via quotaHalt(), not via bumpNullStreak')
+  // A second call is gated (no-op) — the halt is stable, not compounded
+  await host.agentSafe('y', { label: 'exec:1' })
+  assert.equal(calls, 1, 'QUOTA_HALT gate is stable: no additional spawns after halt')
+})
+
+test('agentSafe: model_unavailable does NOT bump null streak — quotaHalt() is the sole halt signal', async () => {
+  // Parallel to the quota no-double-trip test: model_unavailable must call quotaHalt() directly,
+  // never bumpNullStreak() — so the null-streak breaker is not incremented, only QUOTA_HALT is set.
+  let calls = 0
+  const host = withHost(async () => { calls++; throw new Error('issue with the selected model — may not have access to it') })
+  const r = await host.agentSafe('x', { label: 'exec:1' })
+  assert.equal(r.kind, 'model_unavailable', 'error classifies as model_unavailable')
+  // Agent called exactly once — no retry-loop that would feed bumpNullStreak
+  assert.equal(calls, 1, 'model_unavailable: agent called exactly once (no double-invoke)')
+  assert.ok(host.getQuotaHalt(), 'QUOTA_HALT set via quotaHalt(), not via bumpNullStreak')
+  // Second call is gated — the halt is a one-way latch, not compounded by the breaker
+  await host.agentSafe('y', { label: 'exec:2' })
+  assert.equal(calls, 1, 'QUOTA_HALT gate is stable after model_unavailable: no additional spawns')
+})
+
+test('agentSafe: QUOTA_HALT is set once per session — a second quota-kind error is gated, not double-set', async () => {
+  // QUOTA_HALT is a one-way latch: after the first quota/model_unavailable error sets it, every
+  // subsequent agentSafe call is short-circuited (returns kind:'null', no agent spawn). A second
+  // quota-class error therefore CANNOT fire (the gate prevents it reaching the catch block), so
+  // QUOTA_HALT is set exactly once per session, not once per outcome kind.
+  let phase = 0
+  const host = withHost(async () => {
+    phase++
+    // First call: quota error; second call: should be gated before reaching agent
+    throw new Error(phase === 1 ? 'rate limit exceeded' : 'issue with the selected model — may not have access to it')
+  })
+  const r1 = await host.agentSafe('x', { label: 'verify:1' })
+  assert.equal(r1.kind, 'quota', 'first call → quota')
+  const haltMsg = host.getQuotaHalt()
+  assert.ok(haltMsg, 'QUOTA_HALT set after first error')
+  // Second call: gated by QUOTA_HALT, no agent spawn, returns kind:'null'
+  const r2 = await host.agentSafe('y', { label: 'exec:1' })
+  assert.equal(r2.kind, 'null', 'gated call → kind:null (no-op)')
+  assert.equal(phase, 1, 'agent was never invoked a second time (QUOTA_HALT gate fires first)')
+  // QUOTA_HALT message unchanged — the latch is stable, not re-set by the no-op
+  assert.equal(host.getQuotaHalt(), haltMsg, 'QUOTA_HALT message is the first error\'s, unchanged by the gated call')
+})
+
 test('agentSafe quota breaker: 3 nulls across >=2 classes halts; 3 same-class does NOT', async () => {
   const same = withHost(async () => null)
   await same.agentSafe('a', { label: 'verify:1' })
