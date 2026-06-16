@@ -117,3 +117,36 @@ test('classifier: classifyFailure(false) returns null kind (falsy non-Error shor
   // `false && false.message` → false; String(false || false) = 'false'; matches no regex → 'null'.
   assert.equal(classifyFailure(false), 'null')
 })
+
+// ── additional pattern-group coverage (contract-required) ────────────────────
+
+test('classifyFailure: literal quota keyword → quota', () => {
+  // /quota/i literal in the message — the most direct match for billing-quota exhaustion
+  assert.equal(classifyFailure(new Error('quota exceeded for this billing period')), 'quota')
+})
+
+test('classifyFailure: too-many-requests string → quota', () => {
+  // /too many requests/i covers HTTP-429 style messages (the contract lists this variant)
+  assert.equal(classifyFailure(new Error('too many requests, please slow down')), 'quota')
+})
+
+test('classifyFailure: rate-limit hyphenated → quota', () => {
+  // /rate.?limit/ covers "rate-limit" (the .? allows zero or one separator character)
+  assert.equal(classifyFailure(new Error('rate-limit hit for this API key')), 'quota')
+})
+
+test('classifyFailure: selected-model-may-not-exist string → model_unavailable', () => {
+  // /selected model.*may not exist/i — the third model_unavailable branch in the regex
+  assert.equal(classifyFailure(new Error('The selected model may not exist in this region')), 'model_unavailable')
+})
+
+test('classifyFailure: empty string → null (no regex match on empty input)', () => {
+  // String('') = ''; neither quota nor model_unavailable regex match; falls through to 'null'
+  assert.equal(classifyFailure(''), 'null')
+})
+
+test('classifier: classifyFailure(undefined) returns null kind (falsy short-circuit)', () => {
+  // `undefined && undefined.message` → undefined; String(undefined || undefined) = 'undefined';
+  // matches no quota/model regex → 'null'.
+  assert.equal(classifyFailure(undefined), 'null')
+})
