@@ -162,7 +162,13 @@ export const R_CRITIC =
   'ACCEPTANCE COVERAGE (spec-first handoff): if the TASK carries an "ACCEPTANCE VARIANTS" block (lines like ' +
   '"[now] token (Ln) criterion" handed in by spec-first), ALSO audit COVERAGE — for each NOW acceptance variant, ' +
   'check whether some proposed slice addresses it; report any UNCOVERED variant as a missing item (cite its token). ' +
-  'A named acceptance variant that no slice covers is exactly the gap this audit exists to catch.'
+  'A named acceptance variant that no slice covers is exactly the gap this audit exists to catch. ' +
+  'CONSOLIDATE (over-decomposition is the dominant failure): when several missing items are TEST-ONLY coverage of the ' +
+  'SAME already-implemented behavior (extra assertions/edge-cases, NO new production code or path), return them as ONE ' +
+  'item ("harden <behavior> with these N checks") — one leaf adds them all, Canon-TDD one-at-a-time INSIDE the executor. ' +
+  'NEVER emit one item per assertion: a separate slice means a full executor+verifier+commit cycle, and a pile of ' +
+  'per-assertion test leaves is exactly the over-decomposition that makes a 10-minute change cost an hour. Reserve ' +
+  'separate items for gaps that need DISTINCT production code or touch INDEPENDENT seams.'
 export const R_COORD =
   'You are the Coordinator — the ONLY agent with global context. A conflict has occurred merging one branch ' +
   'of a parallel build. Resolve the hunk by HONORING BOTH slices\' stated intent — never silently ' +
