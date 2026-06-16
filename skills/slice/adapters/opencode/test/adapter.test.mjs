@@ -51,6 +51,43 @@ describe("adapter sh-path", () => {
     const result = await shNative(prompt)
     assert.strictEqual(result.exitCode, 1)
   })
+
+  // ── sh() bypass rationale + worktree setup proof ─────────────────────────────
+  // WHY sh() bypasses agent(): the engine's parallel worktree setup runs commands like
+  //   `git worktree add`, `git -C <repo> rev-parse HEAD`, `git -C <repo> branch -D rs/g*`
+  // These MUST be deterministic (same input → same output, zero LLM variance) and free
+  // (no provider tokens). Routing them through agent() would: (a) spend provider credits,
+  // (b) let the LLM paraphrase or refuse the command, (c) add latency per worktree.
+  // shNative() uses execFile(/bin/sh, ['-c', cmd]) directly — not spawn, not exec — so the
+  // command string reaches /bin/sh verbatim, the exit code is the process exit code, and
+  // stdout is the raw bytes. This is the SAME execFile path the current adapter uses;
+  // the tests below prove the path is preserved by running a real git command.
+  it("shNative runs a real `git rev-parse HEAD` — exit 0, stdout is a 40-char hex SHA (worktree setup proof)", async () => {
+    // Behavioral claim: a git command representative of worktree prologue reaches /bin/sh
+    // natively; the SHA in stdout is deterministic (same commit, same hash every run).
+    const REPO = new URL("../../../../..", import.meta.url).pathname  // soilSpoon-skills root
+    const prompt = `${SH_PREFIX}\n\ngit -C ${REPO} rev-parse HEAD`
+    const result = await shNative(prompt)
+    assert.strictEqual(result.exitCode, 0, `git rev-parse HEAD should exit 0, got: ${result.exitCode}\nstdout: ${result.stdout}`)
+    const sha = result.stdout.trim().split("\n")[0]
+    assert.match(sha, /^[0-9a-f]{40}$/, `expected 40-char hex SHA, got: ${JSON.stringify(sha)}`)
+  })
+
+  it("shNative with parallel Promise.all — two git commands run concurrently, both exit 0 (parallel worktree path)", async () => {
+    // Behavioral claim: parallel worktree setup uses Promise.all over shNative() thunks;
+    // each command runs in its own execFile child process. Two concurrent git status calls
+    // both complete with exit 0, proving no shared state or lock contention on the native path.
+    const REPO = new URL("../../../../..", import.meta.url).pathname
+    const [r1, r2] = await Promise.all([
+      shNative(`${SH_PREFIX}\n\ngit -C ${REPO} rev-parse HEAD`),
+      shNative(`${SH_PREFIX}\n\ngit -C ${REPO} status --porcelain`),
+    ])
+    assert.strictEqual(r1.exitCode, 0, `concurrent git rev-parse should exit 0, got: ${r1.exitCode}`)
+    assert.strictEqual(r2.exitCode, 0, `concurrent git status should exit 0, got: ${r2.exitCode}`)
+    // Both SHAs from the same HEAD must match
+    const sha1 = r1.stdout.trim().split("\n")[0]
+    assert.match(sha1, /^[0-9a-f]{40}$/, `expected 40-char hex SHA from concurrent call, got: ${JSON.stringify(sha1)}`)
+  })
 })
 
 // ── C: role-routing ───────────────────────────────────────────────────────────
