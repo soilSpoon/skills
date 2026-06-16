@@ -1,0 +1,12 @@
+{
+  "type": "module",
+  "scripts": {
+    "test": "node host-smoke.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opencode-ai/sdk": "^1.17.7",
+    "@opencode-ai/plugin": "latest",
+    "typescript": "^6"
+  }
+}
