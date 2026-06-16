@@ -188,6 +188,12 @@ var circuitBreaker = (threshold, classThreshold = 0) => {
 var engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
 ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
 ${duty}`;
+var classifyFailure = (err) => {
+  const m = String(err && err.message || err);
+  if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) return "quota";
+  if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) return "model_unavailable";
+  return "null";
+};
 
 // src/phases/verify.ts
 var makeVerifyLeaf = (d) => {

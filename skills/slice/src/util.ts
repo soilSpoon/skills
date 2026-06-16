@@ -59,3 +59,13 @@ export type Breaker = ReturnType<typeof circuitBreaker>  // shape of a circuitBr
 // the model JUDGES from this fixed deterministic result, never re-runs it (ITEM 8 keystone).
 export const engineRanBlock = ({ cmd, note, exitCode, tail, duty }: { cmd: string; note?: string; exitCode: number; tail: string; duty: string }): string =>
   `\nENGINE-RAN: \`${cmd}\`${note ? ' ' + note : ''} exited ${exitCode}. Output tail: ${tail}\n${duty}`
+
+// classifyFailure: maps a caught API error to a quota-halt kind — VERBATIM encoding of the
+// host.ts catch-branch heuristics. budget/ceiling errors are NEVER passed here (host.ts re-throws
+// those before reaching this function). Returns 'null' for unrecognised or non-Error throws.
+export const classifyFailure = (err: unknown): 'quota' | 'model_unavailable' | 'null' => {
+  const m = String(((err as any) && (err as any).message) || err)
+  if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) return 'quota'
+  if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) return 'model_unavailable'
+  return 'null'
+}

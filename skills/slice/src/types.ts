@@ -182,3 +182,10 @@ export type GitCtx = {
   LOCKFILE: string
   gitVerify: (repo: string, from?: string) => string
 }
+
+// AgentOutcome<T>: discriminated union returned by agentSafe once callers are migrated from T|null.
+// ok:true carries the typed value; ok:false carries a kind (matching classifyFailure's vocabulary
+// plus schema/timeout/refusal for the non-API failure modes) and a detail string for logging.
+export type AgentOutcome<T> =
+  | { ok: true; value: T }
+  | { ok: false; kind: 'schema' | 'quota' | 'model_unavailable' | 'timeout' | 'refusal' | 'null'; detail: string }

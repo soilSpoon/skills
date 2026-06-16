@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
-import { circuitBreaker, b64encode, engineRanBlock } from '../../src/util.ts'
+import { circuitBreaker, b64encode, engineRanBlock, classifyFailure } from '../../src/util.ts'
 
 test('circuitBreaker: trips at threshold when classThreshold is 0 (the t0red/untrusted shape)', () => {
   const b = circuitBreaker(2)
@@ -56,4 +56,45 @@ test('engineRanBlock: emits the ENGINE-RAN shell-truth shape the verifier judges
   assert.match(out, /JUDGE from this\.$/)
   // optional note is appended only when present
   assert.match(engineRanBlock({ cmd: 'c', note: '(retry)', exitCode: 1, tail: 't', duty: 'd' }), /`c` \(retry\) exited 1/)
+})
+
+// classifyFailure: maps API error message heuristics to quota-halt kind — VERBATIM from host.ts catch branch
+test('classifyFailure: session-limit string → quota', () => {
+  // host.ts: /session limit|rate.?limit|quota|too many requests|overloaded|credit/i → 'quota'
+  assert.equal(classifyFailure(new Error('session limit reached')), 'quota')
+})
+
+test('classifyFailure: rate-limit string → quota', () => {
+  // host.ts: /rate.?limit/ covers "rate limit" and "rate-limit"
+  assert.equal(classifyFailure(new Error('rate limit exceeded')), 'quota')
+})
+
+test('classifyFailure: credit string → quota', () => {
+  // host.ts: /credit/i covers credit-balance exhaustion messages
+  assert.equal(classifyFailure(new Error('insufficient credit balance')), 'quota')
+})
+
+test('classifyFailure: overloaded string → quota', () => {
+  // host.ts: /overloaded/i covers API-overloaded responses
+  assert.equal(classifyFailure(new Error('The API is overloaded right now')), 'quota')
+})
+
+test('classifyFailure: issue-with-model string → model_unavailable', () => {
+  // host.ts: /issue with the selected model/i → 'model_unavailable'
+  assert.equal(classifyFailure(new Error('There is an issue with the selected model')), 'model_unavailable')
+})
+
+test('classifyFailure: may-not-have-access string → model_unavailable', () => {
+  // host.ts: /may not have access to it/i → 'model_unavailable'
+  assert.equal(classifyFailure(new Error('You may not have access to it')), 'model_unavailable')
+})
+
+test('classifyFailure: unknown error string → null', () => {
+  // host.ts: anything else falls through to null (generic failure, not a classified API error)
+  assert.equal(classifyFailure(new Error('something completely unrelated went wrong')), 'null')
+})
+
+test('classifyFailure: non-Error object → null', () => {
+  // host.ts: String(e && e.message || e) — non-Error coerces to message-less string → null
+  assert.equal(classifyFailure({ code: 42 }), 'null')
 })
