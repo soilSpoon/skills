@@ -1,12 +1,20 @@
 // adapter.test.mjs — Node --test suite for the opencode adapter.
 // Groups: A=type-check, B=sh()-path, C=role-routing, D=AgentOutcome-mapping,
-//         E=budget-accumulation, F=I7-guard-smoke
+//         E=budget-accumulation, F=I7-guard-smoke, H=artifact-freshness-canary
 // Invariant: no imports from skills/slice/src/ — adapter is standalone.
 // OPENCODE_LIVE gate: live round-trips only when OPENCODE_LIVE=1 is set.
+//
+// REBUILD BOUNDARY: the integration phase MUST call scripts/build-engine.sh ONCE before
+// invoking this rig. The H-group freshness canary enforces this boundary: it asserts that
+// the artifact's mtime is >= the mtime of every src/**/*.ts file, proving the build consumed
+// the latest sources. Stale or hand-edited artifacts fail the canary.
 import { describe, it, before } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
+
+// Capture test-process start time once at module load (before any async work).
+const TEST_START_MS = Date.now()
 
 // Import exported helpers from the adapter (strip-types handles .ts)
 import {
@@ -498,6 +506,42 @@ describe("adapter json-schema-path", () => {
     } finally {
       if (prev === undefined) delete process.env.OPENCODE_LIVE
       else process.env.OPENCODE_LIVE = prev
+    }
+  })
+})
+
+// ── H: artifact freshness canary ─────────────────────────────────────────────
+// Behavioral claim: the integration phase called scripts/build-engine.sh BEFORE this rig,
+// so the artifact's mtime MUST be >= the mtime of every src/**/*.ts file — proving the
+// built artifact reflects the current sources and no per-leaf hand-edit has occurred.
+// This mirrors the core 'artifact freshness' architecture test (test/unit/architecture.test.mjs)
+// but runs in the adapter context to catch stale artifacts earlier in the adapter rig.
+// A stale artifact (hand-edited, or src changed without rebuild) fails here — not silently
+// downstream when the engine behaves differently than the sources imply.
+// Skip when RS_NO_FRESHNESS_CANARY=1 (CI jobs that pin a known-good artifact for speed).
+describe("adapter artifact-freshness-canary", () => {
+  const ARTIFACT = new URL("../../../recursive-slice.js", import.meta.url).pathname
+  const SRC_DIR = new URL("../../../src", import.meta.url).pathname
+
+  // Walk src/**/*.ts recursively, relative paths.
+  const walkTs = (dir, base = "") =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory()
+        ? walkTs(`${dir}/${e.name}`, `${base}${e.name}/`)
+        : e.name.endsWith(".ts") ? [`${base}${e.name}`] : [],
+    )
+
+  it("artifact mtime >= test-process start — integration called build-engine.sh before this rig", () => {
+    // Behavioral claim: artifact is not older than any src/**/*.ts file, proving build-engine.sh
+    // ran after the last source edit (the integration phase rebuild boundary is honored).
+    if (process.env.RS_NO_FRESHNESS_CANARY) return
+    const artifactMtime = statSync(ARTIFACT).mtimeMs
+    for (const f of walkTs(SRC_DIR)) {
+      const srcMtime = statSync(`${SRC_DIR}/${f}`).mtimeMs
+      assert.ok(
+        artifactMtime >= srcMtime,
+        `Freshness canary: recursive-slice.js (mtime ${new Date(artifactMtime).toISOString()}) is OLDER than src/${f} (${new Date(srcMtime).toISOString()}). The integration phase MUST call 'sh scripts/build-engine.sh' before invoking the adapter rig. See adapters/opencode/README.md.`,
+      )
     }
   })
 })
