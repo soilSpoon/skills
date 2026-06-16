@@ -149,3 +149,23 @@ export type TraceRecord = {
   trustworthy?: boolean
   repairAttempt?: number
 }
+// Cohesive parameter-objects threaded into phases (introduce-parameter-object — collapses the flat
+// 17-26 dep bags into named bundles that travel together: the run's tuning limits, and the git/repo context).
+export type Limits = {
+  FLOOR: number
+  MAX_LEAVES: number
+  MAX_DISCOVERED: number
+  MAX_SPIKES: number
+  MAX_REPAIR: number
+  MAX_REPAIR_HARD: number
+  MAX_UNTRUSTED_STREAK: number
+  CONFIRM_TIER: boolean
+}
+export type GitCtx = {
+  REPO: string
+  BASE_SHA: string
+  GIT: boolean
+  GIT_EXEC: string
+  LOCKFILE: string
+  gitVerify: (repo: string, from?: string) => string
+}

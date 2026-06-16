@@ -191,7 +191,9 @@ ${duty}`;
 
 // src/phases/verify.ts
 var makeVerifyLeaf = (d) => {
-  const { sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP } = d;
+  const { host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d;
+  const { sh, agentSafe, shUnavailable } = host;
+  const { gitVerify, GIT } = git;
   return async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
     const leafTest = node.kind === "tidy" || tier === "light" || !!engineT0 ? "" : LEAF_TEST(node.testScope);
     const reported = JSON.stringify({
@@ -276,7 +278,10 @@ LENS: judge specifically through "${L}".`,
 
 // src/phases/leaf-loop.ts
 var makeRunWork = (d) => {
-  const { sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt } = d;
+  const { host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d;
+  const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host;
+  const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg;
+  const { REPO, GIT, GIT_EXEC } = git;
   async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
     buildNote = buildNote || "";
     const tag = gid != null ? `g${gid}:` : "";
@@ -619,7 +624,9 @@ ${cmd}`,
 
 // src/phases/integrate.ts
 var integratePhase = async (d) => {
-  const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline, ABORTS, done, merge, groups } = d;
+  const { host, git, INV, TASK, baseline, ABORTS, done, merge, groups } = d;
+  const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host;
+  const { REPO, BASE_SHA, GIT, LOCKFILE } = git;
   phase("Integrate");
   let finalRun = { exitCode: -1, stdout: "" };
   let integration = null;
@@ -797,7 +804,8 @@ Match the language the task was written in. Be concrete.`,
 
 // src/main.ts
 async function __main() {
-  const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = makeHost();
+  const host = makeHost();
+  const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = host;
   const A = typeof args === "string" ? JSON.parse(args) : args || {};
   if (!A.task) {
     log("FATAL: no task in args — refusing to run. (Resuming? Pass the ORIGINAL args alongside resumeFromRunId.)");
@@ -820,6 +828,7 @@ async function __main() {
   const MAX_WORKERS = 4;
   const MAX_UNTRUSTED_STREAK = 3;
   const ENGINE_DIFF_CAP = 6e3;
+  const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER };
   phase("Baseline");
   log(`Task: ${TASK}${PARALLEL ? " [parallel mode]" : ""}`);
   const baseline = await agentSafe(
@@ -944,7 +953,8 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       }
     }
   }
-  const verifyLeaf = makeVerifyLeaf({ sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP });
+  const git = { REPO, BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify };
+  const verifyLeaf = makeVerifyLeaf({ host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP });
   const t0redBreaker = circuitBreaker(2);
   const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i;
   const ABORTS = [];
@@ -960,7 +970,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   const SCRATCH = goParallel && useSharedScratch ? `${REPO}/.rs-scratch` : "";
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
-  const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt });
+  const runWork = makeRunWork({ host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline });
   if (goParallel) {
     const a0 = await agentSafe(
       `${R_SLICE}
@@ -1110,6 +1120,6 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
     }
     return { error: `over-tiered: ${overTier.stop} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: overTier.slices };
   }
-  return await integratePhase({ sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline, ABORTS, done, merge, groups });
+  return await integratePhase({ host, git, INV, TASK, baseline, ABORTS, done, merge, groups });
 }
 return await __main()

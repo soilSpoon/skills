@@ -3,23 +3,23 @@
 // UNCHANGED — only the closed-over deps are now destructured from `d`. The tsup bundle re-inlines this.
 import { VERDICT } from '../schemas'
 import { R_VERIFY, R_VERIFY_LIGHT } from '../prompts'
-import type { WorkNode, ExecResult, Verdict, RiskTier, ShResult, AgentOpts } from '../types'
+import type { WorkNode, ExecResult, Verdict, RiskTier, ShResult, AgentOpts, GitCtx } from '../types'
+import type { Host } from '../host'
 
 declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
 
 export type VerifyDeps = {
-  sh: (cmd: string, label?: string) => Promise<ShResult>
-  agentSafe: (prompt: string, opts?: AgentOpts) => Promise<any>
-  gitVerify: (repo: string, from?: string) => string
-  shUnavailable: (r: ShResult) => boolean
+  host: Host
+  git: GitCtx
   LEAF_TEST: (scope?: string) => string
   INV: string
-  GIT: boolean
   ENGINE_DIFF_CAP: number
 }
 
 export const makeVerifyLeaf = (d: VerifyDeps) => {
-  const { sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP } = d
+  const { host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP } = d
+  const { sh, agentSafe, shUnavailable } = host
+  const { gitVerify, GIT } = git
   return async (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string): Promise<Verdict> => {
   // ④ tidy: engine already ran the full suite (ENGINE-RAN); light: diff-audit path — no filter-run;
   // engineT0 non-empty: engine already ran filtered gate — injecting LEAF_TEST is contradictory noise.

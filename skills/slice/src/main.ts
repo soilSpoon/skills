@@ -35,7 +35,8 @@ async function __main(): Promise<EngineResult> {
 // "You've hit your session limit"). First quota-shaped error (or 3 consecutive nulls of any
 // cause) flips QUOTA_HALT; from then on agentSafe no-ops, loops stop cleanly, and the run
 // ends resumable instead of burning attempts until the harness gives up.
-const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = makeHost()
+const host = makeHost()   // cohesive host-services bundle — passed WHOLE to phases (one param); destructured here for main's own use
+const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = host
 // ---- args: { task, repo, maxDepth?, parallel? } -----------------------------
 const A = ((typeof args === 'string') ? JSON.parse(args) : (args || {})) as EngineArgs   // tolerate stringified args
 // I7: refuse to run without a task — a resume that forgot the original args once ran a full
@@ -79,6 +80,8 @@ const MAX_UNTRUSTED_STREAK = 3           // A: run-level no-progress detection �
 const ENGINE_DIFF_CAP = 6000             // ITEM 9: max chars of leaf diff injected as ENGINE-DIFF into a verify
                                          // prompt; above this, point the verifier back at git (gitVerify) rather
                                          // than flood the prompt with a giant diff it would not read anyway
+// the run's tuning limits, bundled (introduce-parameter-object) — threaded as one `cfg` into the leaf loop
+const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER }
 
 
 // =============================================================================
@@ -343,7 +346,9 @@ if (GIT) {
 //   light (easy)    → audit diff/tests, no full re-run (integration is the net)
 //   standard        → one independent reproduction
 //   heavy (hard)    → 3 perspective-diverse skeptics (PARALLEL — runtime queues concurrent calls safely); UNANIMOUS trust required
-const verifyLeaf = makeVerifyLeaf({ sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP })
+// the git/repo context, bundled — all members final by here (BASE_SHA, GIT_EXEC, gitVerify, LOCKFILE all set above)
+const git = { REPO, BASE_SHA, GIT, GIT_EXEC, LOCKFILE, gitVerify }
+const verifyLeaf = makeVerifyLeaf({ host, git, LEAF_TEST, INV, ENGINE_DIFF_CAP })
 
 // ---- runWork: the recursive decomposition+execution loop for ONE work unit, in ONE repo
 // (the main checkout, or a group's worktree). Sequential + Canon-TDD discover-as-you-go.
@@ -390,7 +395,7 @@ const buildNoteFor = (repo: string) => (SCRATCH && repo !== REPO)
     `dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.`
   : ''
 // The leaf loop (src/phases/leaf-loop.ts) — wired here, AFTER SCRATCH is known, with all its shared services.
-const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline: baseline!, getQuotaHalt })
+const runWork = makeRunWork({ host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline: baseline! })
 if (goParallel) {
   // ITEM 10: the merged decompose role gates the partition — does the ROOT split (action:'slice') or is
   // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
@@ -557,6 +562,6 @@ if (overTier.stop) {
 }
 
 // =============================================================================
-return await integratePhase({ sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline: baseline!, ABORTS, done, merge, groups })
+return await integratePhase({ host, git, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
 
 }

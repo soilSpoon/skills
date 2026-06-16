@@ -10,13 +10,10 @@ globalThis.parallel = async (thunks) => Promise.all(thunks.map((t) => t()))
 
 function mk(agentImpl) {
   return makeVerifyLeaf({
-    sh: async () => ({ exitCode: 0, stdout: '' }),
-    agentSafe: agentImpl,
-    gitVerify: () => '',
-    shUnavailable: () => false,
+    host: { sh: async () => ({ exitCode: 0, stdout: '' }), agentSafe: agentImpl, shUnavailable: () => false },
+    git: { GIT: false, gitVerify: () => '' },   // GIT:false skips the engine-diff git fetch
     LEAF_TEST: () => '',
     INV: '',
-    GIT: false,             // skip the engine-diff git fetch
     ENGINE_DIFF_CAP: 6000,
   })
 }

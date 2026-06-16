@@ -5,7 +5,8 @@
 import { BRIEFING, VERDICT } from '../schemas'
 import { R_VERIFY } from '../prompts'
 import { b64encode, engineRanBlock } from '../util'
-import type { ShResult, AgentOpts, Baseline, Verdict, LeafRecord, EngineResult, Briefing, Groups } from '../types'
+import type { ShResult, AgentOpts, Baseline, Verdict, LeafRecord, EngineResult, Briefing, Groups, GitCtx } from '../types'
+import type { Host } from '../host'
 
 declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
 declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
@@ -14,17 +15,10 @@ declare function log(message: string): void
 declare const budget: { total: number | null; spent(): number; remaining(): number }
 
 export type IntegrateDeps = {
-  sh: (cmd: string, label?: string) => Promise<ShResult>
-  shForce: (cmd: string, label?: string) => Promise<ShResult>
-  shUnavailable: (r: ShResult) => boolean
-  agentSafe: (prompt: string, opts?: AgentOpts) => Promise<any>
-  getQuotaHalt: () => string
-  REPO: string
-  BASE_SHA: string
+  host: Host
+  git: GitCtx
   INV: string
-  LOCKFILE: string
   TASK: string
-  GIT: boolean
   baseline: Baseline
   ABORTS: string[]
   done: LeafRecord[]
@@ -33,7 +27,9 @@ export type IntegrateDeps = {
 }
 
 export const integratePhase = async (d: IntegrateDeps): Promise<EngineResult> => {
-const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline, ABORTS, done, merge, groups } = d
+const { host, git, INV, TASK, baseline, ABORTS, done, merge, groups } = d
+const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host
+const { REPO, BASE_SHA, GIT, LOCKFILE } = git
 phase('Integrate')
 // DETERMINISTIC system-level net (④): per-leaf full-suite runs were removed, so the whole-system regression
 // gate must NOT rest on a single soft LLM call (a late budget cutoff could starve it to null, leaving committed

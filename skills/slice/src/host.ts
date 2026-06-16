@@ -136,3 +136,5 @@ const shBatch = async (script: string, label?: string): Promise<{ raw: ShResult;
 }
   return { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt: () => QUOTA_HALT }
 }
+// The cohesive host-services bundle — phases take this whole (one param) instead of 5-7 flat services.
+export type Host = ReturnType<typeof makeHost>

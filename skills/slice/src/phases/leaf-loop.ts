@@ -7,7 +7,8 @@ import { DECOMPOSE, SLICES, LEARNING, RESULT, MISSING } from '../schemas'
 import { R_SLICE, R_EXEC, R_CRITIC } from '../prompts'
 import { circuitBreaker, engineRanBlock } from '../util'
 import type { Breaker } from '../util'
-import type { ShResult, TraceRecord, AgentOpts, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel } from '../types'
+import type { Host } from '../host'
+import type { ShResult, TraceRecord, AgentOpts, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx } from '../types'
 
 declare function agent(prompt: string, opts?: AgentOpts): Promise<any>
 declare function parallel<T>(thunks: Array<() => Promise<T>>): Promise<Array<T | null>>
@@ -16,36 +17,26 @@ declare function log(message: string): void
 declare const budget: { total: number | null; spent(): number; remaining(): number }
 
 export type RunWorkDeps = {
-  sh: (cmd: string, label?: string) => Promise<ShResult>
-  shBatch: (script: string, label?: string) => Promise<{ raw: ShResult; get: (name: string) => { code: number; out: string } | null }>
+  host: Host
+  cfg: Limits
+  git: GitCtx
+  SCRATCH: string
   trace: (rec: TraceRecord) => Promise<void>
-  agentSafe: (prompt: string, opts?: AgentOpts) => Promise<any>
   verifyLeaf: (lbl: string, node: WorkNode, res: ExecResult, tier: RiskTier | undefined, repo: string, leafStart: string, engineT0: string, buildNote: string) => Promise<Verdict>
   t0redBreaker: Breaker
   LEAF_TEST: (scope?: string) => string
   INV: string
-  REPO: string
-  GIT: boolean
-  GIT_EXEC: string
-  SCRATCH: string
   ABORTS: string[]
   RE_ZERO_TESTS: RegExp
-  MARKER: RegExp
   overTier: { stop: string; slices: number }
-  FLOOR: number
-  MAX_LEAVES: number
-  MAX_DISCOVERED: number
-  MAX_SPIKES: number
-  MAX_REPAIR: number
-  MAX_REPAIR_HARD: number
-  MAX_UNTRUSTED_STREAK: number
-  CONFIRM_TIER: boolean
   baseline: Baseline
-  getQuotaHalt: () => string   // live read of main.ts's mutable QUOTA_HALT (set by quotaHalt() mid-run)
 }
 
 export const makeRunWork = (d: RunWorkDeps) => {
-const { sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt } = d
+const { host, cfg, git, SCRATCH, trace, verifyLeaf, t0redBreaker, LEAF_TEST, INV, ABORTS, RE_ZERO_TESTS, overTier, baseline } = d
+const { sh, shBatch, agentSafe, getQuotaHalt, MARKER } = host
+const { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER } = cfg
+const { REPO, GIT, GIT_EXEC } = git
 async function runWork(rootTask: string, repo: string, startDepth: number, gid?: number | string, cleanOK?: boolean, kind?: SliceKind, buildNote?: string): Promise<{ done: LeafRecord[] }> {
   buildNote = buildNote || ''
   const tag = gid != null ? `g${gid}:` : ''
