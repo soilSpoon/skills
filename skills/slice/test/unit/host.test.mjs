@@ -241,3 +241,89 @@ test('same-class-null-kind-streak: 3 generic-catch (kind:null) outcomes from the
   // The quota breaker must NOT have tripped — QUOTA_HALT remains empty
   assert.equal(host.getQuotaHalt(), '', '3 same-class null-kind outcomes do NOT trip the quota breaker (class-gate requires >=2 distinct classes)')
 })
+
+// ── Edge-case hardenings: null/undefined response, mixed error types, quota-then-timeout ────────
+
+test('agentSafe-outcome-edge null-despite-schema: null return with schema opts → kind:null (schema presence does not change distrust)', async () => {
+  // agentSafe does not validate the returned value against opts.schema — that is the caller's job.
+  // When agent() returns null even though opts.schema was provided (e.g. the LLM refused to emit
+  // structured output), agentSafe still maps it to {ok:false, kind:'null'}, not ok:true. This pins
+  // that schema opts do not create a special branch: null is always distrust regardless of schema.
+  const host = withHost(async () => null)
+  const r = await host.agentSafe('x', {
+    label: 'exec:1',
+    schema: { type: 'object', required: ['passed'], properties: { passed: { type: 'boolean' } } },
+  })
+  assert.equal(r.ok, false, 'null despite schema → ok:false (schema opts do not bypass distrust)')
+  assert.equal(r.kind, 'null', 'null despite schema → kind:null (no special schema-error branch in agentSafe)')
+  assert.ok(typeof r.detail === 'string', 'null-with-schema outcome carries a detail string')
+})
+
+test('agentSafe-outcome-edge retry-on-parse-fail: first ok:false then ok:true (the integrate.ts retry shape)', async () => {
+  // The engine's integrate phase (and owner-briefing) retries ONCE when agentSafe returns ok:false
+  // (null/API error). This test pins the two-call sequence that the retry pattern relies on:
+  // call 1 → {ok:false, kind:'null'} (simulates parse-fail / null return); caller retries;
+  // call 2 → {ok:true, value} (the second attempt succeeds). Both calls are distinct invocations
+  // on the SAME host instance, confirming the state machine does not permanently latch on null.
+  let callCount = 0
+  const host = withHost(async () => {
+    callCount++
+    if (callCount === 1) return null          // first call: parse-fail / null
+    return { summary: 'ok', passed: true }   // second call: success
+  })
+  const r1 = await host.agentSafe('parse this', { label: 'exec:1' })
+  assert.equal(r1.ok, false, 'first call (parse-fail) → ok:false')
+  assert.equal(r1.kind, 'null', 'first call → kind:null (null return, not a throw)')
+  const r2 = await host.agentSafe('parse this (retry)', { label: 'exec:1' })
+  assert.equal(r2.ok, true, 'second call (retry succeeds) → ok:true')
+  assert.deepEqual(r2.value, { summary: 'ok', passed: true }, 'retry carries the value verbatim')
+  assert.equal(callCount, 2, 'exactly two agent invocations: fail then success')
+})
+
+test('agentSafe-outcome-edge quota-then-timeout: quota sets QUOTA_HALT, subsequent timeout throw is gated (never spawned)', async () => {
+  // Sequence: call 1 throws a quota error (rate-limit) → QUOTA_HALT is set, returns kind:'quota'.
+  // Call 2 WOULD throw a timeout/network error (ECONNRESET) but QUOTA_HALT fires FIRST — the agent
+  // is never invoked, and the outcome is kind:'null' with detail:'quota halt active'. This pins that
+  // QUOTA_HALT is a one-way gate: once tripped by quota, ALL subsequent errors (timeout, network,
+  // model_unavailable) are also pre-empted — they can never compound or reset the halt state.
+  let secondCallThrew = false
+  let phase = 0
+  const host = withHost(async () => {
+    phase++
+    if (phase === 1) throw new Error('rate limit exceeded')   // call 1: quota error
+    secondCallThrew = true                                     // call 2: should never reach here
+    throw new Error('ECONNRESET: connection reset by peer')
+  })
+  // Call 1: quota fires, QUOTA_HALT set
+  const r1 = await host.agentSafe('work', { label: 'exec:1' })
+  assert.equal(r1.ok, false, 'quota throw → ok:false')
+  assert.equal(r1.kind, 'quota', 'quota throw → kind:quota')
+  assert.ok(host.getQuotaHalt(), 'QUOTA_HALT is set after quota error')
+  // Call 2: timeout/ECONNRESET throw, but QUOTA_HALT gate pre-empts it entirely
+  const r2 = await host.agentSafe('work', { label: 'exec:2' })
+  assert.equal(secondCallThrew, false, 'QUOTA_HALT gate prevents the second agent from being spawned (timeout throw never fires)')
+  assert.equal(r2.ok, false, 'gated call → ok:false')
+  assert.equal(r2.kind, 'null', 'gated call → kind:null (the no-op gate kind, not timeout)')
+  assert.equal(r2.detail, 'quota halt active', 'gated call detail is exactly "quota halt active"')
+})
+
+test('agentSafe-outcome-edge refusal-from-sdk: content-policy throws fall through to kind:null (classifyFailure has no refusal branch)', async () => {
+  // classifyFailure (util.ts L0) recognises only quota and model_unavailable patterns; a refusal
+  // message ("content policy violation", "request refused") matches neither regex and falls through
+  // to the 'null' default. host.ts then maps that to {ok:false, kind:'null'} via the generic-catch
+  // branch (bumpNullStreak, not quotaHalt). This pins the CURRENT behavior: SDK-level refusal kinds
+  // (the opencode adapter's classifySdkError returns kind:'refusal') are invisible to the core host;
+  // the core safely treats them as generic null-distrust, not a halt-worthy error class.
+  for (const msg of [
+    'content policy violation',
+    'request was refused by the safety filter',
+    'I cannot help with that',
+    'This request has been declined',
+  ]) {
+    const host = withHost(async () => { throw new Error(msg) })
+    const r = await host.agentSafe('sensitive task', { label: 'exec:1' })
+    assert.equal(r.ok, false, `refusal-like throw → ok:false (msg: ${msg})`)
+    assert.equal(r.kind, 'null', `refusal-like throw → kind:null, not kind:refusal (msg: ${msg})`)
+    assert.ok(!host.getQuotaHalt(), `refusal-like throw does NOT set QUOTA_HALT (msg: ${msg})`)
+  }
+})
