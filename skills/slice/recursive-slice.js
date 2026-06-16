@@ -274,6 +274,259 @@ LENS: judge specifically through "${L}".`,
   };
 };
 
+// src/phases/leaf-loop.ts
+var makeRunWork = (d) => {
+  const { sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt } = d;
+  async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
+    buildNote = buildNote || "";
+    const tag = gid != null ? `g${gid}:` : "";
+    const stack = [{ task: rootTask, ctx: "", depth: startDepth, spikes: 0, kind: kind || "behavior" }];
+    const done = [];
+    const executedKeys = /* @__PURE__ */ new Set();
+    let discovered = 0;
+    const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK);
+    const keyOf = (s) => String(s).trim().slice(0, 120);
+    while (stack.length && done.length < MAX_LEAVES) {
+      const node = stack.pop();
+      const atFloor = node.depth >= FLOOR;
+      let d2 = null, action;
+      if (node.atomic) {
+        action = "execute";
+      } else {
+        d2 = await agentSafe(
+          `${R_SLICE}
+
+Repo: ${repo}
+Decide this node's next action (bias HARD toward execute), then act.
+Task: ${node.task}
+${node.ctx ? "Context: " + node.ctx + "\n" : ""}Depth ${node.depth}/${FLOOR}${atFloor ? " (AT FLOOR — you must return execute)" : ""}.
+${INV}
+If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, independently-verifiable slices with a self-contained contract each (group near-identical units; 2-5 slices; isolate any risky seam first).`,
+          { phase: "Work", label: `${tag}decompose:d${node.depth}`, model: "sonnet", schema: DECOMPOSE }
+        );
+        if (!d2) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`);
+        action = atFloor || !d2 ? "execute" : d2.action;
+        if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
+      }
+      if (action === "slice") {
+        let slices = d2 && d2.slices || [];
+        if (slices.length > 1 && node.depth <= 1) {
+          const crit = await agentSafe(
+            `${R_CRITIC}
+
+Repo: ${repo}
+Task: ${node.task}
+Proposed list:
+` + slices.map((s, j) => `${j + 1}. ${s.desc}`).join("\n") + `
+${INV}`,
+            // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
+            // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
+            // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
+            // NOT for verifier/lens (they MUST keep Bash to re-run — Bash-less verify silently
+            // defeats the fabricated-green catch, main.ts fabricated-green lesson) nor baseliner
+            // (Explore skips CLAUDE.md, which the baseliner must read to build the project card).
+            { phase: "Work", label: `${tag}critic:d${node.depth}`, agentType: "Explore", schema: MISSING }
+          );
+          if (crit && crit.missing && crit.missing.length) {
+            slices = slices.concat(crit.missing.map((m) => ({ ...m, kind: "behavior" })));
+            log(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`);
+          }
+        }
+        if (slices.length <= 1) {
+          log(`${tag}non-reducing slice [d${node.depth}] → execute`);
+          action = "execute";
+        } else {
+          log(`${tag}slice [d${node.depth}] → ${slices.length}`);
+          if (node.depth === 0) {
+            const compileBound = baseline.coldBuildCost === "expensive";
+            log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? "; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count" : ""}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`);
+            if (compileBound && slices.length <= 3 && slices.every((s) => s.riskTier === "light") && !CONFIRM_TIER) {
+              overTier.stop = `compile-bound repo, ${slices.length} low-risk slice(s) — inline T1 work`;
+              overTier.slices = slices.length;
+              log(`${tag}⟂ OVER-TIER STOP: this looks like inline-T1 work (compile-bound + ${slices.length} all-light slice(s)). Doing it inline is faster. To force the engine anyway, re-run with confirmTier:true. (No leaves ran; nothing changed.)`);
+              return { done: [] };
+            }
+          }
+          for (let j = slices.length - 1; j >= 0; j--) {
+            const iface = slices[j].interface;
+            const ifaceCtx = iface && !/^TBD/i.test(iface.trim()) ? `
+Interface (FIXED): ${iface}` : "";
+            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 });
+          }
+          continue;
+        }
+      }
+      if (action === "spike") {
+        const learn = await agentSafe(
+          `You are the Spiker (Beck: concrete hypotheses — make the uncertainty small, falsifiable, and cheap).
+Repo: ${repo}
+De-risk this hard-but-small task with the smallest experiment / minimal reproduction (remove extraneous detail; learn, don't build): ${node.task}
+${node.ctx}`,
+          { phase: "Work", label: `${tag}spike:d${node.depth}`, model: "sonnet", schema: LEARNING }
+        );
+        stack.push({ ...node, ctx: `${node.ctx}
+LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.spikes + 1 });
+        log(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`);
+        continue;
+      }
+      if (getQuotaHalt() || budget.total && budget.remaining() < 12e4) {
+        log(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping after ${done.length} leaves`);
+        break;
+      }
+      const k = keyOf(node.task);
+      if (executedKeys.has(k)) continue;
+      executedKeys.add(k);
+      const i = done.length;
+      const lbl = `${tag}${i}`;
+      const tier = node.kind === "tidy" ? "standard" : node.atomic ? node.riskTier || "standard" : d2 && d2.riskTier || "standard";
+      const TIDY = node.kind === "tidy" ? "\nTIDY-FIRST leaf (Beck — make the change easy): a behavior-PRESERVING structural change ONLY (rename/extract/generalize/move). Do NOT add or change any test; do NOT change observable behavior — the EXISTING suite must stay green UNCHANGED. EXCEPTIONS for this tidy leaf: its proof IS the existing suite, so run the FULL existing suite once (this overrides the never-full-suite speed rule); and commit as ONE refactor commit (this replaces the two-hats behavior+refactor commit pair — a tidy leaf has no behavior step)." : "";
+      const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || "").match(/[0-9a-f]{40}/i) || [""])[0] : "";
+      const restore = async () => {
+        if (!GIT || !cleanOK || !leafStart) return false;
+        const b = await shBatch(
+          `git -C ${repo} reset --hard ${leafStart}; printf '<<RS:reset:%s>>\\n' "$?"; git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch; printf '<<RS:clean:%s>>\\n' "$?"`,
+          // drop untracked files the leaf created (never the shared build dir)
+          `reset:${lbl}`
+        );
+        return b.get("reset") !== null;
+      };
+      let res = null, verdict = null, attempt = 0, prevIssueCount = Infinity;
+      let gateLevel = "llm-only";
+      while (true) {
+        const repair = attempt === 0 ? "" : `
+REPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ${JSON.stringify((verdict && verdict.issues && verdict.issues.length ? verdict.issues : [verdict && verdict.reason]).slice(0, 6).map((s) => String(s).slice(0, 300)))}. ` + (verdict && verdict.prescription ? `
+REVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}
+` : "") + (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : "") + `then fix exactly those objections. In git mode add a fresh commit.`;
+        const seamCtx = node.seamPointers && node.seamPointers.length ? `
+Seam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):
+${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ""}${p.symbol ? ` (${p.symbol})` : ""}${p.currentText ? ` — "${p.currentText}"` : ""}`).join("\n")}` : "";
+        res = await agentSafe(
+          `${R_EXEC}
+
+Repo: ${repo}
+Do EXACTLY this one atomic task.
+Task: ${node.task}
+${node.ctx}${seamCtx}
+${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
+          { phase: "Work", label: `exec:${lbl}${attempt ? ".r" + attempt : ""}`, model: "sonnet", schema: RESULT }
+        );
+        if (!res) break;
+        await trace({ phase: "Work", role: `exec:${lbl}`, model: "sonnet", leafIndex: i, repairAttempt: attempt });
+        if (!res.passed) {
+          verdict = { trustworthy: false, reason: "tier-0 gate: deterministic build/tests RED" };
+        } else {
+          let engineT0 = "", t0red = null;
+          const okScope = (s) => !!s && /^[A-Za-z0-9_.-]+$/.test(String(s));
+          const gateScope = okScope(node.testScope) ? node.testScope : okScope(res.testScope) ? res.testScope : "";
+          const t0cmd = node.kind !== "tidy" && gateScope && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", gateScope) : "";
+          if (!t0cmd && node.kind !== "tidy") {
+            log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
+          }
+          if (t0cmd) {
+            const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
+            if (t0.exitCode !== 0) {
+              const t0tail = String(t0.stdout || "");
+              if (RE_ZERO_TESTS.test(t0tail)) {
+                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
+                engineT0 = engineRanBlock({
+                  cmd: t0cmd,
+                  note: "(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)",
+                  exitCode: t0.exitCode,
+                  tail: t0tail.slice(-300),
+                  duty: `The engine's filtered gate matched ZERO tests under scope \`${gateScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.`
+                });
+              } else {
+                t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] };
+                if (t0redBreaker.record(), t0redBreaker.tripped()) {
+                  baseline.filterCommand = "";
+                  log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
+                }
+              }
+            } else {
+              t0redBreaker.reset();
+              gateLevel = "deterministic-filtered";
+              engineT0 = engineRanBlock({
+                cmd: t0cmd,
+                exitCode: 0,
+                tail: String(t0.stdout || "").slice(-300),
+                duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${gateScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
+              });
+            }
+          }
+          if (!t0red && node.kind === "tidy" && baseline.measureCommand) {
+            const tidyFull = await sh(`cd ${repo} && ${baseline.measureCommand}`, `tidy-fullsuite:${lbl}`);
+            if (tidyFull.exitCode !== 0) {
+              t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || "").slice(-300)}`] };
+            } else {
+              gateLevel = "full-suite";
+              engineT0 = engineRanBlock({
+                cmd: baseline.measureCommand,
+                note: "(full suite — tidy behavior-preservation gate)",
+                exitCode: 0,
+                tail: String(tidyFull.stdout || "").slice(-300),
+                duty: `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`
+              });
+            }
+          }
+          verdict = t0red || await verifyLeaf(lbl, node, res, attempt === 0 ? tier : tier === "light" ? "standard" : tier, repo, leafStart, engineT0, buildNote);
+        }
+        if (verdict.trustworthy) break;
+        const issueCount = (verdict.issues || []).length || 1;
+        const converging = issueCount < prevIssueCount;
+        if (attempt >= MAX_REPAIR && !(converging && attempt < MAX_REPAIR_HARD)) break;
+        if (getQuotaHalt() || budget.total && budget.remaining() < 12e4) {
+          log(`${tag}${getQuotaHalt() ? "quota halt" : "budget low"} — stopping repairs (leaf ${i} stays untrusted → reverted)`);
+          break;
+        }
+        prevIssueCount = attempt === 0 && tier === "light" ? Infinity : issueCount;
+        log(`${tag}leaf ${i} untrusted (tier=${res.passed ? tier : "tier0-red"}, ${issueCount} issue(s)${attempt > 0 && converging ? ", converging" : ""}) → self-repair ${attempt + 1}/${converging ? MAX_REPAIR_HARD : MAX_REPAIR}`);
+        attempt++;
+      }
+      if (!res) {
+        log(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`);
+        await restore();
+        done.push({ task: node.task, passed: false, summary: "executor returned no result (API/rate-limit)", verdict: { trustworthy: false, reason: "executor failed" } });
+        if (untrustedBreaker.record(), untrustedBreaker.tripped()) {
+          ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
+          log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`);
+          break;
+        }
+        continue;
+      }
+      done.push({ task: node.task, ...res, verdict, gateLevel });
+      log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
+      await trace({ phase: "Work", role: `leaf-verify:${lbl}`, model: "verify", leafIndex: i, gateLevel, trustworthy: verdict.trustworthy, repairAttempt: attempt });
+      if (GIT && !verdict.trustworthy) {
+        const restored = await restore();
+        log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
+      }
+      if (verdict.trustworthy) untrustedBreaker.reset();
+      else untrustedBreaker.record();
+      if (untrustedBreaker.tripped()) {
+        ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
+        log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`);
+        break;
+      }
+      const feed = verdict.trustworthy ? [...res.discovered || [], ...verdict.followUps || []] : [];
+      if (feed.length) {
+        const fresh = feed.map(String).filter((d3) => !executedKeys.has(keyOf(d3))).slice(0, Math.max(0, MAX_DISCOVERED - discovered));
+        if (fresh.length) {
+          fresh.forEach((d3) => executedKeys.add(keyOf(d3)));
+          discovered += fresh.length;
+          const batchTask = `Address these ${fresh.length} discovered/review-flagged scenario(s) as ONE leaf (the implementation is stable, so batching tests is Canon-TDD-safe — write a meaningful test for each):
+- ${fresh.join("\n- ")}
+If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a test), do NOT force it — note it in \`discovered\` for a focused follow-up.`;
+          stack.push({ task: batchTask, ctx: `Discovered while doing "${node.task.slice(0, 40)}".`, kind: "behavior", atomic: true, riskTier: "standard", testScope: node.testScope, depth: node.depth, spikes: 0 });
+          log(`${tag}+${fresh.length} discovered → 1 batched follow-up leaf`);
+        }
+      }
+    }
+    if (done.length >= MAX_LEAVES) log(`${tag}NOTE: hit MAX_LEAVES — work truncated`);
+    return { done };
+  }
+  return runWork;
+};
+
 // src/main.ts
 async function __main() {
   let QUOTA_HALT = "";
@@ -330,8 +583,7 @@ async function __main() {
   const CONFIRM_NO_RIG = A.confirmNoRig === true;
   const SHARED_SCRATCH = A.sharedScratch === true;
   const MAX_LEAVES = 24;
-  let OVER_TIER_STOP = "";
-  let OVER_TIER_SLICES = 0;
+  const overTier = { stop: "", slices: 0 };
   const MAX_DISCOVERED = 8;
   const MAX_SPIKES = 1;
   const MAX_REPAIR = 1;
@@ -512,253 +764,6 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
   const t0redBreaker = circuitBreaker(2);
   const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i;
   const ABORTS = [];
-  async function runWork(rootTask, repo, startDepth, gid, cleanOK, kind, buildNote) {
-    buildNote = buildNote || "";
-    const tag = gid != null ? `g${gid}:` : "";
-    const stack = [{ task: rootTask, ctx: "", depth: startDepth, spikes: 0, kind: kind || "behavior" }];
-    const done2 = [];
-    const executedKeys = /* @__PURE__ */ new Set();
-    let discovered = 0;
-    const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK);
-    const keyOf = (s) => String(s).trim().slice(0, 120);
-    while (stack.length && done2.length < MAX_LEAVES) {
-      const node = stack.pop();
-      const atFloor = node.depth >= FLOOR;
-      let d = null, action;
-      if (node.atomic) {
-        action = "execute";
-      } else {
-        d = await agentSafe(
-          `${R_SLICE}
-
-Repo: ${repo}
-Decide this node's next action (bias HARD toward execute), then act.
-Task: ${node.task}
-${node.ctx ? "Context: " + node.ctx + "\n" : ""}Depth ${node.depth}/${FLOOR}${atFloor ? " (AT FLOOR — you must return execute)" : ""}.
-${INV}
-If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, independently-verifiable slices with a self-contained contract each (group near-identical units; 2-5 slices; isolate any risky seam first).`,
-          { phase: "Work", label: `${tag}decompose:d${node.depth}`, model: "sonnet", schema: DECOMPOSE }
-        );
-        if (!d) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`);
-        action = atFloor || !d ? "execute" : d.action;
-        if (action === "spike" && node.spikes >= MAX_SPIKES) action = "execute";
-      }
-      if (action === "slice") {
-        let slices = d && d.slices || [];
-        if (slices.length > 1 && node.depth <= 1) {
-          const crit = await agentSafe(
-            `${R_CRITIC}
-
-Repo: ${repo}
-Task: ${node.task}
-Proposed list:
-` + slices.map((s, j) => `${j + 1}. ${s.desc}`).join("\n") + `
-${INV}`,
-            // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
-            // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
-            // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
-            // NOT for verifier/lens (they MUST keep Bash to re-run — Bash-less verify silently
-            // defeats the fabricated-green catch, main.ts fabricated-green lesson) nor baseliner
-            // (Explore skips CLAUDE.md, which the baseliner must read to build the project card).
-            { phase: "Work", label: `${tag}critic:d${node.depth}`, agentType: "Explore", schema: MISSING }
-          );
-          if (crit && crit.missing && crit.missing.length) {
-            slices = slices.concat(crit.missing.map((m) => ({ ...m, kind: "behavior" })));
-            log(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`);
-          }
-        }
-        if (slices.length <= 1) {
-          log(`${tag}non-reducing slice [d${node.depth}] → execute`);
-          action = "execute";
-        } else {
-          log(`${tag}slice [d${node.depth}] → ${slices.length}`);
-          if (node.depth === 0) {
-            const compileBound = baseline.coldBuildCost === "expensive";
-            log(`${tag}⟂ SCALE: ${slices.length} top-level slice(s) (a FLOOR — the completeness critic + per-leaf discovery expand it)${compileBound ? "; compile-bound → each leaf is a full build cycle, wall-clock ∝ leaf count" : ""}. If you diagnosed this task low-risk/file:line, that is the over-tier signal — prefer inline T1, not a multi-leaf engine run.`);
-            if (compileBound && slices.length <= 3 && slices.every((s) => s.riskTier === "light") && !CONFIRM_TIER) {
-              OVER_TIER_STOP = `compile-bound repo, ${slices.length} low-risk slice(s) — inline T1 work`;
-              OVER_TIER_SLICES = slices.length;
-              log(`${tag}⟂ OVER-TIER STOP: this looks like inline-T1 work (compile-bound + ${slices.length} all-light slice(s)). Doing it inline is faster. To force the engine anyway, re-run with confirmTier:true. (No leaves ran; nothing changed.)`);
-              return { done: [] };
-            }
-          }
-          for (let j = slices.length - 1; j >= 0; j--) {
-            const iface = slices[j].interface;
-            const ifaceCtx = iface && !/^TBD/i.test(iface.trim()) ? `
-Interface (FIXED): ${iface}` : "";
-            stack.push({ task: slices[j].desc, ctx: `Contract: ${slices[j].contract}${ifaceCtx}`, kind: slices[j].kind || node.kind || "behavior", atomic: slices[j].atomic, riskTier: slices[j].riskTier, testScope: slices[j].testScope, seamPointers: slices[j].seamPointers, depth: node.depth + 1, spikes: 0 });
-          }
-          continue;
-        }
-      }
-      if (action === "spike") {
-        const learn = await agentSafe(
-          `You are the Spiker (Beck: concrete hypotheses — make the uncertainty small, falsifiable, and cheap).
-Repo: ${repo}
-De-risk this hard-but-small task with the smallest experiment / minimal reproduction (remove extraneous detail; learn, don't build): ${node.task}
-${node.ctx}`,
-          { phase: "Work", label: `${tag}spike:d${node.depth}`, model: "sonnet", schema: LEARNING }
-        );
-        stack.push({ ...node, ctx: `${node.ctx}
-LEARNED: ${learn ? learn.summary : "(spike produced no result)"}`, spikes: node.spikes + 1 });
-        log(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`);
-        continue;
-      }
-      if (QUOTA_HALT || budget.total && budget.remaining() < 12e4) {
-        log(`${tag}${QUOTA_HALT ? "quota halt" : "budget low"} — stopping after ${done2.length} leaves`);
-        break;
-      }
-      const k = keyOf(node.task);
-      if (executedKeys.has(k)) continue;
-      executedKeys.add(k);
-      const i = done2.length;
-      const lbl = `${tag}${i}`;
-      const tier = node.kind === "tidy" ? "standard" : node.atomic ? node.riskTier || "standard" : d && d.riskTier || "standard";
-      const TIDY = node.kind === "tidy" ? "\nTIDY-FIRST leaf (Beck — make the change easy): a behavior-PRESERVING structural change ONLY (rename/extract/generalize/move). Do NOT add or change any test; do NOT change observable behavior — the EXISTING suite must stay green UNCHANGED. EXCEPTIONS for this tidy leaf: its proof IS the existing suite, so run the FULL existing suite once (this overrides the never-full-suite speed rule); and commit as ONE refactor commit (this replaces the two-hats behavior+refactor commit pair — a tidy leaf has no behavior step)." : "";
-      const leafStart = GIT ? (((await sh(`git -C ${repo} rev-parse HEAD 2>/dev/null || true`, `head:${lbl}`)).stdout || "").match(/[0-9a-f]{40}/i) || [""])[0] : "";
-      const restore = async () => {
-        if (!GIT || !cleanOK || !leafStart) return false;
-        const b = await shBatch(
-          `git -C ${repo} reset --hard ${leafStart}; printf '<<RS:reset:%s>>\\n' "$?"; git -C ${repo} clean -fdq -e .rs-wt -e .rs-scratch; printf '<<RS:clean:%s>>\\n' "$?"`,
-          // drop untracked files the leaf created (never the shared build dir)
-          `reset:${lbl}`
-        );
-        return b.get("reset") !== null;
-      };
-      let res = null, verdict = null, attempt = 0, prevIssueCount = Infinity;
-      let gateLevel = "llm-only";
-      while (true) {
-        const repair = attempt === 0 ? "" : `
-REPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ${JSON.stringify((verdict && verdict.issues && verdict.issues.length ? verdict.issues : [verdict && verdict.reason]).slice(0, 6).map((s) => String(s).slice(0, 300)))}. ` + (verdict && verdict.prescription ? `
-REVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}
-` : "") + (GIT && cleanOK && leafStart ? `FIRST undo your prior attempt with \`git -C ${repo} reset --hard ${leafStart}\` (sibling commits survive), then re-implement fresh; ` : "") + `then fix exactly those objections. In git mode add a fresh commit.`;
-        const seamCtx = node.seamPointers && node.seamPointers.length ? `
-Seam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):
-${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ""}${p.symbol ? ` (${p.symbol})` : ""}${p.currentText ? ` — "${p.currentText}"` : ""}`).join("\n")}` : "";
-        res = await agentSafe(
-          `${R_EXEC}
-
-Repo: ${repo}
-Do EXACTLY this one atomic task.
-Task: ${node.task}
-${node.ctx}${seamCtx}
-${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
-          { phase: "Work", label: `exec:${lbl}${attempt ? ".r" + attempt : ""}`, model: "sonnet", schema: RESULT }
-        );
-        if (!res) break;
-        await trace({ phase: "Work", role: `exec:${lbl}`, model: "sonnet", leafIndex: i, repairAttempt: attempt });
-        if (!res.passed) {
-          verdict = { trustworthy: false, reason: "tier-0 gate: deterministic build/tests RED" };
-        } else {
-          let engineT0 = "", t0red = null;
-          const okScope = (s) => !!s && /^[A-Za-z0-9_.-]+$/.test(String(s));
-          const gateScope = okScope(node.testScope) ? node.testScope : okScope(res.testScope) ? res.testScope : "";
-          const t0cmd = node.kind !== "tidy" && gateScope && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", gateScope) : "";
-          if (!t0cmd && node.kind !== "tidy") {
-            log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
-          }
-          if (t0cmd) {
-            const t0 = await sh(`cd ${repo} && ${t0cmd}${SCRATCH && repo !== REPO ? ` --scratch-path ${SCRATCH}` : ""}`, `t0:${lbl}`);
-            if (t0.exitCode !== 0) {
-              const t0tail = String(t0.stdout || "");
-              if (RE_ZERO_TESTS.test(t0tail)) {
-                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
-                engineT0 = engineRanBlock({
-                  cmd: t0cmd,
-                  note: "(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)",
-                  exitCode: t0.exitCode,
-                  tail: t0tail.slice(-300),
-                  duty: `The engine's filtered gate matched ZERO tests under scope \`${gateScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.`
-                });
-              } else {
-                t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] };
-                if (t0redBreaker.record(), t0redBreaker.tripped()) {
-                  baseline.filterCommand = "";
-                  log(`${tag}engine t0 disagreed with executor-green ${t0redBreaker.streak}× in a row — suspecting a broken filterCommand template; disabling the engine gate (LLM verify takes over)`);
-                }
-              }
-            } else {
-              t0redBreaker.reset();
-              gateLevel = "deterministic-filtered";
-              engineT0 = engineRanBlock({
-                cmd: t0cmd,
-                exitCode: 0,
-                tail: String(t0.stdout || "").slice(-300),
-                duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${gateScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
-              });
-            }
-          }
-          if (!t0red && node.kind === "tidy" && baseline.measureCommand) {
-            const tidyFull = await sh(`cd ${repo} && ${baseline.measureCommand}`, `tidy-fullsuite:${lbl}`);
-            if (tidyFull.exitCode !== 0) {
-              t0red = { trustworthy: false, reason: `tidy-fullsuite (ENGINE-run full suite) RED: measureCommand exited ${tidyFull.exitCode} (behavior not preserved)`, issues: [`full suite failed for tidy leaf; output tail: ${String(tidyFull.stdout || "").slice(-300)}`] };
-            } else {
-              gateLevel = "full-suite";
-              engineT0 = engineRanBlock({
-                cmd: baseline.measureCommand,
-                note: "(full suite — tidy behavior-preservation gate)",
-                exitCode: 0,
-                tail: String(tidyFull.stdout || "").slice(-300),
-                duty: `Confirm from that output that the existing suite is actually green (zero tests run = vacuous). Do NOT re-run the suite yourself — judge the ARTIFACTS: diff scope, no test added/changed/deleted, pure structural refactor, no observable behavior change.`
-              });
-            }
-          }
-          verdict = t0red || await verifyLeaf(lbl, node, res, attempt === 0 ? tier : tier === "light" ? "standard" : tier, repo, leafStart, engineT0, buildNote);
-        }
-        if (verdict.trustworthy) break;
-        const issueCount = (verdict.issues || []).length || 1;
-        const converging = issueCount < prevIssueCount;
-        if (attempt >= MAX_REPAIR && !(converging && attempt < MAX_REPAIR_HARD)) break;
-        if (QUOTA_HALT || budget.total && budget.remaining() < 12e4) {
-          log(`${tag}${QUOTA_HALT ? "quota halt" : "budget low"} — stopping repairs (leaf ${i} stays untrusted → reverted)`);
-          break;
-        }
-        prevIssueCount = attempt === 0 && tier === "light" ? Infinity : issueCount;
-        log(`${tag}leaf ${i} untrusted (tier=${res.passed ? tier : "tier0-red"}, ${issueCount} issue(s)${attempt > 0 && converging ? ", converging" : ""}) → self-repair ${attempt + 1}/${converging ? MAX_REPAIR_HARD : MAX_REPAIR}`);
-        attempt++;
-      }
-      if (!res) {
-        log(`${tag}leaf ${i} exec FAILED (no result) — restoring, continuing`);
-        await restore();
-        done2.push({ task: node.task, passed: false, summary: "executor returned no result (API/rate-limit)", verdict: { trustworthy: false, reason: "executor failed" } });
-        if (untrustedBreaker.record(), untrustedBreaker.tripped()) {
-          ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
-          log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure suspected). Integrate still runs.`);
-          break;
-        }
-        continue;
-      }
-      done2.push({ task: node.task, ...res, verdict, gateLevel });
-      log(`${tag}leaf ${i} ${res.passed ? "green" : "RED"} | tier=${tier}${attempt ? ` (repaired×${attempt})` : ""} | gate=${gateLevel} | ${verdict.trustworthy ? "trusted" : "NOT trusted"}: ${node.task.slice(0, 36)}`);
-      await trace({ phase: "Work", role: `leaf-verify:${lbl}`, model: "verify", leafIndex: i, gateLevel, trustworthy: verdict.trustworthy, repairAttempt: attempt });
-      if (GIT && !verdict.trustworthy) {
-        const restored = await restore();
-        log(`${tag}leaf ${i} untrusted → ${restored ? `restored to ${leafStart.slice(0, 8)}` : !cleanOK ? "NOT auto-cleaned (dirty main baseline — left to protect your uncommitted work)" : !leafStart ? "NOT auto-cleaned (HEAD capture failed — left as-is, flagged for Integrate)" : "NOT auto-cleaned (restore skipped — quota halt or sh proxy unavailable)"}`);
-      }
-      if (verdict.trustworthy) untrustedBreaker.reset();
-      else untrustedBreaker.record();
-      if (untrustedBreaker.tripped()) {
-        ABORTS.push(`${tag || "main:"} ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — unit halted`);
-        log(`${tag}⚠ ${MAX_UNTRUSTED_STREAK} consecutive untrusted leaves — halting this unit (systemic failure: wrong decomposition / broken env / API trouble). Integrate still runs.`);
-        break;
-      }
-      const feed = verdict.trustworthy ? [...res.discovered || [], ...verdict.followUps || []] : [];
-      if (feed.length) {
-        const fresh = feed.map(String).filter((d2) => !executedKeys.has(keyOf(d2))).slice(0, Math.max(0, MAX_DISCOVERED - discovered));
-        if (fresh.length) {
-          fresh.forEach((d2) => executedKeys.add(keyOf(d2)));
-          discovered += fresh.length;
-          const batchTask = `Address these ${fresh.length} discovered/review-flagged scenario(s) as ONE leaf (the implementation is stable, so batching tests is Canon-TDD-safe — write a meaningful test for each):
-- ${fresh.join("\n- ")}
-If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a test), do NOT force it — note it in \`discovered\` for a focused follow-up.`;
-          stack.push({ task: batchTask, ctx: `Discovered while doing "${node.task.slice(0, 40)}".`, kind: "behavior", atomic: true, riskTier: "standard", testScope: node.testScope, depth: node.depth, spikes: 0 });
-          log(`${tag}+${fresh.length} discovered → 1 batched follow-up leaf`);
-        }
-      }
-    }
-    if (done2.length >= MAX_LEAVES) log(`${tag}NOTE: hit MAX_LEAVES — work truncated`);
-    return { done: done2 };
-  }
   phase("Plan");
   let groups = null;
   const autoSharedScratch = baseline.coldBuildCost === "expensive" && A.sharedScratch !== false;
@@ -771,6 +776,7 @@ If ANY scenario actually needs an IMPLEMENTATION/behavior change (not just a tes
   const SCRATCH = goParallel && useSharedScratch ? `${REPO}/.rs-scratch` : "";
   const buildNoteFor = (repo) => SCRATCH && repo !== REPO ? `
 SHARED BUILD DIRECTORY (mandatory): append \`--scratch-path ${SCRATCH}\` to EVERY build/test invocation (SwiftPM passes it through its wrappers; Cargo's equivalent is CARGO_TARGET_DIR; other builders have their own shared-build-dir mechanism — use this project's equivalent). The parallel worktrees share that ONE build dir so dependencies compile once; builds serialize on its lock (expected — do not work around it); NEVER delete it.` : "";
+  const runWork = makeRunWork({ sh, shBatch, trace, agentSafe, verifyLeaf, t0redBreaker, LEAF_TEST, INV, REPO, GIT, GIT_EXEC, SCRATCH, ABORTS, RE_ZERO_TESTS, MARKER, overTier, FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REPAIR_HARD, MAX_UNTRUSTED_STREAK, CONFIRM_TIER, baseline, getQuotaHalt: () => QUOTA_HALT });
   if (goParallel) {
     const a0 = await agentSafe(
       `${R_SLICE}
@@ -909,7 +915,7 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
     const r = await runWork(TASK, REPO, 0, void 0, gitClean);
     done = r.done;
   }
-  if (OVER_TIER_STOP) {
+  if (overTier.stop) {
     log(`over-tier stop — skipping integrate/wiring/briefing (nothing was executed)`);
     if (LOCKFILE) {
       try {
@@ -918,7 +924,7 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
         log(`lock-clear failed — stale lock at ${LOCKFILE}; remove before next run.`);
       }
     }
-    return { error: `over-tiered: ${OVER_TIER_STOP} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: OVER_TIER_SLICES };
+    return { error: `over-tiered: ${overTier.stop} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: overTier.slices };
   }
   phase("Integrate");
   let finalRun = { exitCode: -1, stdout: "" };

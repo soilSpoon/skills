@@ -53,6 +53,7 @@ export const circuitBreaker = (threshold: number, classThreshold = 0) => {
     reset() { streak = 0; classes.clear() },
   }
 }
+export type Breaker = ReturnType<typeof circuitBreaker>  // shape of a circuitBreaker instance (for typing it as a phase dep)
 
 // The shell-truth→ENGINE-RAN→judge string in ONE helper (leaf + tidy gates emit an identical shape):
 // the model JUDGES from this fixed deterministic result, never re-runs it (ITEM 8 keystone).

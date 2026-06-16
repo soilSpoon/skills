@@ -139,3 +139,13 @@ export interface AgentOpts {
   isolation?: 'worktree'
   agentType?: string
 }
+// One JSONL run-trace line (shared by main.ts's `trace` + extracted phases that emit traces).
+export type TraceRecord = {
+  phase: string
+  role?: string
+  model?: string
+  leafIndex?: number
+  gateLevel?: GateLevel
+  trustworthy?: boolean
+  repairAttempt?: number
+}
