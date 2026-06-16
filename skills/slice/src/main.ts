@@ -22,6 +22,23 @@ declare function phase(title: string): void
 declare function log(message: string): void
 declare const args: unknown
 declare const budget: { total: number | null; spent(): number; remaining(): number }
+// ============================================================================================
+// ARCHITECTURE — the module-boundary principle (ENFORCED by test/unit/architecture.test.mjs, so it
+// is a checked invariant, not a per-case "should I split this?" judgment). The engine src is a strict
+// layered DAG; imports flow STRICTLY DOWN:
+//   L0 pure leaves   types · util · prompts · schemas · leaf-prompt  (a helper/fragment with NO
+//                    engine-state coupling → its own module)
+//   L1 host          agentSafe + sh/shBatch proxies — the I/O boundary
+//   L2 phases/*      verify · leaf-loop · integrate — each a COHESIVE trust/logic unit. The test for
+//                    "make it a module": cohesive responsibility + a clean deps interface (host/cfg/git
+//                    bundles) + the body lifts out BYTE-FOR-BYTE. If extracting would instead force an
+//                    error-protocol or divorce a spec from its mechanism (e.g. the git+lock bootstrap's
+//                    FATAL aborts) → it is NOT a module; it stays here, inline, in the orchestrator.
+//   L3 main (this)   the orchestration SPINE: parse args → wire host → baseline → bootstrap git+lock →
+//                    wire phases → plan → work → integrate. Imported by nothing. Phases compose via this
+//                    file's dep-wiring, never by importing each other. Deps travel as cohesive
+//                    parameter-objects (host/cfg/git), never flat bags.
+// ============================================================================================
 async function __main(): Promise<EngineResult> {
 // Runtime-throw containment: agent() can THROW rather than return null (observed live:
 // "subagent completed without calling StructuredOutput" killed a 50-agent, 5-hour run that
@@ -156,6 +173,12 @@ const LEAF_TEST = makeLeafTest(baseline.measureCommand)   // dynamic per-leaf pr
 // ENGINE-RAN prefix / no tail — so they are NOT folded in: that would change the byte-text the verifier sees.)
 // engineRanBlock (shell-truth→ENGINE-RAN→judge string) → src/util.ts.
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ GIT + LOCK BOOTSTRAP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Establishes BASE_SHA / GIT / gitVerify / GIT_EXEC / trace and acquires the inter-run lock (LOCKFILE).
+// INTENTIONALLY INLINE, not a phases/* module (per the ARCHITECTURE note up top): it carries FATAL
+// early-returns that abort the whole run, and the 2-batch atomic-lock SPEC lives in the comments ON
+// this code (the most race-sensitive path — inter-run mutual exclusion, Lesson 9). Extracting it would
+// force an error-protocol and divorce the spec from its mechanism — so the boundary rule says: stays here.
 // Deterministic gitSha — do NOT rely on the LLM baseliner to remember it (it once silently
 // didn't, disabling git mode). A fixed `git rev-parse HEAD`, run verbatim, owns this.
 //

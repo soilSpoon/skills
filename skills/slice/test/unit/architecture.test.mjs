@@ -1,0 +1,61 @@
+// Architecture fitness test — the module-boundary PRINCIPLE, ENFORCED instead of agonized.
+// The engine's src is a strict layered DAG; imports must flow STRICTLY DOWNWARD. This test turns
+// "should this be its own module / can it import that?" from a per-case judgment into a checked
+// invariant: a phase that reaches sideways (sibling phase) or up (main), or a "pure leaf" that grows
+// a dependency, fails HERE — loudly, at the boundary — so the structure can't silently erode.
+//
+// LAYERS (a file may import ONLY from a strictly lower layer):
+//   L0  pure leaves — types/util/prompts/schemas/leaf-prompt (no relative imports at all)
+//   L1  host        — the I/O layer (agentSafe + sh proxies); imports L0 only
+//   L2  phases      — verify/leaf-loop/integrate, each a cohesive trust/logic unit; import L0+L1,
+//                     NEVER a sibling phase (they are wired together via deps in main, not by import)
+//   L3  main        — the orchestrator spine; imports everything below; imported by NOTHING
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { posix, dirname, join } from 'node:path'
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src')
+const LAYER = {
+  'types.ts': 0, 'util.ts': 0, 'prompts.ts': 0, 'schemas.ts': 0, 'leaf-prompt.ts': 0,
+  'host.ts': 1,
+  'phases/verify.ts': 2, 'phases/leaf-loop.ts': 2, 'phases/integrate.ts': 2,
+  'main.ts': 3,
+}
+
+// every .ts under src (recursively), as keys relative to src/
+function srcFiles(dir = SRC, base = '') {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? srcFiles(join(dir, e.name), posix.join(base, e.name))
+    : e.name.endsWith('.ts') ? [posix.join(base, e.name)] : [])
+}
+const relImports = (key) => [...readFileSync(join(SRC, key), 'utf8').matchAll(/from\s+'(\.[^']+)'/g)]
+  .map((m) => posix.normalize(posix.join(posix.dirname(key), m[1])) + '.ts')
+
+test('every src/*.ts is classified into a layer (a new unclassified file fails — forces the decision)', () => {
+  for (const f of srcFiles()) assert.ok(f in LAYER, `unclassified src file: ${f} — assign it a layer in this test`)
+})
+
+test('imports flow STRICTLY downward — no phase→sibling-phase, no →main, no cycle', () => {
+  for (const f of srcFiles()) {
+    for (const dep of relImports(f)) {
+      assert.ok(dep in LAYER, `${f} imports unknown module ${dep}`)
+      assert.ok(LAYER[dep] < LAYER[f], `LAYER VIOLATION: ${f} (L${LAYER[f]}) imports ${dep} (L${LAYER[dep]}) — imports must go strictly DOWN`)
+    }
+  }
+})
+
+test('the pure leaves (L0) import nothing relative — they stay pure', () => {
+  for (const f of srcFiles()) if (LAYER[f] === 0) assert.deepEqual(relImports(f), [], `${f} is an L0 pure leaf but imports ${relImports(f)}`)
+})
+
+test('main.ts is the spine — imported by NO other module', () => {
+  for (const f of srcFiles()) if (f !== 'main.ts')
+    assert.ok(!relImports(f).includes('main.ts'), `${f} imports main.ts — the orchestrator must be a sink, not a dependency`)
+})
+
+test('phases are leaves of the logic layer — no phase imports another phase (they compose via deps, not imports)', () => {
+  for (const f of srcFiles()) if (f.startsWith('phases/'))
+    for (const dep of relImports(f)) assert.ok(!dep.startsWith('phases/'), `${f} imports sibling phase ${dep} — phases compose through main's dep-wiring, never directly`)
+})

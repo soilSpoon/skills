@@ -296,8 +296,31 @@ pins `outExtension` → `.mjs`, and `build-engine.sh` asserts EXACTLY one top-le
 the entry footer, and an AsyncFunction parse-gate — because the artifact is a workflow-script body (the runtime
 strips the `meta` banner and runs the rest as an AsyncFunction), not a standalone module.
 
+## Module structure — a strict layered DAG (the boundary rule, ENFORCED)
+
+The engine source (`src/*.ts`, bundled by tsup into `recursive-slice.js`) is a layered DAG; imports
+flow STRICTLY DOWN, so **"should this be its own module?" is answered by a rule, not a per-case
+judgment.** `test/unit/architecture.test.mjs` enforces it (a phase reaching sideways or up, or a pure
+leaf growing a dependency, fails the test loudly):
+
+| Layer | Files | Rule |
+|---|---|---|
+| **L0 pure leaves** | `types` · `util` · `prompts` · `schemas` · `leaf-prompt` | no relative imports — a helper/fragment with NO engine-state coupling becomes one of these |
+| **L1 host** | `host.ts` | the I/O boundary (`agentSafe` + `sh`/`shBatch` proxies + the quota breaker); imports L0 only |
+| **L2 phases** | `phases/verify` · `phases/leaf-loop` · `phases/integrate` | each a COHESIVE trust/logic unit; imports L0+L1; **never a sibling phase** (they compose via main's dep-wiring) |
+| **L3 main** | `main.ts` | the orchestration SPINE; imports everything below; imported by nothing |
+
+**The test for "make it a module" (L2):** cohesive responsibility + a clean deps interface (the
+`host`/`cfg`/`git` parameter-objects) + the body lifts out BYTE-FOR-BYTE. If extracting would instead
+force an error-protocol or divorce a spec from its mechanism — e.g. the **git+lock bootstrap** (FATAL
+early-returns + the 2-batch atomic-lock spec living on the code, the most race-sensitive path, Lesson 9),
+or the **integrate result-pipeline** (splitting re-threads shared state = a re-introduced parameter-clump)
+— then it is NOT a module: it stays inline in the orchestrator. Deps are threaded as cohesive
+parameter-objects, never flat bags.
+
 ## File map
-- `recursive-slice.js` (skill base dir) — the engine (this document).
-- `agents/slice-*.md` — standalone mirrors of the role personas (install to `~/.claude/agents/` to spawn them directly via the Agent tool).
-- `SKILL.md` — `/slice` front door.
-- `scripts/slice-watch.py` — live run viewer.
+- `src/*.ts` → `recursive-slice.js` — the engine source (layered above) + its tsup bundle artifact.
+- `test/` — `scenarios.test.mjs` (whole-engine behavior pins via `host.mjs`) + `unit/*.test.mjs`
+  (module contracts: util/host/verify + the **architecture** fitness test). `npm test` runs both.
+- `agents/slice-*.md` — standalone mirrors of the role personas (install to `~/.claude/agents/`).
+- `SKILL.md` — `/slice` front door. `scripts/slice-watch.py` — live run viewer.
