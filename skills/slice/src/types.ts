@@ -66,6 +66,7 @@ export interface ExecResult {
   commits?: string[]
   interfaceConcern?: string
   purposeVerified?: boolean
+  testScope?: string  // bare-token filter the leaf's tests run under — engine's deterministic-gate fallback when the slicer assigned no WorkNode.testScope (closes the spec-first→slice→gate token thread)
 }
 export interface Verdict {
   trustworthy: boolean

@@ -2000,3 +2000,27 @@ test('rig cross-check: no WARN when rigPresent and measureCommand agree (default
   const { logs } = await runEngine({ args: ARGS, dispatch: dispatcher() })
   assert.ok(!logs.some((l) => /rig cross-check/.test(l)), 'no spurious cross-check WARN on the consistent happy path')
 })
+
+test('gate fallback: executor-reported testScope binds the deterministic gate when the slice assigned none', async () => {
+  // 2026-06-16 MailKit dogfood: a root executed directly as ONE cohesive leaf has no slicer-assigned
+  // node.testScope, so the per-leaf filtered gate degraded to llm-only even though the executor created
+  // named tests (spec-first→slice→gate token thread broke). The executor now REPORTS the bare-token scope
+  // its tests run under, and the gate falls back to it. (Pre-fix: this leaf was a trust-floor degradation.)
+  const dispatch = dispatcher((c) => {
+    if (!isSh(c) && /exec:/.test(c.opts.label || '')) return { ...FIX.exec, testScope: 'MyScope' }
+  })
+  const { result, logs } = await runEngine({ args: ARGS, dispatch })
+  assert.equal(result.fullSuiteGreen, true)
+  assert.deepEqual(result.degradations, [], 'no llm-only degradation: gate bound via the executor-reported testScope')
+  assert.ok(!logs.some((l) => /gate=llm-only/.test(l)), 'no gate=llm-only WARN when the executor reports a usable testScope')
+})
+
+test('gate fallback: a usable node.testScope still WINS over the executor-reported one (no behavior change for sliced leaves)', async () => {
+  // Guard: the fallback must only apply when node.testScope is absent/unsafe — a slicer-assigned scope is
+  // authoritative. Here the slice carries testScope and the exec also reports one; the slice's must be used.
+  const dispatch = dispatcher((c) => {
+    if (!isSh(c) && /exec:/.test(c.opts.label || '')) return { ...FIX.exec, testScope: 'ExecScope' }
+  })
+  const { result } = await runEngine({ args: { ...ARGS, task: 'x' }, dispatch })
+  assert.equal(result.fullSuiteGreen, true)
+})

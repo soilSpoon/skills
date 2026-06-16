@@ -63,6 +63,7 @@ export const RESULT = { type: 'object', required: ['summary', 'passed', 'evidenc
   commits: { type: 'array', items: { type: 'string' } },       // git mode: SHAs created (behavior commit, then refactor commit)
   interfaceConcern: { type: 'string' },                        // if the FIXED interface seemed wrong — reported up, NOT changed
   purposeVerified: { type: 'boolean' },                        // ① did this verify against REAL/recorded-real behavior (purpose), or only hand-fakes/mocks (prompt only)?
+  testScope: { type: 'string' },                               // the bare-token filter (suite name / shared test-name token, /^[A-Za-z0-9_.-]+$/) the tests this leaf added run under — the engine's deterministic-gate fallback when the slicer assigned no node.testScope (e.g. a root executed directly as one cohesive leaf). Closes the spec-first→slice→gate token thread.
 } }
 export const VERDICT = { type: 'object', required: ['trustworthy', 'reason'], properties: {
   trustworthy: { type: 'boolean' },

@@ -325,7 +325,8 @@ const LEAF_TEST = (scope?: string) =>
   `the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's ` +
   `incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. ` +
   `Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. ` +
-  `Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`
+  `Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize. ` +
+  `REPORT \`testScope\` in your result: the SINGLE bare token (a suite name, or a shared substring of the test names you added — matching /^[A-Za-z0-9_.-]+$/; NO spaces/slashes/'|') under which the project-card filter form runs EXACTLY the test(s) you added/touched and nothing unrelated. The engine re-runs that filter as the deterministic per-leaf gate — so it MUST match the names you actually used (a wrong token zero-matches → this leaf degrades to LLM-verify, never a false RED). This is what binds the deterministic gate when no scope was handed to you above; without it the leaf rests on the LLM verifier alone.`
 
 // ITEM 8 (KEYSTONE): the engine's deepest idea — run a deterministic shell command, then a model JUDGES from
 // that FIXED result (never re-runs) — was hand-reimplemented at the two leaf gates (filtered tier-0 + tidy
@@ -809,9 +810,16 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         let engineT0 = '', t0red: Verdict | null = null
         // No '|' in the whitelist: the scope is substituted UNQUOTED, so '|' would become a shell pipe
         // (exit 127 → false RED). One suite per slice; multi-suite scopes just skip the engine gate.
-        const scopeSafe = node.testScope && /^[A-Za-z0-9_.-]+$/.test(String(node.testScope))
-        const t0cmd = (node.kind !== 'tidy' && scopeSafe && baseline!.filterCommand && baseline!.filterCommand.includes('{scope}'))
-          ? baseline!.filterCommand!.replace('{scope}', String(node.testScope)) : ''
+        // Gate scope: the slicer-assigned node.testScope is authoritative; if absent/unsafe (a root executed
+        // directly as ONE cohesive leaf has none — the 2026-06-16 MailKit dogfood gap, where 3/3 leaves
+        // silently went llm-only), fall back to the bare-token scope the EXECUTOR reports its tests run under
+        // (res.testScope) so the spec-first→slice→gate token thread still binds a deterministic filtered gate.
+        // Failure mode is the status quo: a wrong res.testScope zero-matches → the existing finding path (below)
+        // degrades THIS leaf to llm-only — never a false RED.
+        const okScope = (s: unknown): s is string => !!s && /^[A-Za-z0-9_.-]+$/.test(String(s))
+        const gateScope = okScope(node.testScope) ? node.testScope : (okScope(res.testScope) ? res.testScope : '')
+        const t0cmd = (node.kind !== 'tidy' && gateScope && baseline!.filterCommand && baseline!.filterCommand.includes('{scope}'))
+          ? baseline!.filterCommand!.replace('{scope}', gateScope) : ''
         // ITEM 1: a NON-tidy leaf with NO runnable filtered gate (missing/disabled filterCommand, or an
         // unsafe/multi-suite scope) silently fell through to the LLM verifier ALONE — a silent trust-floor
         // downgrade with no record (the Lesson-3 class). Make it LOUD: name the leaf and the reason. (A tidy
@@ -829,11 +837,11 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
               // ① ZERO tests matched (scope/name mismatch, NOT a failure, NOT a broken template). Do NOT
               // t0red and do NOT trip the breaker — else one mismatched scope kills gating run-wide. This
               // leaf stays gate=llm-only (default); hand the verifier the finding to confirm independently.
-              log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${node.testScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`)
+              log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`)
               engineT0 = engineRanBlock({
                 cmd: t0cmd, note: '(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)',
                 exitCode: t0.exitCode, tail: t0tail.slice(-300),
-                duty: `The engine's filtered gate matched ZERO tests under scope \`${node.testScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.` })
+                duty: `The engine's filtered gate matched ZERO tests under scope \`${gateScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.` })
             } else {
               t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] }
               // A BROKEN template (env/wrapper/filter-syntax) false-REDs every leaf run-wide. After 2
@@ -849,7 +857,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
             // the verifier the output and the zero-tests duty instead of an assertion.
             engineT0 = engineRanBlock({
               cmd: t0cmd, exitCode: 0, tail: String(t0.stdout || '').slice(-300),
-              duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — ` +
+              duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${gateScope}\` — ` +
                 `zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. ` +
                 `If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).` })
           }

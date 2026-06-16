@@ -98,8 +98,10 @@ var RESULT = { type: "object", required: ["summary", "passed", "evidence"], prop
   // git mode: SHAs created (behavior commit, then refactor commit)
   interfaceConcern: { type: "string" },
   // if the FIXED interface seemed wrong — reported up, NOT changed
-  purposeVerified: { type: "boolean" }
+  purposeVerified: { type: "boolean" },
   // ① did this verify against REAL/recorded-real behavior (purpose), or only hand-fakes/mocks (prompt only)?
+  testScope: { type: "string" }
+  // the bare-token filter (suite name / shared test-name token, /^[A-Za-z0-9_.-]+$/) the tests this leaf added run under — the engine's deterministic-gate fallback when the slicer assigned no node.testScope (e.g. a root executed directly as one cohesive leaf). Closes the spec-first→slice→gate token thread.
 } };
 var VERDICT = { type: "object", required: ["trustworthy", "reason"], properties: {
   trustworthy: { type: "boolean" },
@@ -329,7 +331,7 @@ Executors apply them; verifiers treat clear violations as issues (a skipped non-
 - ${baseline.invariants.join("\n- ")}
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const LEAF_TEST = (scope) => `
-LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test you add so this EXACT token matches the runner's filter. Know your runner: many match a FUNCTION/TEST-NAME substring (Swift Testing \`--filter\`, pytest \`-k\`) — for those put \`${scope}\` IN the @Test/test-function name, NOT a suite path; suite-path runners match the suite/class name. (The engine re-runs this filter as the deterministic gate; a name mismatch = zero tests matched, which now degrades THIS leaf to LLM-verify — a FINDING, not a false RED.) ` : `Filter to the test you add or touch — match the runner's filter syntax (function-name substring for Swift Testing/pytest; suite path otherwise). `) + `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize.`;
+LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED tests — the bare full measure command (\`${baseline.measureCommand}\`) is FORBIDDEN here (it recompiles + runs the whole unrelated suite; it runs ONCE at integration as the net). ` + (scope ? `Test scope = \`${scope}\` — run the project-card filter form scoped to it, and NAME the test you add so this EXACT token matches the runner's filter. Know your runner: many match a FUNCTION/TEST-NAME substring (Swift Testing \`--filter\`, pytest \`-k\`) — for those put \`${scope}\` IN the @Test/test-function name, NOT a suite path; suite-path runners match the suite/class name. (The engine re-runs this filter as the deterministic gate; a name mismatch = zero tests matched, which now degrades THIS leaf to LLM-verify — a FINDING, not a false RED.) ` : `Filter to the test you add or touch — match the runner's filter syntax (function-name substring for Swift Testing/pytest; suite path otherwise). `) + `A full BUILD is fine; a full TEST run is not. STATIC CHECKS (lint/typecheck) follow the same rule: scope them to the files you changed when the toolchain supports it (e.g. lint only changed paths; rely on the typechecker's incremental cache) — a WHOLE-PROJECT lint/typecheck belongs to the integration net, not to every edit. Minimize re-runs: red once, green once, post-refactor once — do not re-run an unchanged check. Never poll or busy-wait on other processes (no pgrep/sleep loops — one such loop once wasted 5 minutes); run your command directly and let the build tool's own lock serialize. REPORT \`testScope\` in your result: the SINGLE bare token (a suite name, or a shared substring of the test names you added — matching /^[A-Za-z0-9_.-]+$/; NO spaces/slashes/'|') under which the project-card filter form runs EXACTLY the test(s) you added/touched and nothing unrelated. The engine re-runs that filter as the deterministic per-leaf gate — so it MUST match the names you actually used (a wrong token zero-matches → this leaf degrades to LLM-verify, never a false RED). This is what binds the deterministic gate when no scope was handed to you above; without it the leaf rests on the LLM verifier alone.`;
   const engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
 ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
 ${duty}`;
@@ -641,8 +643,9 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
           verdict = { trustworthy: false, reason: "tier-0 gate: deterministic build/tests RED" };
         } else {
           let engineT0 = "", t0red = null;
-          const scopeSafe = node.testScope && /^[A-Za-z0-9_.-]+$/.test(String(node.testScope));
-          const t0cmd = node.kind !== "tidy" && scopeSafe && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", String(node.testScope)) : "";
+          const okScope = (s) => !!s && /^[A-Za-z0-9_.-]+$/.test(String(s));
+          const gateScope = okScope(node.testScope) ? node.testScope : okScope(res.testScope) ? res.testScope : "";
+          const t0cmd = node.kind !== "tidy" && gateScope && baseline.filterCommand && baseline.filterCommand.includes("{scope}") ? baseline.filterCommand.replace("{scope}", gateScope) : "";
           if (!t0cmd && node.kind !== "tidy") {
             log(`${tag}⚠ WARN: leaf ${i} (${node.task.slice(0, 36)}) gate=llm-only (no filterCommand/scope) — trust rests on the LLM verifier + the integrate net`);
           }
@@ -651,13 +654,13 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
             if (t0.exitCode !== 0) {
               const t0tail = String(t0.stdout || "");
               if (RE_ZERO_TESTS.test(t0tail)) {
-                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${node.testScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
+                log(`${tag}⚠ leaf ${i} t0 filter matched ZERO tests (scope='${gateScope}' ≠ any test name) → gate=llm-only for THIS leaf only (scope mismatch, breaker untouched)`);
                 engineT0 = engineRanBlock({
                   cmd: t0cmd,
                   note: "(filter matched ZERO tests — scope/name MISMATCH, NOT a pass)",
                   exitCode: t0.exitCode,
                   tail: t0tail.slice(-300),
-                  duty: `The engine's filtered gate matched ZERO tests under scope \`${node.testScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.`
+                  duty: `The engine's filtered gate matched ZERO tests under scope \`${gateScope}\` — the executor's testScope does not match any test it added (a FINDING; common with Swift Testing function-name filters). Do NOT treat this as green: independently confirm the leaf's tests exist and pass, or distrust.`
                 });
               } else {
                 t0red = { trustworthy: false, reason: `tier-0 (ENGINE-run filtered tests) RED: \`${t0cmd}\` exited ${t0.exitCode} though the executor reported green`, issues: [`deterministic filtered run failed (exit ${t0.exitCode}); output tail: ${t0tail.slice(-300)}`] };
@@ -673,7 +676,7 @@ ${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}
                 cmd: t0cmd,
                 exitCode: 0,
                 tail: String(t0.stdout || "").slice(-300),
-                duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${node.testScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
+                duty: `FIRST confirm from that output that at least one test ACTUALLY EXECUTED under scope \`${gateScope}\` — zero tests matched = a FINDING (vacuous gate / scope-suite mismatch): distrust or re-run yourself. If tests did run, do NOT re-run them — audit the ARTIFACTS (diff scope, test meaningfulness, over-fit, interface drift).`
               });
             }
           }
