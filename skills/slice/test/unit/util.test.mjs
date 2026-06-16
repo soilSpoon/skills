@@ -150,3 +150,13 @@ test('classifier: classifyFailure(undefined) returns null kind (falsy short-circ
   // matches no quota/model regex → 'null'.
   assert.equal(classifyFailure(undefined), 'null')
 })
+
+test('classifyFailure: budget/ceiling error → null (classifier is blind; agentSafe re-throws before calling it)', () => {
+  // agentSafe re-throws budget/ceiling errors before ever invoking classifyFailure.
+  // classifyFailure itself has no special branch for budget/ceiling — it simply matches no
+  // quota/model_unavailable regex and falls through to the 'null' default.
+  // This test pins that the pure classifier is intentionally blind to these strings.
+  assert.equal(classifyFailure(new Error('budget ceiling exceeded')), 'null')
+  assert.equal(classifyFailure(new Error('budget limit reached')), 'null')
+  assert.equal(classifyFailure(new Error('ceiling hit for this project')), 'null')
+})
