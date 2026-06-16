@@ -1,5 +1,0 @@
-
-> eval-native-zeromatch@0.1.0 verify:l1
-> node -e "console.error('Test run with 0 tests; No matching test cases were run'); process.exit(1)"
-
-Test run with 0 tests; No matching test cases were run
