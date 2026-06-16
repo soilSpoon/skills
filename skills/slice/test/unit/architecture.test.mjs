@@ -72,3 +72,39 @@ test('the ambient-global PORT lives ONLY in runtime.ts — no core file re-grows
       `${f} declares a Workflow ambient global — the core must depend on the injected Runtime, not globals. Route it through runtime.ts.`)
   }
 })
+
+// AgentOutcome<T> is the discriminated union that every agentSafe call site depends on. It belongs in
+// types.ts (L0: pure, no relative imports) so BOTH host.ts (L1) and all phases (L2) can import it
+// without a layer violation. Moving it to host.ts (L1) would block phases from importing it directly
+// (phase→L1 is a sideways import for the type), and moving it to a phase (L2) would block host.ts
+// from using it at all. This test pins that invariant — if the file changes, the failure is explicit.
+test('AgentOutcome<T> is defined in types.ts (L0) — the discriminated union boundary the whole stack imports', () => {
+  const typesContent = readFileSync(join(SRC, 'types.ts'), 'utf8')
+  // Export must be present (the type definition, not just a comment about it)
+  assert.ok(/export\s+type\s+AgentOutcome/.test(typesContent),
+    'types.ts must export AgentOutcome<T> — moving it to a higher layer breaks host.ts import or phase imports')
+  // No other L0/L1/L2 file may RE-export or re-define AgentOutcome (it should have exactly one home)
+  for (const f of srcFiles()) {
+    if (f === 'types.ts') continue
+    const content = readFileSync(join(SRC, f), 'utf8')
+    assert.ok(!/export\s+type\s+AgentOutcome/.test(content),
+      `${f} re-exports or re-defines AgentOutcome — it must live ONLY in types.ts (L0)`)
+  }
+})
+
+// classifyFailure maps caught API errors to quota-halt kinds. It belongs in util.ts (L0) so host.ts
+// (L1) can import it without a layer violation and unit tests (util.test.mjs) can test it in isolation.
+// Promoting it to host.ts (L1) removes direct testability; promoting it to a phase (L2) blocks host.ts
+// from using it. This test pins the home — a future "clean-up" that inlines it into host.ts is a trap.
+test('classifyFailure is exported from util.ts (L0) — the failure-classifier boundary', () => {
+  const utilContent = readFileSync(join(SRC, 'util.ts'), 'utf8')
+  assert.ok(/export\s+const\s+classifyFailure/.test(utilContent),
+    'util.ts must export classifyFailure — it is the L0 failure-classifier that host.ts (L1) imports')
+  // It must not be defined at L2 or above (would block host.ts from importing it)
+  for (const f of srcFiles()) {
+    if (f === 'util.ts') continue
+    const content = readFileSync(join(SRC, f), 'utf8')
+    assert.ok(!/export\s+const\s+classifyFailure/.test(content),
+      `${f} also exports classifyFailure — the classifier must live only in util.ts (L0), not in ${f}`)
+  }
+})
