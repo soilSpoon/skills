@@ -617,6 +617,184 @@ ${cmd}`,
   return { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt: () => QUOTA_HALT };
 };
 
+// src/phases/integrate.ts
+var integratePhase = async (d) => {
+  const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline, ABORTS, done, merge, groups } = d;
+  phase("Integrate");
+  let finalRun = { exitCode: -1, stdout: "" };
+  let integration = null;
+  if (getQuotaHalt()) {
+    ABORTS.push(`quota-halt: ${getQuotaHalt()} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
+    log("quota halt — skipping integrate/wiring/briefing (resume to run them)");
+  } else try {
+    finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite");
+    if (finalRun.exitCode === 137) {
+      log("integrate full suite timed out (exit 137) — one automatic retry (known flake class)");
+      finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite-retry");
+    }
+    if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`);
+    integration = await agentSafe(
+      `${R_VERIFY}
+
+Repo: ${REPO}
+All work is done. The FULL baseline measure command was JUST run DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? "GREEN" : "RED"}) — do NOT re-run the whole suite; JUDGE from that result whether every invariant still holds across the integrated whole${finalRun.exitCode === 0 ? "" : " (it is RED — identify which leaf/area most likely regressed)"}.
+${INV}` + (GIT ? `
+Also summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`) and confirm no out-of-scope file changed since baseline.` : ""),
+      { phase: "Integrate", schema: VERDICT }
+    );
+    if (!integration) {
+      log("integration agent unavailable (API error) — one retry");
+      integration = await agentSafe(
+        `${R_VERIFY}
+
+Repo: ${REPO}
+All work is done. The FULL baseline measure command was JUST run DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? "GREEN" : "RED"}) — do NOT re-run the whole suite; JUDGE from that result whether every invariant still holds across the integrated whole.
+${INV}`,
+        { phase: "Integrate", label: "integration-retry", schema: VERDICT }
+      );
+    }
+  } catch (e) {
+    log(`integrate phase error (budget ceiling / API): ${e && e.message ? e.message : e} — returning partial results; the full-suite net DID NOT RUN.`);
+  }
+  const fullSuiteGreen = finalRun.exitCode === 0;
+  const trusted = done.filter((d2) => d2.verdict && d2.verdict.trustworthy);
+  const degradations = trusted.filter((d2) => d2.gateLevel === "llm-only").map((d2) => `gate=llm-only (no deterministic gate ran): ${String(d2.task).slice(0, 80)}`);
+  if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
+  let wiringGaps = [];
+  if (GIT && trusted.length && !getQuotaHalt()) {
+    try {
+      const newPub = await sh(
+        `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | sed -E 's/^\\+\\s*//' | head -40`,
+        "wiring-scan"
+      );
+      const symbols = shUnavailable(newPub) ? "" : (newPub.stdout || "").trim();
+      if (symbols) {
+        const names = [...new Set((symbols.match(/(?:func|fn|function|var|let|class|struct|enum|const)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || []).map((m) => m.replace(/^.*\s/, "")))].slice(0, 20);
+        let refCounts = "";
+        if (names.length) {
+          const counter = names.map((n) => `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join("; ");
+          refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, "wiring-count")).stdout || "").trim();
+        }
+        const w = await agentSafe(
+          `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} (extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):
+${symbols}
+
+DETERMINISTIC reference counts (engine-run \`grep -rw\` over production paths; a count of 1-3 usually means declaration-only = UNWIRED candidate):
+${refCounts || "(count step unavailable)"}
+
+Judge from those counts — re-grep a symbol yourself ONLY when its count is ambiguous. Report as gaps ONLY symbols that (a) have ZERO production call sites AND (b) look like they were MEANT to be wired into an existing flow — i.e. the feature is unreachable by a user. EXCLUDE: protocol/interface requirements, overrides, library-surface API intended for external consumers, entry points referenced by config/manifest, helpers used by other NEW symbols that ARE wired. Each gap: "<symbol> (<file>): <why it looks unwired, one line>". Empty array if all wired.`,
+          { phase: "Integrate", label: "wiring-audit", schema: { type: "object", required: ["gaps"], properties: { gaps: { type: "array", items: { type: "string" } } } } }
+        );
+        wiringGaps = w && w.gaps || [];
+        if (wiringGaps.length) log(`⚠ wiring-audit: ${wiringGaps.length} new symbol(s) with NO production call site (built-tested-unwired class)`);
+        else log("wiring-audit: all new exported symbols reachable from production code");
+      }
+    } catch (e) {
+      log(`wiring-audit skipped: ${e && e.message ? e.message : e}`);
+    }
+  }
+  const purposeGaps = [
+    ...baseline.inProcessVerifiable === false && baseline.purposeCheck ? [`baseline: purpose needs out-of-process verification — ${baseline.purposeCheck}`] : [],
+    ...done.map((d2) => d2.verdict && d2.verdict.purposeGap).filter((g) => !!g),
+    // the executor's own honest admission becomes a gap even if the verifier omitted one
+    ...done.filter((d2) => d2.purposeVerified === false && !(d2.verdict && d2.verdict.purposeGap)).map((d2) => `leaf verified only via fakes/mocks (purposeVerified=false): ${String(d2.task).slice(0, 60)}`),
+    ...integration && integration.purposeGap ? [integration.purposeGap] : []
+  ];
+  let briefing = null;
+  if (trusted.length && !getQuotaHalt()) {
+    const ledgerForBriefing = done.map((d2, j) => ({
+      i: j,
+      task: String(d2.task).slice(0, 140),
+      trusted: !!(d2.verdict && d2.verdict.trustworthy),
+      commits: d2.commits || [],
+      files: d2.filesChanged || [],
+      interfaceConcern: d2.interfaceConcern || void 0,
+      purposeGap: d2.verdict && d2.verdict.purposeGap || void 0,
+      discovered: d2.discovered && d2.discovered.length ? d2.discovered : void 0,
+      funList: d2.funList && d2.funList.length ? d2.funList : void 0,
+      refactor: d2.refactor ? String(d2.refactor).slice(0, 200) : void 0
+    }));
+    try {
+      briefing = await agentSafe(
+        `You are the Comprehension Steward. A trust-first workflow just landed VERIFIED code the OWNER has not read — "comprehension debt": speed silently converts into a codebase the owner can no longer debug or steer. Turn this run's ledger into a GUIDED READ (~10-15 min) that repays that debt cheaply.
+Repo: ${REPO}. Baseline ${BASE_SHA ? BASE_SHA.slice(0, 8) : "(no git)"} → HEAD.` + (GIT ? ` First run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` and \`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`, then READ the key files yourself before writing.` : "") + `
+Ledger (per leaf): ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
+Write \`briefing\` as markdown with EXACTLY these sections:
+1. **Reading order** — files in dependency order (pure core first, shells last): per file what it does, which commit introduced it, why it matters.
+2. **Decisions made for you** — interface/design choices made on the owner's behalf and WHY (include every interfaceConcern verbatim).
+3. **Buried bodies** — quirks, known follow-ups, discovered-but-not-done items, funList tangents, anything that would surprise the owner in 3 months.
+4. **Verify by hand** — the human-oracle items: every purposeGap, with the EXACT command/steps to close it (live test, app action).
+Be concrete: real paths, commit SHAs, line pointers where it matters. Match the language the task was written in. No fluff — the test is: after this read, can the owner debug and steer this code?`,
+        { phase: "Integrate", label: "owner-briefing", schema: BRIEFING }
+      );
+      if (!briefing) {
+        log("owner-briefing agent unavailable (API error) — one retry");
+        briefing = await agentSafe(
+          `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : "") + `
+Ledger: ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
+Match the language the task was written in. Be concrete.`,
+          { phase: "Integrate", label: "owner-briefing-retry", schema: BRIEFING }
+        );
+      }
+    } catch (e) {
+      log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`);
+    }
+    if (briefing && briefing.briefing) {
+      try {
+        const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : "briefing";
+        const dir = `${REPO}/docs/briefings`;
+        const file = `${dir}/${ts}.md`;
+        const b64 = b64encode(String(briefing.briefing));
+        const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
+        if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`);
+        else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
+      } catch (e) {
+        log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
+      }
+    }
+  }
+  if (LOCKFILE) {
+    try {
+      await shForce(`rm -f ${LOCKFILE}`, "lock-clear");
+    } catch (e) {
+      log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`);
+    }
+  }
+  if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
+  log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
+  if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
+  const allLeavesTrusted = trusted.length === done.length;
+  const mergeOk = !merge || merge.trustworthy;
+  const integrationOk = !!(integration && integration.trustworthy);
+  const noDegradations = !degradations || degradations.length === 0;
+  const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations;
+  const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} · integration ${integrationOk ? "OK" : integration ? "DISTRUSTED" : "UNKNOWN"} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? "" : "s"}${merge ? ` · merge ${mergeOk ? "OK" : "ISSUES"}` : ""}`;
+  const firstFailure = !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted` : !mergeOk ? "parallel merge NOT trustworthy" : !fullSuiteGreen ? finalRun.exitCode === -1 ? "integrate full-suite DID NOT RUN" : `integrate full-suite RED (exit ${finalRun.exitCode})` : !integrationOk ? integration ? "integration verdict DISTRUSTED" : "integration verdict UNKNOWN (never ran)" : !noDegradations ? `${degradations.length} trust-floor degradation(s)` : "";
+  const ownersHeadline = overallTrust ? `TRUSTED — ${headlineCounts}` : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`;
+  log(`Overall verdict: ${ownersHeadline}`);
+  return {
+    task: TASK,
+    mode: groups ? "parallel" : "sequential",
+    baseline,
+    results: done,
+    coordinator: merge,
+    integration,
+    fullSuiteGreen,
+    integrationExit: finalRun.exitCode,
+    trustedLeaves: trusted.length,
+    totalLeaves: done.length,
+    purposeGaps,
+    wiringGaps,
+    aborts: ABORTS,
+    degradations,
+    overallTrust,
+    ownersHeadline,
+    // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
+    briefing: briefing && briefing.briefing || void 0
+    // B: the owner's guided read — RELAY this, don't bury it
+  };
+};
+
 // src/main.ts
 async function __main() {
   const { agentSafe, sh, shForce, shBatch, shUnavailable, SH_UNAVAILABLE, MARKER, getQuotaHalt } = makeHost();
@@ -932,178 +1110,6 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
     }
     return { error: `over-tiered: ${overTier.stop} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: overTier.slices };
   }
-  phase("Integrate");
-  let finalRun = { exitCode: -1, stdout: "" };
-  let integration = null;
-  if (getQuotaHalt()) {
-    ABORTS.push(`quota-halt: ${getQuotaHalt()} — integrate/wiring/briefing skipped; relaunch with resumeFromRunId after the limit resets (cached leaves replay free)`);
-    log("quota halt — skipping integrate/wiring/briefing (resume to run them)");
-  } else try {
-    finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite");
-    if (finalRun.exitCode === 137) {
-      log("integrate full suite timed out (exit 137) — one automatic retry (known flake class)");
-      finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, "integrate-fullsuite-retry");
-    }
-    if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`);
-    integration = await agentSafe(
-      `${R_VERIFY}
-
-Repo: ${REPO}
-All work is done. The FULL baseline measure command was JUST run DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? "GREEN" : "RED"}) — do NOT re-run the whole suite; JUDGE from that result whether every invariant still holds across the integrated whole${finalRun.exitCode === 0 ? "" : " (it is RED — identify which leaf/area most likely regressed)"}.
-${INV}` + (GIT ? `
-Also summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`) and confirm no out-of-scope file changed since baseline.` : ""),
-      { phase: "Integrate", schema: VERDICT }
-    );
-    if (!integration) {
-      log("integration agent unavailable (API error) — one retry");
-      integration = await agentSafe(
-        `${R_VERIFY}
-
-Repo: ${REPO}
-All work is done. The FULL baseline measure command was JUST run DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? "GREEN" : "RED"}) — do NOT re-run the whole suite; JUDGE from that result whether every invariant still holds across the integrated whole.
-${INV}`,
-        { phase: "Integrate", label: "integration-retry", schema: VERDICT }
-      );
-    }
-  } catch (e) {
-    log(`integrate phase error (budget ceiling / API): ${e && e.message ? e.message : e} — returning partial results; the full-suite net DID NOT RUN.`);
-  }
-  const fullSuiteGreen = finalRun.exitCode === 0;
-  const trusted = done.filter((d) => d.verdict && d.verdict.trustworthy);
-  const degradations = trusted.filter((d) => d.gateLevel === "llm-only").map((d) => `gate=llm-only (no deterministic gate ran): ${String(d.task).slice(0, 80)}`);
-  if (degradations.length) log(`⚠ ${degradations.length} TRUST-FLOOR DEGRADATION(S): leaf(s) trusted on the LLM verifier ALONE (no deterministic tier-0 gate) — see degradations.`);
-  let wiringGaps = [];
-  if (GIT && trusted.length && !getQuotaHalt()) {
-    try {
-      const newPub = await sh(
-        `cd ${REPO} && git diff ${BASE_SHA}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null | grep -E '^\\+[^+].*\\b(public|open|export|pub)\\b.*\\b(func|fn|function|var|let|class|struct|enum|const)\\b' | sed -E 's/^\\+\\s*//' | head -40`,
-        "wiring-scan"
-      );
-      const symbols = shUnavailable(newPub) ? "" : (newPub.stdout || "").trim();
-      if (symbols) {
-        const names = [...new Set((symbols.match(/(?:func|fn|function|var|let|class|struct|enum|const)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || []).map((m) => m.replace(/^.*\s/, "")))].slice(0, 20);
-        let refCounts = "";
-        if (names.length) {
-          const counter = names.map((n) => `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join("; ");
-          refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, "wiring-count")).stdout || "").trim();
-        }
-        const w = await agentSafe(
-          `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} (extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):
-${symbols}
-
-DETERMINISTIC reference counts (engine-run \`grep -rw\` over production paths; a count of 1-3 usually means declaration-only = UNWIRED candidate):
-${refCounts || "(count step unavailable)"}
-
-Judge from those counts — re-grep a symbol yourself ONLY when its count is ambiguous. Report as gaps ONLY symbols that (a) have ZERO production call sites AND (b) look like they were MEANT to be wired into an existing flow — i.e. the feature is unreachable by a user. EXCLUDE: protocol/interface requirements, overrides, library-surface API intended for external consumers, entry points referenced by config/manifest, helpers used by other NEW symbols that ARE wired. Each gap: "<symbol> (<file>): <why it looks unwired, one line>". Empty array if all wired.`,
-          { phase: "Integrate", label: "wiring-audit", schema: { type: "object", required: ["gaps"], properties: { gaps: { type: "array", items: { type: "string" } } } } }
-        );
-        wiringGaps = w && w.gaps || [];
-        if (wiringGaps.length) log(`⚠ wiring-audit: ${wiringGaps.length} new symbol(s) with NO production call site (built-tested-unwired class)`);
-        else log("wiring-audit: all new exported symbols reachable from production code");
-      }
-    } catch (e) {
-      log(`wiring-audit skipped: ${e && e.message ? e.message : e}`);
-    }
-  }
-  const purposeGaps = [
-    ...baseline.inProcessVerifiable === false && baseline.purposeCheck ? [`baseline: purpose needs out-of-process verification — ${baseline.purposeCheck}`] : [],
-    ...done.map((d) => d.verdict && d.verdict.purposeGap).filter((g) => !!g),
-    // the executor's own honest admission becomes a gap even if the verifier omitted one
-    ...done.filter((d) => d.purposeVerified === false && !(d.verdict && d.verdict.purposeGap)).map((d) => `leaf verified only via fakes/mocks (purposeVerified=false): ${String(d.task).slice(0, 60)}`),
-    ...integration && integration.purposeGap ? [integration.purposeGap] : []
-  ];
-  let briefing = null;
-  if (trusted.length && !getQuotaHalt()) {
-    const ledgerForBriefing = done.map((d, j) => ({
-      i: j,
-      task: String(d.task).slice(0, 140),
-      trusted: !!(d.verdict && d.verdict.trustworthy),
-      commits: d.commits || [],
-      files: d.filesChanged || [],
-      interfaceConcern: d.interfaceConcern || void 0,
-      purposeGap: d.verdict && d.verdict.purposeGap || void 0,
-      discovered: d.discovered && d.discovered.length ? d.discovered : void 0,
-      funList: d.funList && d.funList.length ? d.funList : void 0,
-      refactor: d.refactor ? String(d.refactor).slice(0, 200) : void 0
-    }));
-    try {
-      briefing = await agentSafe(
-        `You are the Comprehension Steward. A trust-first workflow just landed VERIFIED code the OWNER has not read — "comprehension debt": speed silently converts into a codebase the owner can no longer debug or steer. Turn this run's ledger into a GUIDED READ (~10-15 min) that repays that debt cheaply.
-Repo: ${REPO}. Baseline ${BASE_SHA ? BASE_SHA.slice(0, 8) : "(no git)"} → HEAD.` + (GIT ? ` First run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` and \`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`, then READ the key files yourself before writing.` : "") + `
-Ledger (per leaf): ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
-Write \`briefing\` as markdown with EXACTLY these sections:
-1. **Reading order** — files in dependency order (pure core first, shells last): per file what it does, which commit introduced it, why it matters.
-2. **Decisions made for you** — interface/design choices made on the owner's behalf and WHY (include every interfaceConcern verbatim).
-3. **Buried bodies** — quirks, known follow-ups, discovered-but-not-done items, funList tangents, anything that would surprise the owner in 3 months.
-4. **Verify by hand** — the human-oracle items: every purposeGap, with the EXACT command/steps to close it (live test, app action).
-Be concrete: real paths, commit SHAs, line pointers where it matters. Match the language the task was written in. No fluff — the test is: after this read, can the owner debug and steer this code?`,
-        { phase: "Integrate", label: "owner-briefing", schema: BRIEFING }
-      );
-      if (!briefing) {
-        log("owner-briefing agent unavailable (API error) — one retry");
-        briefing = await agentSafe(
-          `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : "") + `
-Ledger: ${JSON.stringify(ledgerForBriefing).slice(0, 6e3)}
-Match the language the task was written in. Be concrete.`,
-          { phase: "Integrate", label: "owner-briefing-retry", schema: BRIEFING }
-        );
-      }
-    } catch (e) {
-      log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`);
-    }
-    if (briefing && briefing.briefing) {
-      try {
-        const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : "briefing";
-        const dir = `${REPO}/docs/briefings`;
-        const file = `${dir}/${ts}.md`;
-        const b64 = b64encode(String(briefing.briefing));
-        const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
-        if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`);
-        else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
-      } catch (e) {
-        log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
-      }
-    }
-  }
-  if (LOCKFILE) {
-    try {
-      await shForce(`rm -f ${LOCKFILE}`, "lock-clear");
-    } catch (e) {
-      log(`lock-clear failed (budget ceiling?) — stale lock left at ${LOCKFILE}; remove it before the next run.`);
-    }
-  }
-  if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
-  log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
-  if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
-  const allLeavesTrusted = trusted.length === done.length;
-  const mergeOk = !merge || merge.trustworthy;
-  const integrationOk = !!(integration && integration.trustworthy);
-  const noDegradations = !degradations || degradations.length === 0;
-  const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations;
-  const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} · integration ${integrationOk ? "OK" : integration ? "DISTRUSTED" : "UNKNOWN"} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? "" : "s"}${merge ? ` · merge ${mergeOk ? "OK" : "ISSUES"}` : ""}`;
-  const firstFailure = !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted` : !mergeOk ? "parallel merge NOT trustworthy" : !fullSuiteGreen ? finalRun.exitCode === -1 ? "integrate full-suite DID NOT RUN" : `integrate full-suite RED (exit ${finalRun.exitCode})` : !integrationOk ? integration ? "integration verdict DISTRUSTED" : "integration verdict UNKNOWN (never ran)" : !noDegradations ? `${degradations.length} trust-floor degradation(s)` : "";
-  const ownersHeadline = overallTrust ? `TRUSTED — ${headlineCounts}` : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`;
-  log(`Overall verdict: ${ownersHeadline}`);
-  return {
-    task: TASK,
-    mode: groups ? "parallel" : "sequential",
-    baseline,
-    results: done,
-    coordinator: merge,
-    integration,
-    fullSuiteGreen,
-    integrationExit: finalRun.exitCode,
-    trustedLeaves: trusted.length,
-    totalLeaves: done.length,
-    purposeGaps,
-    wiringGaps,
-    aborts: ABORTS,
-    degradations,
-    overallTrust,
-    ownersHeadline,
-    // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
-    briefing: briefing && briefing.briefing || void 0
-    // B: the owner's guided read — RELAY this, don't bury it
-  };
+  return await integratePhase({ sh, shForce, shUnavailable, agentSafe, getQuotaHalt, REPO, BASE_SHA, INV, LOCKFILE, TASK, GIT, baseline, ABORTS, done, merge, groups });
 }
 return await __main()

@@ -1,7 +1,7 @@
 {
   "name": "slice",
   "description": "Trust-first recursive decomposition engine: baseline → vertical slices → Canon-TDD leaves → adversarial verification → per-leaf commits → deterministic integrate + owner's briefing. Installs the /slice skill and the 4 role subagents.",
-  "version": "1.14.2",
+  "version": "1.15.0",
   "author": {
     "name": "Daehee Lee",
     "email": "lee111dae11@proton.me"
