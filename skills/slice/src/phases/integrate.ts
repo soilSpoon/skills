@@ -50,20 +50,22 @@ if (getQuotaHalt()) {
     finalRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'integrate-fullsuite-retry')
   }
   if (finalRun.exitCode !== 0) log(`⚠ FULL SUITE RED at integration (exit ${finalRun.exitCode}) — a leaf regression may have escaped its filter (④); the LLM integrator will attribute.`)
-  integration = (await agentSafe(
+  const integrationR = await agentSafe<Verdict>(
     `${R_VERIFY}\n\nRepo: ${REPO}\nAll work is done. The FULL baseline measure command was JUST run ` +
     `DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run the whole ` +
     `suite; JUDGE from that result whether every invariant still holds across the integrated whole` +
     `${finalRun.exitCode === 0 ? '' : ' (it is RED — identify which leaf/area most likely regressed)'}.\n${INV}` +
     (GIT ? `\nAlso summarize the cumulative trust deposit (\`git -C ${REPO} diff ${BASE_SHA}..HEAD --stat\`) and confirm no out-of-scope file changed since baseline.` : ''),
-    { phase: 'Integrate', schema: VERDICT })) as Verdict | null
+    { phase: 'Integrate', schema: VERDICT })
+  integration = integrationR.ok ? integrationR.value : null
   if (!integration) {
     log('integration agent unavailable (API error) — one retry')
-    integration = (await agentSafe(
+    const integrationRetryR = await agentSafe<Verdict>(
       `${R_VERIFY}\n\nRepo: ${REPO}\nAll work is done. The FULL baseline measure command was JUST run ` +
       `DETERMINISTICALLY with exit=${finalRun.exitCode} (${finalRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run the whole ` +
       `suite; JUDGE from that result whether every invariant still holds across the integrated whole.\n${INV}`,
-      { phase: 'Integrate', label: 'integration-retry', schema: VERDICT })) as Verdict | null
+      { phase: 'Integrate', label: 'integration-retry', schema: VERDICT })
+    integration = integrationRetryR.ok ? integrationRetryR.value : null
   }
 } catch (e) {
   log(`integrate phase error (budget ceiling / API): ${e && e.message ? e.message : e} — returning partial results; the full-suite net DID NOT RUN.`)
@@ -110,7 +112,7 @@ if (GIT && trusted.length && !getQuotaHalt()) {
           `printf '%s %s\\n' "${n}" "$(grep -rw "${n}" . --exclude-dir=.git --exclude-dir=node_modules 2>/dev/null | grep -viE '(^|/)(tests?|spec)' | wc -l | tr -d ' ')"`).join('; ')
         refCounts = ((await sh(`cd ${REPO} && { ${counter}; }`, 'wiring-count')).stdout || '').trim()
       }
-      const w: { gaps?: string[] } | null = await agentSafe(
+      const wR = await agentSafe<{ gaps?: string[] }>(
         `You are the WIRING auditor. This run added the following NEW exported declarations to ${REPO} ` +
         `(extracted from \`git diff ${BASE_SHA.slice(0, 8)}..HEAD\`, test files excluded):\n${symbols}\n\n` +
         `DETERMINISTIC reference counts (engine-run \`grep -rw\` over production paths; a count of 1-3 ` +
@@ -122,6 +124,7 @@ if (GIT && trusted.length && !getQuotaHalt()) {
         `consumers, entry points referenced by config/manifest, helpers used by other NEW symbols that ARE wired. ` +
         `Each gap: "<symbol> (<file>): <why it looks unwired, one line>". Empty array if all wired.`,
         { phase: 'Integrate', label: 'wiring-audit', schema: { type: 'object', required: ['gaps'], properties: { gaps: { type: 'array', items: { type: 'string' } } } } })
+      const w = wR.ok ? wR.value : null
       wiringGaps = (w && w.gaps) || []
       if (wiringGaps.length) log(`⚠ wiring-audit: ${wiringGaps.length} new symbol(s) with NO production call site (built-tested-unwired class)`)
       else log('wiring-audit: all new exported symbols reachable from production code')
@@ -155,7 +158,7 @@ if (trusted.length && !getQuotaHalt()) {
     refactor: d.refactor ? String(d.refactor).slice(0, 200) : undefined,
   }))
   try {
-    briefing = (await agentSafe(
+    const briefingR = await agentSafe<Briefing>(
       `You are the Comprehension Steward. A trust-first workflow just landed VERIFIED code the OWNER has not ` +
       `read — "comprehension debt": speed silently converts into a codebase the owner can no longer debug or ` +
       `steer. Turn this run's ledger into a GUIDED READ (~10-15 min) that repays that debt cheaply.\n` +
@@ -168,15 +171,17 @@ if (trusted.length && !getQuotaHalt()) {
       `3. **Buried bodies** — quirks, known follow-ups, discovered-but-not-done items, funList tangents, anything that would surprise the owner in 3 months.\n` +
       `4. **Verify by hand** — the human-oracle items: every purposeGap, with the EXACT command/steps to close it (live test, app action).\n` +
       `Be concrete: real paths, commit SHAs, line pointers where it matters. Match the language the task was written in. No fluff — the test is: after this read, can the owner debug and steer this code?`,
-      { phase: 'Integrate', label: 'owner-briefing', schema: BRIEFING })) as Briefing | null
+      { phase: 'Integrate', label: 'owner-briefing', schema: BRIEFING })
+    briefing = briefingR.ok ? briefingR.value : null
     if (!briefing) {
       log('owner-briefing agent unavailable (API error) — one retry')
-      briefing = (await agentSafe(
+      const briefingRetryR = await agentSafe<Briefing>(
         `You are the Comprehension Steward. Turn this run's ledger into a GUIDED READ (~10-15 min) for the ` +
         `owner: reading order (files, commits, why), decisions made for them, buried bodies, and what to ` +
         `verify by hand. Repo: ${REPO}.` + (GIT ? ` Run \`git -C ${REPO} log --oneline ${BASE_SHA}..HEAD\` first.` : '') +
         `\nLedger: ${JSON.stringify(ledgerForBriefing).slice(0, 6000)}\nMatch the language the task was written in. Be concrete.`,
-        { phase: 'Integrate', label: 'owner-briefing-retry', schema: BRIEFING })) as Briefing | null
+        { phase: 'Integrate', label: 'owner-briefing-retry', schema: BRIEFING })
+      briefing = briefingRetryR.ok ? briefingRetryR.value : null
     }
   } catch (e) { log(`owner-briefing skipped (budget/API): ${e && e.message ? e.message : e}`) }
   // ITEM 2: best-effort DETERMINISTIC persist of the briefing text to docs/briefings/<ts>.md. The

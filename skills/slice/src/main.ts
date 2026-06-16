@@ -86,10 +86,11 @@ const cfg = { FLOOR, MAX_LEAVES, MAX_DISCOVERED, MAX_SPIKES, MAX_REPAIR, MAX_REP
 // =============================================================================
 phase('Baseline')
 log(`Task: ${TASK}${PARALLEL ? ' [parallel mode]' : ''}`)
-const baseline: Baseline | null = await agentSafe(
+const baselineR = await agentSafe<Baseline>(
   `${R_BASELINE}\n\nRepo: ${REPO}\nUpcoming work: "${TASK}"\nEstablish the trust invariant BEFORE any change. ` +
   `Find the measurement command, run it once, and distill the project card.`,
   { phase: 'Baseline', model: 'sonnet', schema: BASELINE })
+const baseline: Baseline | null = baselineR.ok ? baselineR.value : null
 if (!baseline) { log('FATAL: baseline agent returned no result (API/rate-limit) — aborting before any change.'); return { error: 'baseline failed', task: TASK } }
 log(`Baseline: ${baseline.currentState} | measure: ${baseline.measureCommand}`)
 // RIG CROSS-CHECK (non-halting, additive — surfaces a baseliner inconsistency between its rigPresent verdict
@@ -391,13 +392,14 @@ if (goParallel) {
   // it a single executable unit (no parallel benefit)? This is the same execute|slice|spike judgment the
   // former Plan-phase assessor made; the dedicated COARSE-partition cut below keeps its own R_SLICE call
   // (it is a different cut from fine slicing — few coarse groups, light-overlap independence engineering).
-  const a0: Decompose | null = await agentSafe(
+  const a0R = await agentSafe<Decompose>(
     `${R_SLICE}\n\nRepo: ${REPO}\nDecide ONLY this root's next action: is it one executable unit (action:'execute') ` +
     `or does it split into multiple parallelizable units (action:'slice')? Do NOT emit slices here — the coarse ` +
     `partition is requested separately next.\nTask: ${TASK}\nDepth 0/${FLOOR}.\n${INV}`,
     { phase: 'Plan', model: 'sonnet', schema: DECOMPOSE })
+  const a0 = a0R.ok ? a0R.value : null
   if (a0 && a0.action === 'slice') {
-    const sl: { slices?: SliceSpec[] } | null = await agentSafe(
+    const slR = await agentSafe<{ slices?: SliceSpec[] }>(
       `${R_SLICE}\n\nRepo: ${REPO}\nThis is the PARALLEL PARTITION — NOT fine slicing. Each group you emit becomes ` +
       `its OWN git worktree (its own branch off the baseline), so produce FEW, COARSE groups: ONE per LARGEST ` +
       `parallelizable unit. Aim for 2-4 groups; NEVER split one coherent feature — its fine-grained decomposition ` +
@@ -410,6 +412,7 @@ if (goParallel) {
       `sides; when you accept overlap, LIST the expected overlapping files in that group's contract so the ` +
       `coordinator anticipates them. Heavy same-file rework across groups is the only hard disqualifier.\nTask: ${TASK}\n${INV}`,
       { phase: 'Plan', label: 'partition:d0', schema: SLICES })
+    const sl = slR.ok ? slR.value : null
     const all = (sl && sl.slices) || []
     const indep = all.filter(s => s.independent)
     if (indep.length >= 2) {
@@ -505,7 +508,7 @@ if (groups) {
     const m = await sh(`git -C ${REPO} merge --no-ff --no-edit rs/g${i}`, `merge:${i}`)
     if (m.exitCode !== 0) {                                     // conflict/error → LLM judgment for THIS branch only
       conflicts++
-      await agentSafe(
+      await agentSafe<Verdict>(
         `${R_COORD}\n\nRepo: ${REPO}\nThe deterministic \`git -C ${REPO} merge --no-ff rs/g${i}\` FAILED (conflict). ` +
         `Resolve ONLY this branch's conflict (slice "${groups.indep[i].desc}"), honoring both sides' intent, complete ` +
         `the merge commit, then confirm the tree builds.\n${INV}`,
@@ -515,12 +518,13 @@ if (groups) {
   // Deterministic merge net (mirrors the Integrate gate): the engine runs the full measure command
   // via sh() — shell truth — and the LLM JUDGES from that result instead of re-running it.
   const mergeRun = await sh(`cd ${REPO} && ${baseline.measureCommand}`, 'merge-fullsuite')
-  merge = (await agentSafe(
+  const mergeR = await agentSafe<Verdict>(
     `${R_VERIFY}\n\nRepo: ${REPO}\n${N} parallel branches were merged into the working branch (${conflicts} needed ` +
     `conflict resolution). The FULL measure command was JUST run DETERMINISTICALLY with exit=${mergeRun.exitCode} ` +
     `(${mergeRun.exitCode === 0 ? 'GREEN' : 'RED'}) — do NOT re-run it; JUDGE from that result whether every baseline ` +
     `invariant holds and NO slice's work was lost.\n${INV}`,
-    { phase: 'Coordinate', label: 'merge-verify', schema: VERDICT })) as Verdict | null
+    { phase: 'Coordinate', label: 'merge-verify', schema: VERDICT })
+  merge = mergeR.ok ? mergeR.value : null
   log(`coordinator: merged ${N} branches (${conflicts} conflicts) — ${merge && merge.trustworthy ? 'OK' : 'ISSUES'}`)
   await clearWorktrees('wt-post')   // unconditional two-phase cleanup — no leaked worktrees/branches/.rs-wt
   } // end QUOTA_HALT gate

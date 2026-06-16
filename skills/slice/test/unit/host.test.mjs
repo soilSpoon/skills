@@ -14,12 +14,17 @@ function withHost(agentImpl) {
 }
 
 test('agentSafe: a session-limit throw flips quota halt; subsequent calls no-op without spawning', async () => {
+  // agentSafe now returns AgentOutcome<T>: { ok:false, kind:'quota' } on session-limit, not null
   let calls = 0
   const host = withHost(async () => { calls++; throw new Error('session limit reached') })
-  assert.equal(await host.agentSafe('x', { label: 'verify:1' }), null, 'quota-class error → null')
+  const r1 = await host.agentSafe('x', { label: 'verify:1' })
+  assert.equal(r1.ok, false, 'quota-class error → ok:false')
+  assert.equal(r1.kind, 'quota', 'quota-class error → kind:quota')
   assert.ok(host.getQuotaHalt(), 'quota halt flag set')
   const before = calls
-  assert.equal(await host.agentSafe('y', { label: 'verify:2' }), null)
+  const r2 = await host.agentSafe('y', { label: 'verify:2' })
+  assert.equal(r2.ok, false, 'no-op after halt → ok:false')
+  assert.equal(r2.kind, 'null', 'quota-halt no-op → kind:null')
   assert.equal(calls, before, 'no further agent spawned after halt (the no-op gate)')
 })
 
@@ -40,6 +45,22 @@ test('agentSafe quota breaker: 3 nulls across >=2 classes halts; 3 same-class do
 test('agentSafe: a budget/ceiling throw is RE-THROWN (means STOP, not a work verdict)', async () => {
   const host = withHost(async () => { throw new Error('budget ceiling exceeded') })
   await assert.rejects(() => host.agentSafe('x', { label: 'exec:1' }), /budget|ceiling/)
+})
+
+test('agentSafe: plain null from agent() returns { ok:false, kind:"null" }', async () => {
+  // Plain null return (not a throw) produces ok:false, kind:'null', not re-thrown
+  const host = withHost(async () => null)
+  const r = await host.agentSafe('x', { label: 'exec:1' })
+  assert.equal(r.ok, false, 'null agent return → ok:false')
+  assert.equal(r.kind, 'null', 'null agent return → kind:null')
+})
+
+test('agentSafe: successful agent call returns { ok:true, value }', async () => {
+  // A non-null return produces ok:true with the typed value
+  const host = withHost(async () => ({ exitCode: 0, stdout: 'hello' }))
+  const r = await host.agentSafe('x', { label: 'exec:1' })
+  assert.equal(r.ok, true, 'non-null agent return → ok:true')
+  assert.deepEqual(r.value, { exitCode: 0, stdout: 'hello' }, 'value carries the agent result')
 })
 
 test('sh: null proxy → SH_UNAVAILABLE sentinel (outage, not "ran but failed")', async () => {

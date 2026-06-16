@@ -8,7 +8,7 @@ import { R_SLICE, R_EXEC, R_CRITIC } from '../prompts'
 import { circuitBreaker, engineRanBlock } from '../util'
 import type { Breaker } from '../util'
 import type { Host } from '../host'
-import type { ShResult, TraceRecord, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx, Runtime } from '../types'
+import type { ShResult, TraceRecord, WorkNode, ExecResult, Verdict, RiskTier, SliceKind, LeafRecord, Decompose, SliceSpec, Baseline, GateLevel, Limits, GitCtx, Runtime, AgentOutcome } from '../types'
 
 export type RunWorkDeps = {
   rt: Runtime
@@ -59,14 +59,15 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     if (node.atomic) {
       action = 'execute'
     } else {
-      d = (await agentSafe(
+      const dR = await agentSafe<Decompose>(
         `${R_SLICE}\n\nRepo: ${repo}\nDecide this node's next action (bias HARD toward execute), then act.\n` +
         `Task: ${node.task}\n${node.ctx ? 'Context: ' + node.ctx + '\n' : ''}` +
         `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}\n` +
         `If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, ` +
         `independently-verifiable slices with a self-contained contract each (group near-identical units; ` +
         `2-5 slices; isolate any risky seam first).`,
-        { phase: 'Work', label: `${tag}decompose:d${node.depth}`, model: 'sonnet', schema: DECOMPOSE })) as Decompose | null
+        { phase: 'Work', label: `${tag}decompose:d${node.depth}`, model: 'sonnet', schema: DECOMPOSE })
+      d = dR.ok ? dR.value : null
       if (!d) log(`${tag}decompose failed [d${node.depth}] — defaulting to execute`)
       action = (atFloor || !d) ? 'execute' : d.action
       if (action === 'spike' && node.spikes >= MAX_SPIKES) action = 'execute'
@@ -82,7 +83,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       // proportional-ceremony). Bound to depth ≤ 1 (root + first level); deeper plan-gaps are still caught by
       // per-leaf discovery (the executor's `discovered` scenarios), so this trims runtime, not the trust floor.
       if (slices.length > 1 && node.depth <= 1) {
-        const crit: { missing?: Array<{ desc: string; contract: string }> } | null = await agentSafe(
+        const critR = await agentSafe<{ missing?: Array<{ desc: string; contract: string }> }>(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
           slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}`,
           // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
@@ -92,6 +93,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
           // defeats the fabricated-green catch, main.ts fabricated-green lesson) nor baseliner
           // (Explore skips CLAUDE.md, which the baseliner must read to build the project card).
           { phase: 'Work', label: `${tag}critic:d${node.depth}`, agentType: 'Explore', schema: MISSING })
+        const crit = critR.ok ? critR.value : null
         if (crit && crit.missing && crit.missing.length) {
           slices = slices.concat(crit.missing.map(m => ({ ...m, kind: 'behavior' })))   // critic items are always behavior scenarios
           log(`${tag}completeness critic +${crit.missing.length} missing scenario(s)`)
@@ -129,11 +131,12 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     }
 
     if (action === 'spike') {
-      const learn: { summary: string } | null = await agentSafe(
+      const learnR = await agentSafe<{ summary: string }>(
         `You are the Spiker (Beck: concrete hypotheses — make the uncertainty small, falsifiable, and cheap).\n` +
         `Repo: ${repo}\nDe-risk this hard-but-small task with the smallest experiment / minimal ` +
         `reproduction (remove extraneous detail; learn, don't build): ${node.task}\n${node.ctx}`,
         { phase: 'Work', label: `${tag}spike:d${node.depth}`, model: 'sonnet', schema: LEARNING })
+      const learn = learnR.ok ? learnR.value : null
       stack.push({ ...node, ctx: `${node.ctx}\nLEARNED: ${learn ? learn.summary : '(spike produced no result)'}`, spikes: node.spikes + 1 })
       log(`${tag}spike [d${node.depth}]: ${node.task.slice(0, 50)}`)
       continue
@@ -192,7 +195,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // trust-floor downgrade (the Lesson-3 class) — logged + recorded + collected run-wide.
     let gateLevel: GateLevel = 'llm-only'
     while (true) {
-      const repair = attempt === 0 ? '' :
+      const repair: string = attempt === 0 ? '' :
         `\nREPAIR ATTEMPT ${attempt}: a prior attempt was REJECTED by review for: ` +
         `${JSON.stringify((verdict && verdict.issues && verdict.issues.length ? verdict.issues : [verdict && verdict.reason]).slice(0, 6).map(s => String(s).slice(0, 300)))}. ` +
         (verdict && verdict.prescription ? `\nREVIEWER'S PRESCRIBED FIX (apply exactly unless evidently wrong): ${String(verdict.prescription).slice(0, 1200)}\n` : '') +
@@ -201,9 +204,10 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       const seamCtx = (node.seamPointers && node.seamPointers.length)
         ? `\nSeam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):\n${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ''}${p.symbol ? ` (${p.symbol})` : ''}${p.currentText ? ` — "${p.currentText}"` : ''}`).join('\n')}`
         : ''
-      res = await agentSafe(
+      const resR: AgentOutcome<ExecResult> = await agentSafe<ExecResult>(
         `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}${seamCtx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
+      res = resR.ok ? resR.value : null
       if (!res) break
       // ITEM 7: trace the executor call (cost dimension — model:sonnet, which repair attempt). Distinct
       // from the leaf-verify line below: this records the EXECUTOR was spawned (executor!=verifier — the
@@ -228,8 +232,8 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         // Failure mode is the status quo: a wrong res.testScope zero-matches → the existing finding path (below)
         // degrades THIS leaf to llm-only — never a false RED.
         const okScope = (s: unknown): s is string => !!s && /^[A-Za-z0-9_.-]+$/.test(String(s))
-        const gateScope = okScope(node.testScope) ? node.testScope : (okScope(res.testScope) ? res.testScope : '')
-        const t0cmd = (node.kind !== 'tidy' && gateScope && baseline!.filterCommand && baseline!.filterCommand.includes('{scope}'))
+        const gateScope: string = okScope(node.testScope) ? node.testScope : (okScope(res.testScope) ? res.testScope : '')
+        const t0cmd: string = (node.kind !== 'tidy' && gateScope && baseline!.filterCommand && baseline!.filterCommand.includes('{scope}'))
           ? baseline!.filterCommand!.replace('{scope}', gateScope) : ''
         // ITEM 1: a NON-tidy leaf with NO runnable filtered gate (missing/disabled filterCommand, or an
         // unsafe/multi-suite scope) silently fell through to the LLM verifier ALONE — a silent trust-floor

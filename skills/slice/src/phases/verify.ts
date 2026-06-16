@@ -59,18 +59,18 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
   const base = `${R_VERIFY}\n\nRepo: ${repo}\nAdversarially verify this finished leaf.\nTask: ${node.task}\n` +
     `Reported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineDiff}${engineT0 || ''}${buildNote || ''}`
   if (node.kind === 'tidy') {   // ③ a tidy leaf must be BEHAVIOR-PRESERVING — verify THAT, not new-feature trust
-    return (await agentSafe(
+    const r = await agentSafe<Verdict>(
       `${base}\nThis is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing ` +
       `suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO ` +
       `observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
-      { phase: 'Work', label: `verify:${lbl}·tidy`, model: 'sonnet', schema: VERDICT }))
-      || { trustworthy: false, reason: 'verification unavailable — untrusted' }
+      { phase: 'Work', label: `verify:${lbl}·tidy`, model: 'sonnet', schema: VERDICT })
+    return r.ok ? r.value : { trustworthy: false, reason: 'verification unavailable — untrusted' }
   }
   if (tier === 'light') {
-    return (await agentSafe(
+    const r = await agentSafe<Verdict>(
       `${R_VERIFY_LIGHT}\n\nRepo: ${repo}\nLow-risk leaf: ${node.task}\nReported: ${reported}\n${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ''}${buildNote || ''}`,
-      { phase: 'Work', label: `verify:${lbl}·light`, model: 'sonnet', schema: VERDICT }))
-      || { trustworthy: false, reason: 'verification unavailable — untrusted' }
+      { phase: 'Work', label: `verify:${lbl}·light`, model: 'sonnet', schema: VERDICT })
+    return r.ok ? r.value : { trustworthy: false, reason: 'verification unavailable — untrusted' }
   }
   if (tier === 'heavy') {
     const lenses = ['correctness & reproduce the green', 'security: secrets/credentials NEVER logged or leaked', 'interface & cross-module drift']
@@ -80,10 +80,10 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
     // Run all 3 lenses in parallel: the Workflow runtime queues concurrent calls against its concurrency
     // cap, so nesting parallel() is safe — ~3× faster heavy-leaf verification vs. sequential.
     const rawVotes = await parallel(lenses.map((L, li) => async () => {
-      const v: Verdict | null = await agentSafe(`${base}\nLENS: judge specifically through "${L}".`,
+      const r = await agentSafe<Verdict>(`${base}\nLENS: judge specifically through "${L}".`,
         { phase: 'Work', label: `verify:${lbl}·${L.slice(0, 9)}`, ...(li === 0 ? { model: 'opus' } : {}), schema: VERDICT })
-      return v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` }
-    }))                                                          // null lens = distrust: a flaky run can't launder a hard leaf
+      return r.ok ? r.value : { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` }
+    }))                                                          // outcome.ok:false = distrust: a flaky run can't launder a hard leaf
     // parallel() returns T|null per thunk (catches thunk throws); a null slot also counts as distrust.
     const votes: Verdict[] = rawVotes.map((v, li) => v ?? { trustworthy: false, reason: `lens "${lenses[li]}" verifier unavailable — counts as distrust` })
     const distrust = votes.filter(v => !v.trustworthy)
@@ -96,7 +96,7 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
       followUps: votes.flatMap(v => v.followUps || []),                                        // I4: lens follow-ups feed the batch
     }
   }
-  return (await agentSafe(base, { phase: 'Work', label: `verify:${lbl}`, schema: VERDICT }))
-    || { trustworthy: false, reason: 'verification unavailable — untrusted' }
+  const r = await agentSafe<Verdict>(base, { phase: 'Work', label: `verify:${lbl}`, schema: VERDICT })
+  return r.ok ? r.value : { trustworthy: false, reason: 'verification unavailable — untrusted' }
   }
 }

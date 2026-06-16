@@ -3,8 +3,8 @@
 // primitives it uses (agent/log) from the injected Runtime, plus its OWN quota state (QUOTA_HALT);
 // nothing from config or git, so it lifts out cleanly. main.ts calls makeHost(rt) once and threads
 // these services into every phase. No ambient globals — the core depends only on the Runtime type.
-import { circuitBreaker } from './util'
-import type { ShResult, AgentOpts, Runtime } from './types'
+import { circuitBreaker, classifyFailure } from './util'
+import type { ShResult, AgentOpts, AgentOutcome, Runtime } from './types'
 
 export const makeHost = (rt: Pick<Runtime, 'agent' | 'log'>) => {
 const { agent, log } = rt
@@ -24,18 +24,25 @@ const bumpNullStreak = (opts?: AgentOpts) => {
   quotaBreaker.record(callClass(opts))
   if (quotaBreaker.tripped()) quotaHalt(`${quotaBreaker.streak} consecutive agent failures (API/session quota suspected)`)
 }
-const agentSafe: typeof agent = async (prompt, opts) => {
-  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return null }
+const agentSafe = async <T>(prompt: string, opts?: AgentOpts): Promise<AgentOutcome<T>> => {
+  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return { ok: false, kind: 'null', detail: 'quota halt' } }
   try {
-    const r = await agent(prompt, opts)
-    if (r === null) { bumpNullStreak(opts) }
-    else { quotaBreaker.reset() }
-    return r
+    const r: T | null = await agent(prompt, opts)
+    if (r === null) {
+      bumpNullStreak(opts)
+      return { ok: false, kind: 'null', detail: 'agent returned null' }
+    }
+    quotaBreaker.reset()
+    return { ok: true, value: r }
   }
   catch (e: any) {
     const m = String((e && e.message) || e)
     if (/budget|ceiling/i.test(m)) throw e
-    if (/session limit|rate.?limit|quota|too many requests|overloaded|credit/i.test(m)) { quotaHalt(m.slice(0, 120)); return null }
+    const kind = classifyFailure(e)
+    if (kind === 'quota') {
+      quotaHalt(m.slice(0, 120))
+      return { ok: false, kind: 'quota', detail: m.slice(0, 200) }
+    }
     // Model-access failure = INFRA, not a work verdict. Observed live: the session model
     // (claude-fable-5) was not subagent-spawnable; the VERIFY/INTEGRATE/BRIEFING roles INHERIT
     // the session model, so they died with "issue with the selected model … may not have access".
@@ -43,13 +50,13 @@ const agentSafe: typeof agent = async (prompt, opts) => {
     // untrusted-streak HALT, misreading an infra outage as "the approach failed" (and losing the
     // briefing). Treat it like quota: an immediate resumable pause, not a grind. Resume after the
     // transient clears OR after switching the session model to a subagent-spawnable one.
-    if (/issue with the selected model|may not have access to it|selected model.*may not exist/i.test(m)) {
+    if (kind === 'model_unavailable') {
       quotaHalt(`model unavailable to subagents (verify/integrate/briefing inherit the session model): ${m.slice(0, 90)}`)
-      return null
+      return { ok: false, kind: 'model_unavailable', detail: m.slice(0, 200) }
     }
     log(`agent threw (treated as null): ${m.slice(0, 140)}`)
     bumpNullStreak(opts)
-    return null
+    return { ok: false, kind: 'null', detail: m.slice(0, 200) }
   }
 }
 // ---- sh(): deterministic shell escape. The COMMAND is computed in JS (deterministic); the
@@ -69,11 +76,11 @@ const shUnavailable = (r: ShResult) =>
   r === SH_UNAVAILABLE || (!!r && r.exitCode === -2 && String(r.stdout).startsWith('\x00SH_UNAVAILABLE'))
 const SH = { type: 'object', required: ['exitCode'], properties: { stdout: { type: 'string' }, exitCode: { type: 'integer' } } }
 const sh = async (cmd: string, label?: string): Promise<ShResult> => {
-  const r = (await agentSafe(
+  const r = await agentSafe<ShResult>(
     `Run EXACTLY this shell command verbatim, then report its stdout and exit code. Do NOT add to, ` +
     `modify, interpret, explain, or run anything besides this one command:\n\n${cmd}`,
-    { label: label || 'sh', model: 'haiku', schema: SH })) as ShResult | null
-  return r ?? SH_UNAVAILABLE
+    { label: label || 'sh', model: 'haiku', schema: SH })
+  return r.ok ? r.value : SH_UNAVAILABLE
 }
 // A2: shForce — mechanical cleanup path that bypasses QUOTA_HALT. Use ONLY for lock-clear (rm -f
 // <lockfile>) — a purely deterministic, file-system-only operation that touches no user work and
