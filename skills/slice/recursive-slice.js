@@ -564,7 +564,7 @@ var makeHost = (rt) => {
   const agentSafe = async (prompt, opts) => {
     if (QUOTA_HALT) {
       log2(`agent skipped (quota halt): ${opts && (opts.label || opts.phase) || ""}`);
-      return { ok: false, kind: "null", detail: "quota halt" };
+      return { ok: false, kind: "null", detail: "quota halt active" };
     }
     try {
       const r = await agent2(prompt, opts);

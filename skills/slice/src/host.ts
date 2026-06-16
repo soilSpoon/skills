@@ -25,7 +25,7 @@ const bumpNullStreak = (opts?: AgentOpts) => {
   if (quotaBreaker.tripped()) quotaHalt(`${quotaBreaker.streak} consecutive agent failures (API/session quota suspected)`)
 }
 const agentSafe = async <T>(prompt: string, opts?: AgentOpts): Promise<AgentOutcome<T>> => {
-  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return { ok: false, kind: 'null', detail: 'quota halt' } }
+  if (QUOTA_HALT) { log(`agent skipped (quota halt): ${(opts && (opts.label || opts.phase)) || ''}`); return { ok: false, kind: 'null', detail: 'quota halt active' } }
   try {
     const r: T | null = await agent(prompt, opts)
     if (r === null) {

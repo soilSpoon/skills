@@ -190,6 +190,28 @@ test('shUnavailable: value-equality branch detects byte-identical clone even whe
   assert.equal(host.shUnavailable({ exitCode: 0, stdout: '\x00SH_UNAVAILABLE' }), false, 'wrong exitCode: not a sentinel')
 })
 
+test('agentSafe quotaHaltNoOpOutcome: quota-halt early return carries AgentOutcome ok:false kind:null detail:quota-halt-active', async () => {
+  // Pins the SPECIFIC AgentOutcome shape returned by the QUOTA_HALT gate (the early-return branch at
+  // the top of agentSafe, before any agent spawn): ok:false, kind:'null', detail:'quota halt active'.
+  // This distinguishes the no-op outcome from a plain agent-null (which also has kind:'null' but with
+  // detail:'agent returned null') — callers that need to know WHY kind is 'null' can inspect detail.
+  // Behavior: after the first quota error flips QUOTA_HALT, every subsequent agentSafe call MUST
+  // return this exact shape without spawning any agent.
+  let calls = 0
+  const host = withHost(async () => { calls++; throw new Error('rate limit exceeded') })
+  // First call — triggers quota halt
+  const r1 = await host.agentSafe('x', { label: 'verify:1' })
+  assert.equal(r1.kind, 'quota', 'first error → quota kind (precondition: halt is now set)')
+  assert.ok(host.getQuotaHalt(), 'QUOTA_HALT is set (precondition)')
+  const before = calls
+  // Second call — must be gated by QUOTA_HALT early-return, NOT reach the agent
+  const r2 = await host.agentSafe('y', { label: 'exec:1' })
+  assert.equal(calls, before, 'no agent spawned: early-return gate fires before agent()')
+  assert.equal(r2.ok, false, 'no-op outcome → ok:false')
+  assert.equal(r2.kind, 'null', 'no-op outcome → kind:null (distinguishes from quota/model_unavailable)')
+  assert.equal(r2.detail, 'quota halt active', 'no-op detail string is exactly "quota halt active" (distinguishes from plain null)')
+})
+
 test('sh: null agentSafe (agent returns null) → SH_UNAVAILABLE returned and shUnavailable is true', async () => {
   // Pins the full sh() path after AgentOutcome type change: agentSafe wraps null as { ok:false,
   // kind:'null' }; sh() must unwrap and return SH_UNAVAILABLE (not the outcome), so shUnavailable()
