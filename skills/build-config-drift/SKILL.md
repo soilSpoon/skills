@@ -21,7 +21,7 @@ description: 정적 검증(lint/test/tsc/build)은 통과하거나 인프라 컨
 | 6 | Merge ≠ Resolution | git 의 텍스트 머지는 symbol/path resolution 을 검증하지 않는다 — 디렉터리·심볼 삭제 PR 후 분기가 옛 PR 을 머지하면 stale import 가 통과 |
 | 7 | 정의 변경 ≠ 인스턴스 갱신 | compose/manifest 같은 정적 정의는 *재생성* 으로만 컨테이너/리소스에 반영된다. `restart` 는 env/network/volumes 를 갱신하지 않는다 |
 
-자세한 정의·발동 신호·체크리스트는 [principles.md](references/principles.md) (필요해지면 이 파일을 분리). 케이스 스터디 — [case-tailwind-shadcn-postcss.md](references/case-tailwind-shadcn-postcss.md) (자동 마이그레이션 잔재 + monorepo deps 재배치), [case-merge-import-drift.md](references/case-merge-import-drift.md) (디렉터리 삭제·이동 PR 후 분기 PR 의 stale import + npm dep 등록 누락), [case-keycloak-restart-loop.md](references/case-keycloak-restart-loop.md) (compose 정의 ↔ 컨테이너 env drift, `docker restart` 자동복구의 함정).
+각 원칙의 **발동 신호**는 아래 `트리거 맵`(신호 → 단계 → 원칙#)에, **체크리스트**는 `통합 체크리스트`(원칙#별)에 인라인으로 산다 — 별도 principles.md 는 두지 않는다(이 표 + 두 섹션으로 충분; 분리는 원칙 수가 늘어 표가 무거워질 때만). 케이스 스터디 — [case-tailwind-shadcn-postcss.md](references/case-tailwind-shadcn-postcss.md) (자동 마이그레이션 잔재 + monorepo deps 재배치), [case-merge-import-drift.md](references/case-merge-import-drift.md) (디렉터리 삭제·이동 PR 후 분기 PR 의 stale import + npm dep 등록 누락), [case-keycloak-restart-loop.md](references/case-keycloak-restart-loop.md) (compose 정의 ↔ 컨테이너 env drift, `docker restart` 자동복구의 함정).
 
 ## 워크플로 (5단계)
 

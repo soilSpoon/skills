@@ -12,12 +12,12 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 - **변경하기 쉬움** → 4대 코드 품질 기준 (가독성 · 예측 가능성 · 응집도 · 결합도)
 - **모두가 쓸 수 있음** → 접근성 (A11y)
 
-| 축 | 질문 |
+4대 축(가독성·예측 가능성·응집도·결합도)의 정의·질문·원칙·예시는
+**[code-fundamentals](../code-fundamentals/SKILL.md)가 단일 출처**다(아래 `분담` 참조 — 같은
+표를 두 곳에 두지 않는다). 이 스킬이 그 위에 더하는 축은 **접근성** 하나:
+
+| 축 (이 스킬 고유) | 질문 |
 |---|---|
-| **가독성** | 한 번에 고려해야 할 맥락이 적은가? |
-| **예측 가능성** | 이름·시그니처만으로 동작을 예측할 수 있는가? |
-| **응집도** | 같이 수정될 코드가 같이 묶여 있는가? |
-| **결합도** | 한 곳 수정 시 영향 범위가 좁고 예측 가능한가? |
 | **접근성** | 스크린 리더·키보드·색각 이상 사용자도 쓸 수 있는가? |
 
 원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기). 스킬은 답을 강제하지 않고 트레이드오프를 드러내며, 맥락에 따라 선택을 돕는다.
@@ -36,6 +36,12 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 
 - **lane 병렬 dispatch (워크플로 C)**: Claude Code = `Task`(sub-agent) 도구로 각 lane을 동시에 띄움; opencode·Codex CLI·SDK = 각자의 병렬 sub-agent/태스크 호출, 미가용 시 직렬 다회 호출로 폴백.
 - **사용자 커스텀 규칙 위치 / 다른 모델로 rescue (워크플로 C-5)**: Claude Code = config는 `~/.claude/review-extensions/`, rescue는 `codex:rescue`; opencode·Codex CLI·SDK = 클라이언트별 config 디렉터리와 별도 모델 호출 메커니즘으로 동일하게 구현.
+
+> 🎯 **읽기 게이트 (proportional ceremony)** — 아래 3개 프레임워크(**채용 평가축 · 토스 문화
+> 8원칙 · 플랫폼 7원칙**, 이 §40~92)는 *토스 채용/평가 맥락의 리뷰*에서 주로 읽는 배경이다.
+> **일상 코드 리뷰·작성은 §`Lane 분할`(아래)부터** 읽어 4대 축 + 접근성 + lane으로 충분하다 —
+> 채용 맥락이 아니면 이 블록을 건너뛰어라. 매 리뷰에 19개 메타-원칙을 전부 얹는 건 ceremony
+> 과잉이고, 이 스킬 자신이 설파하는 scope-floor·proportional 원칙에 어긋난다.
 
 ## 토스가 실제로 평가하는 것 (채용 기술과제·라이브 코딩)
 
@@ -154,14 +160,14 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | **작성 중**: "Modal/Form/Toggle 만들 건데 뭘 챙겨야 하지?" | 상황별 레시피 | [recipes.md](references/recipes.md) |
 | 테스트 작성 중: `getByRole`/`getByLabelText` 활용 | 테스트로 a11y 강제 | [a11y-basics.md #테스트](references/a11y-basics.md) |
 | 디자인 시스템(`<MyButton>` 등) eslint-plugin-jsx-a11y 적용 | 커스텀 컴포넌트 a11y 매핑 | [a11y-basics.md #디자인-시스템](references/a11y-basics.md) |
-| `useEffect` 여러 개 + 파생값/이벤트 뒤섞임 | useEffect 최소화 체크리스트 | [recipes.md #9](references/recipes.md) |
-| useQuery 키/옵션 복붙 | Query Key Factory + queryOptions | [recipes.md #10](references/recipes.md) |
-| Zod 스키마 optional 범벅 / 생성/수정 usecase마다 스키마 복제 | `.pick/.omit/.partial` compose | [recipes.md #11](references/recipes.md) |
-| Response/Form/Payload 타입이 서로 다름 | 어댑터 레이어 | [recipes.md #12](references/recipes.md) / [cohesion.md #7](../code-fundamentals/references/cohesion.md) |
-| 다이얼로그 10개+ `useState` 폭발 | overlay-kit 선언적 패턴 | [recipes.md #13](references/recipes.md) |
-| `z-index: 9999` 등 매직넘버 산재 | 시맨틱 z-index 토큰 | [recipes.md #14](references/recipes.md) |
-| 서버 enum (`"A"|"B"...`) 타이핑 고민 | 코드젠/UNKNOWN/open-union 3전략 | [recipes.md #15](references/recipes.md) / [predictability.md #11](../code-fundamentals/references/predictability.md) |
-| Next.js App Router/RSC 데이터 패칭 위치 | 컴포넌트 곁 fetch + `cache()` | [recipes.md #16](references/recipes.md) / [cohesion.md #8](../code-fundamentals/references/cohesion.md) |
+| `useEffect` 여러 개 + 파생값/이벤트 뒤섞임 | useEffect 최소화 체크리스트 | [recipes-2-data-forms.md #9](references/recipes-2-data-forms.md) |
+| useQuery 키/옵션 복붙 | Query Key Factory + queryOptions | [recipes-2-data-forms.md #10](references/recipes-2-data-forms.md) |
+| Zod 스키마 optional 범벅 / 생성/수정 usecase마다 스키마 복제 | `.pick/.omit/.partial` compose | [recipes-2-data-forms.md #11](references/recipes-2-data-forms.md) |
+| Response/Form/Payload 타입이 서로 다름 | 어댑터 레이어 | [recipes-2-data-forms.md #12](references/recipes-2-data-forms.md) / [cohesion.md #7](../code-fundamentals/references/cohesion.md) |
+| 다이얼로그 10개+ `useState` 폭발 | overlay-kit 선언적 패턴 | [recipes-2-data-forms.md #13](references/recipes-2-data-forms.md) |
+| `z-index: 9999` 등 매직넘버 산재 | 시맨틱 z-index 토큰 | [recipes-2-data-forms.md #14](references/recipes-2-data-forms.md) |
+| 서버 enum (`"A"|"B"...`) 타이핑 고민 | 코드젠/UNKNOWN/open-union 3전략 | [recipes-2-data-forms.md #15](references/recipes-2-data-forms.md) / [predictability.md #11](../code-fundamentals/references/predictability.md) |
+| Next.js App Router/RSC 데이터 패칭 위치 | 컴포넌트 곁 fetch + `cache()` | [recipes-3-advanced.md #16](references/recipes-3-advanced.md) / [cohesion.md #8](../code-fundamentals/references/cohesion.md) |
 | `setLoading` / `isLoading` Boolean 네이밍 | Boolean state 네이밍 | [predictability.md #4](../code-fundamentals/references/predictability.md) |
 | prop 이름 `terms` vs `value` | controlled `value/onChange` | [predictability.md #5](../code-fundamentals/references/predictability.md) |
 | `default export` 쓸지 `named` 쓸지 | Named export 기본 | [predictability.md #7](../code-fundamentals/references/predictability.md) |
@@ -172,8 +178,8 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | `useInitializeX` 훅 vs `<XInitializer/>` 컴포넌트 | Hook vs Component 결정 규칙 | [cohesion.md #6](../code-fundamentals/references/cohesion.md) |
 | 상수 위치 — 함수 안 vs 밖 | 범용성×도메인 지엽성 | [cohesion.md #4](../code-fundamentals/references/cohesion.md) |
 | `components/`/`hooks/`/`utils/` 만으로 분할 | 도메인 중심 디렉토리 | [cohesion.md #5](../code-fundamentals/references/cohesion.md) |
-| `Object.assign(Fn, {with, Consumer})` / HOC+Consumer 공존 컴포넌트 | 컴포넌트 API 확장 패턴 | [recipes.md #17](references/recipes.md) |
-| ErrorBoundary — fallback 에서 또 에러나면? | FallbackBoundary 위임 | [recipes.md #18](references/recipes.md) |
+| `Object.assign(Fn, {with, Consumer})` / HOC+Consumer 공존 컴포넌트 | 컴포넌트 API 확장 패턴 | [recipes-3-advanced.md #17](references/recipes-3-advanced.md) |
+| ErrorBoundary — fallback 에서 또 에러나면? | FallbackBoundary 위임 | [recipes-3-advanced.md #18](references/recipes-3-advanced.md) |
 | Router / Storage / SDK 등 core 와 외부 환경 분리 | 어댑터 패턴 (얇은 인터페이스 + DI) | [coupling.md #5](../code-fundamentals/references/coupling.md) |
 | 기존 API 유지하면서 새 API로 이전 | `/compat` 어댑터 | [coupling.md #6](../code-fundamentals/references/coupling.md) |
 | `typeof window` / `typeof Buffer` 체크 산재 | 환경 분기 중앙화 | [cohesion.md #9](../code-fundamentals/references/cohesion.md) |
@@ -181,8 +187,8 @@ description: 토스 Frontend Fundamentals 4대 축(가독성·예측 가능성·
 | **npm 라이브러리 빌드/publish/CI 세팅** | 라이브러리 저자 패턴 | [library-patterns.md](references/library-patterns.md) |
 | 조사·URL 경로·CSS class 같은 **문자열 조합**을 타입으로 보장 | 템플릿 리터럴 타입 | [predictability.md #12](../code-fundamentals/references/predictability.md) |
 | 커스텀 `AbortError`/`TimeoutError`/`ValidationError` 만들 때 | 플랫폼 표준으로 승격 (DOMException/RangeError 등) | [predictability.md #13](../code-fundamentals/references/predictability.md) |
-| 다단계 폼·위저드 — 단계마다 required 필드가 다름 | 빌더 패턴 + 단계별 가드 누적 | [recipes.md #19](references/recipes.md) |
-| RSC prefetch 쿼리가 오래 걸려 페이지 전체 지연 | hydration timeout + CSR 폴백 | [recipes.md #20](references/recipes.md) |
+| 다단계 폼·위저드 — 단계마다 required 필드가 다름 | 빌더 패턴 + 단계별 가드 누적 | [recipes-3-advanced.md #19](references/recipes-3-advanced.md) |
+| RSC prefetch 쿼리가 오래 걸려 페이지 전체 지연 | hydration timeout + CSR 폴백 | [recipes-3-advanced.md #20](references/recipes-3-advanced.md) |
 | **과제에서 요청하지 않은** 애니메이션/View Transitions/커스텀 라우팅 계층 도입 | 자가 도입 복잡성 (완성도·실용성 감점) | §토스 평가 — 위 섹션 |
 | `useEffect`가 `navigate` + 상태 초기화 + race 방지 flag까지 다 포함 | React 동작 이해 — effect는 **동기화**용, 명령형 로직은 이벤트 핸들러/콜백으로 | §토스 평가 — React 동작 이해 |
 | 함수가 조용히 `Promise`를 반환하는데 호출부 절반은 `await`, 절반은 버림 | 시그니처로 비동기 드러내기 (`afterTransition` 콜백 / 이름에 `Async`) | [predictability.md #3](../code-fundamentals/references/predictability.md) + §토스 평가 |
