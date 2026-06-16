@@ -189,6 +189,91 @@ var engineRanBlock = ({ cmd, note, exitCode, tail, duty }) => `
 ENGINE-RAN: \`${cmd}\`${note ? " " + note : ""} exited ${exitCode}. Output tail: ${tail}
 ${duty}`;
 
+// src/phases/verify.ts
+var makeVerifyLeaf = (d) => {
+  const { sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP } = d;
+  return async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
+    const leafTest = node.kind === "tidy" || tier === "light" || !!engineT0 ? "" : LEAF_TEST(node.testScope);
+    const reported = JSON.stringify({
+      summary: String(res.summary || "").slice(0, 400),
+      passed: res.passed,
+      evidence: String(res.evidence || "").slice(0, 500),
+      filesChanged: res.filesChanged,
+      commits: res.commits,
+      refactor: res.refactor,
+      interfaceConcern: res.interfaceConcern,
+      discovered: res.discovered,
+      purposeVerified: res.purposeVerified
+    });
+    const hats = GIT && res.commits && res.commits.length >= 2 ? `
+TWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C ${repo} show <sha>\`); a structure/refactor commit must be strictly behavior-preserving (no test or behavior change smuggled in).` : "";
+    let engineDiff = "";
+    if (GIT && leafStart && node.kind !== "tidy") {
+      const d2 = await sh(
+        `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
+        `verify-diff:${lbl}`
+      );
+      if (!shUnavailable(d2)) {
+        const body = String(d2.stdout || "");
+        engineDiff = body.length > ENGINE_DIFF_CAP ? `
+ENGINE-DIFF: (diff too large — inspect via git yourself)` : `
+ENGINE-DIFF: ${body}`;
+      }
+    }
+    const base = `${R_VERIFY}
+
+Repo: ${repo}
+Adversarially verify this finished leaf.
+Task: ${node.task}
+Reported: ${reported}
+${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineDiff}${engineT0 || ""}${buildNote || ""}`;
+    if (node.kind === "tidy") {
+      return await agentSafe(
+        `${base}
+This is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
+        { phase: "Work", label: `verify:${lbl}·tidy`, model: "sonnet", schema: VERDICT }
+      ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
+    }
+    if (tier === "light") {
+      return await agentSafe(
+        `${R_VERIFY_LIGHT}
+
+Repo: ${repo}
+Low-risk leaf: ${node.task}
+Reported: ${reported}
+${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNote || ""}`,
+        { phase: "Work", label: `verify:${lbl}·light`, model: "sonnet", schema: VERDICT }
+      ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
+    }
+    if (tier === "heavy") {
+      const lenses = ["correctness & reproduce the green", "security: secrets/credentials NEVER logged or leaked", "interface & cross-module drift"];
+      const rawVotes = await parallel(lenses.map((L, li) => async () => {
+        const v = await agentSafe(
+          `${base}
+LENS: judge specifically through "${L}".`,
+          { phase: "Work", label: `verify:${lbl}·${L.slice(0, 9)}`, ...li === 0 ? { model: "opus" } : {}, schema: VERDICT }
+        );
+        return v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` };
+      }));
+      const votes = rawVotes.map((v, li) => v ?? { trustworthy: false, reason: `lens "${lenses[li]}" verifier unavailable — counts as distrust` });
+      const distrust = votes.filter((v) => !v.trustworthy);
+      return {
+        trustworthy: distrust.length === 0,
+        // UNANIMOUS across ALL 3 lenses (null counts against)
+        reason: `heavy verify: ${votes.length} lenses, ${distrust.length} distrusted`,
+        issues: votes.flatMap((v) => v.issues || []),
+        purposeGap: votes.map((v) => v.purposeGap).filter(Boolean).join("; ") || void 0,
+        // ① don't drop a hard-leaf purpose gap
+        prescription: votes.map((v) => v.prescription).filter(Boolean).join(" | ") || void 0,
+        // I3: lens prescriptions feed repair
+        followUps: votes.flatMap((v) => v.followUps || [])
+        // I4: lens follow-ups feed the batch
+      };
+    }
+    return await agentSafe(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
+  };
+};
+
 // src/main.ts
 async function __main() {
   let QUOTA_HALT = "";
@@ -423,86 +508,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       }
     }
   }
-  const verifyLeaf = async (lbl, node, res, tier, repo, leafStart, engineT0, buildNote) => {
-    const leafTest = node.kind === "tidy" || tier === "light" || !!engineT0 ? "" : LEAF_TEST(node.testScope);
-    const reported = JSON.stringify({
-      summary: String(res.summary || "").slice(0, 400),
-      passed: res.passed,
-      evidence: String(res.evidence || "").slice(0, 500),
-      filesChanged: res.filesChanged,
-      commits: res.commits,
-      refactor: res.refactor,
-      interfaceConcern: res.interfaceConcern,
-      discovered: res.discovered,
-      purposeVerified: res.purposeVerified
-    });
-    const hats = GIT && res.commits && res.commits.length >= 2 ? `
-TWO-HATS AUDIT: ${res.commits.length} commits — diff EACH separately (\`git -C ${repo} show <sha>\`); a structure/refactor commit must be strictly behavior-preserving (no test or behavior change smuggled in).` : "";
-    let engineDiff = "";
-    if (GIT && leafStart && node.kind !== "tidy") {
-      const d = await sh(
-        `git -C ${repo} diff ${leafStart}..HEAD -- . ':(exclude)*Tests*' ':(exclude)*test*' 2>/dev/null || true`,
-        `verify-diff:${lbl}`
-      );
-      if (!shUnavailable(d)) {
-        const body = String(d.stdout || "");
-        engineDiff = body.length > ENGINE_DIFF_CAP ? `
-ENGINE-DIFF: (diff too large — inspect via git yourself)` : `
-ENGINE-DIFF: ${body}`;
-      }
-    }
-    const base = `${R_VERIFY}
-
-Repo: ${repo}
-Adversarially verify this finished leaf.
-Task: ${node.task}
-Reported: ${reported}
-${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineDiff}${engineT0 || ""}${buildNote || ""}`;
-    if (node.kind === "tidy") {
-      return await agentSafe(
-        `${base}
-This is a TIDY-FIRST leaf: a behavior-PRESERVING structural change. Trust it ONLY if the existing suite is GREEN, NO test was added/changed/deleted, and the diff is a pure structural refactor with NO observable behavior change. Adding tests or changing behavior in a tidy leaf is a FINDING (untrusted).`,
-        { phase: "Work", label: `verify:${lbl}·tidy`, model: "sonnet", schema: VERDICT }
-      ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
-    }
-    if (tier === "light") {
-      return await agentSafe(
-        `${R_VERIFY_LIGHT}
-
-Repo: ${repo}
-Low-risk leaf: ${node.task}
-Reported: ${reported}
-${INV}${gitVerify(repo, leafStart)}${leafTest}${hats}${engineT0 || ""}${buildNote || ""}`,
-        { phase: "Work", label: `verify:${lbl}·light`, model: "sonnet", schema: VERDICT }
-      ) || { trustworthy: false, reason: "verification unavailable — untrusted" };
-    }
-    if (tier === "heavy") {
-      const lenses = ["correctness & reproduce the green", "security: secrets/credentials NEVER logged or leaked", "interface & cross-module drift"];
-      const rawVotes = await parallel(lenses.map((L, li) => async () => {
-        const v = await agentSafe(
-          `${base}
-LENS: judge specifically through "${L}".`,
-          { phase: "Work", label: `verify:${lbl}·${L.slice(0, 9)}`, ...li === 0 ? { model: "opus" } : {}, schema: VERDICT }
-        );
-        return v || { trustworthy: false, reason: `lens "${L}" verifier unavailable — counts as distrust` };
-      }));
-      const votes = rawVotes.map((v, li) => v ?? { trustworthy: false, reason: `lens "${lenses[li]}" verifier unavailable — counts as distrust` });
-      const distrust = votes.filter((v) => !v.trustworthy);
-      return {
-        trustworthy: distrust.length === 0,
-        // UNANIMOUS across ALL 3 lenses (null counts against)
-        reason: `heavy verify: ${votes.length} lenses, ${distrust.length} distrusted`,
-        issues: votes.flatMap((v) => v.issues || []),
-        purposeGap: votes.map((v) => v.purposeGap).filter(Boolean).join("; ") || void 0,
-        // ① don't drop a hard-leaf purpose gap
-        prescription: votes.map((v) => v.prescription).filter(Boolean).join(" | ") || void 0,
-        // I3: lens prescriptions feed repair
-        followUps: votes.flatMap((v) => v.followUps || [])
-        // I4: lens follow-ups feed the batch
-      };
-    }
-    return await agentSafe(base, { phase: "Work", label: `verify:${lbl}`, schema: VERDICT }) || { trustworthy: false, reason: "verification unavailable — untrusted" };
-  };
+  const verifyLeaf = makeVerifyLeaf({ sh, agentSafe, gitVerify, shUnavailable, LEAF_TEST, INV, GIT, ENGINE_DIFF_CAP });
   const t0redBreaker = circuitBreaker(2);
   const RE_ZERO_TESTS = /matched zero tests|no matching test cases|test run with 0 tests|\b(executed|ran|found|matched|collected)\s+0\s+(tests?|items?)\b|\bno tests? (were\s+)?(found|ran|run|matched|to run|collected|executed)\b|\b0 tests? (passed|ran|found|matched|executed)\b/i;
   const ABORTS = [];

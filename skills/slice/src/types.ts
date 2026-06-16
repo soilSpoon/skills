@@ -128,3 +128,14 @@ export interface EngineResult {
   ownersHeadline?: string  // ITEM 2: one human line — the green summary, or the first failing dimension named
   briefing?: string
 }
+
+// Host agent-call shape (shared by main.ts + extracted phase modules so AgentOpts has ONE definition).
+export type ModelTier = 'sonnet' | 'opus' | 'haiku' | 'fable'
+export interface AgentOpts {
+  label?: string
+  phase?: string
+  schema?: Record<string, unknown>
+  model?: ModelTier
+  isolation?: 'worktree'
+  agentType?: string
+}
