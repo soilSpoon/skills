@@ -41,7 +41,11 @@ Watch it: `/workflows`, or `watch -n3 'python3 scripts/slice-watch.py latest <re
 4. **[portable-orchestration.md](portable-orchestration.md)** — running the same algorithm by
    hand on a harness with no Workflow tool (opencode / Codex CLI / subagent-only): the four
    invariants that survive any port, and the accepted degradations.
-5. **[sources.md](sources.md)** — annotated bibliography: the Beck lineage + the contemporary
+5. **[portable-setup.md](portable-setup.md)** — setting up a NEW machine to run fast + reliably,
+   by language/environment: the two costs (shell-as-agent tax + compiler time) and their fixes —
+   host choice (native-exec adapters), the rig, and per-language build caching (Swift Xcode CAS
+   ~4.3×, Rust/C++ sccache, JVM Gradle cache, …), plus the Max-plan auth/billing setup.
+6. **[sources.md](sources.md)** — annotated bibliography: the Beck lineage + the contemporary
    agent-systems sources, each mapped to the engine.
 6. **[outer-loop.md](outer-loop.md)** — the loop altitude above the single-run harness: the opt-in,
    dispatch-only, dry-run-by-default outer driver (`scripts/outer-loop.mjs`) that reads a backlog,
