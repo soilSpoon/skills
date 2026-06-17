@@ -8,9 +8,10 @@
 //
 // Composes PR1 (the engine depends on an injected Runtime) + PR2 (AgentOutcome). Isolated package:
 // zero deps leak into the core (own package.json/tsconfig/node_modules).
-import { execFile } from "node:child_process"
+import { spawn } from "node:child_process"
 import { readFile } from "node:fs/promises"
 import type { query as SdkQuery } from "@anthropic-ai/claude-agent-sdk"
+import { trackProcessGroup, trackQuery } from "./lifecycle.mjs"
 
 // ── Native shell — the whole point: sh() runs DIRECTLY, no model, no agent spawn ────────────────
 // The engine's sh() builds a prompt: "Run EXACTLY this shell command…\n\n<cmd>". We split off the
@@ -20,10 +21,29 @@ export const isShPrompt = (prompt: string) => prompt.startsWith(SH_PREFIX)
 export const shNative = (prompt: string, cwd: string): Promise<{ stdout: string; exitCode: number }> =>
   new Promise((resolve) => {
     const cmd = prompt.split("\n\n").slice(1).join("\n\n")
-    execFile("/bin/sh", ["-c", cmd], { cwd, maxBuffer: 32e6, timeout: 30 * 60_000 }, (err, stdout, stderr) => {
-      const code = err ? (typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1) : 0
-      resolve({ stdout: String(stdout) + String(stderr || ""), exitCode: code })
-    })
+    // detached:true → child is its OWN process-group leader (pgid===pid); lets us reap the whole
+    // xcodebuild→XCBBuildService→swift-frontend subtree via process.kill(-pid) on cleanup. NOT unref'd:
+    // we track and reap it, never let it outlive us.
+    const child = spawn("/bin/sh", ["-c", cmd], { cwd, detached: true })
+    const untrack = trackProcessGroup(child.pid as number)
+
+    let out = ""
+    let truncated = false
+    const MAX = 32e6
+    const push = (b: Buffer) => {
+      if (truncated) return
+      out += b.toString()
+      if (out.length > MAX) { out = out.slice(0, MAX); truncated = true; try { process.kill(-(child.pid as number), "SIGTERM") } catch {} }
+    }
+    child.stdout?.on("data", push)
+    child.stderr?.on("data", push)
+
+    // 30-min timeout → group-kill (matches execFile's old timeout semantics, but reaps the TREE).
+    const timer = setTimeout(() => { try { process.kill(-(child.pid as number), "SIGTERM") } catch {} }, 30 * 60_000)
+
+    const finish = (code: number) => { clearTimeout(timer); untrack(); resolve({ stdout: out, exitCode: code }) }
+    child.on("close", (code, signal) => finish(typeof code === "number" ? code : signal ? 1 : 0))
+    child.on("error", () => finish(1))   // spawn failure → exitCode 1, mirrors old err→1 mapping
   })
 
 // ── AgentOutcome — same discriminated union as PR2 (src/types.ts), reused at the adapter boundary ─
@@ -106,21 +126,30 @@ export async function agentCall(
   const role = roleOf(opts.label || "", opts.phase, opts.model)
   const model = modelFor(opts.model)
   const systemPrompt = deps.persona(role)
+  const abort = new AbortController()
   const options: Record<string, unknown> = {
     allowedTools: toolsFor(role),
     cwd: deps.cwd,
     permissionMode: "bypassPermissions",
+    abortController: abort,
     ...(model ? { model } : {}),
     ...(systemPrompt ? { systemPrompt } : {}),
     ...(opts.schema ? { outputFormat: { type: "json_schema", schema: opts.schema } } : {}),
   }
   const q = deps.runQuery({ prompt, options } as Parameters<typeof SdkQuery>[0])
-  for await (const m of q as AsyncIterable<{ type: string } & SdkResult & { total_cost_usd?: number }>) {
-    if (m.type !== "result") continue
-    if (deps.budget && typeof m.total_cost_usd === "number") deps.budget.add(m.total_cost_usd)
-    return classifyAgentSdkResult(m)
+  // Register this in-flight query so a SIGTERM/SIGINT mid-run aborts the turn AND hard-closes the
+  // 'claude' CLI subprocess (q.close()). close is optional-chained: mocks in tests have no .close.
+  const untrack = trackQuery(abort, () => { try { (q as { close?: () => void }).close?.() } catch {} })
+  try {
+    for await (const m of q as AsyncIterable<{ type: string } & SdkResult & { total_cost_usd?: number }>) {
+      if (m.type !== "result") continue
+      if (deps.budget && typeof m.total_cost_usd === "number") deps.budget.add(m.total_cost_usd)
+      return classifyAgentSdkResult(m)
+    }
+    return { ok: false, kind: "null", detail: "no result message" }
+  } finally {
+    untrack()   // natural completion (or throw) deregisters; cleanup never targets a done query.
   }
-  return { ok: false, kind: "null", detail: "no result message" }
 }
 
 // ── Host the engine artifact (the AsyncFunction trick, faithful to test/host.mjs + the runtime) ──

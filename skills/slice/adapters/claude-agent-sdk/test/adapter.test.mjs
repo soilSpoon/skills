@@ -6,6 +6,11 @@ import assert from 'node:assert/strict'
 import {
   shNative, isShPrompt, classifyAgentSdkResult, roleOf, toolsFor, modelFor, agentCall,
 } from '../slice-engine-sdk.ts'
+import {
+  trackProcessGroup, trackQuery, cleanup, sweepPidfile, configurePidfile, __resetForTests,
+} from '../lifecycle.mjs'
+import { spawn } from 'node:child_process'
+import { setTimeout as delay } from 'node:timers/promises'
 
 // ── the native-shell path (the whole point: sh() runs WITHOUT a model) ──────────────────────────
 test('shNative runs a shell-runner prompt natively, captures stdout + exit 0', async () => {
@@ -95,4 +100,89 @@ test('agentCall: a generator with no result message → kind null', async () => 
   const out = await agentCall('x', { label: 'exec:1' }, { runQuery, cwd: '/r', persona: () => undefined })
   assert.equal(out.ok, false)
   assert.equal(out.kind, 'null')
+})
+
+// ── orphan-leak elimination: lifecycle reaping (token-free, SDK-free) ────────────────────────────
+// (mockQuery is already defined above for the agentCall tests.)
+// Each reaping test resets the module-level registry + one-shot cleaning guard so they're independent.
+test('cleanup() group-kills a tracked detached build tree (real sleep, no tokens)', async (t) => {
+  t.after(() => __resetForTests())
+  __resetForTests()
+  // spawn through the SAME tracked-detached path shNative uses
+  const child = spawn('/bin/sh', ['-c', 'sleep 300'], { detached: true })
+  const untrack = trackProcessGroup(child.pid)
+  await delay(100)
+  // process is alive: signal 0 throws ESRCH if dead, returns if alive
+  assert.doesNotThrow(() => process.kill(child.pid, 0), 'sleep child should be alive before cleanup')
+
+  cleanup()                       // the production teardown path
+  await new Promise((r) => child.on('exit', r))   // wait for the kill to land
+
+  assert.throws(() => process.kill(child.pid, 0), (e) => e.code === 'ESRCH', 'sleep pid must be dead after cleanup')
+  untrack()
+})
+
+test('cleanup() aborts an in-flight query AND calls Query.close() (mocked, no tokens)', async (t) => {
+  t.after(() => __resetForTests())
+  __resetForTests()
+  let aborted = false
+  let closed = false
+  const abort = { abort: () => { aborted = true } }
+  const close = () => { closed = true }
+  const untrack = trackQuery(abort, close)
+
+  cleanup()
+
+  assert.ok(aborted, 'AbortController.abort() called on cleanup')
+  assert.ok(closed, 'Query.close() called on cleanup (kills the claude CLI subprocess)')
+  untrack()
+})
+
+test('agentCall threads an AbortController into query() options', async () => {
+  let captured
+  const runQuery = mockQuery({ subtype: 'success', result: 'ok' }, (p) => { captured = p })
+  await agentCall('x', { label: 'exec:1' }, { runQuery, cwd: '/r', persona: () => undefined })
+  assert.ok(captured.options.abortController instanceof AbortController, 'abortController passed to SDK')
+})
+
+test('sweepPidfile() reaps a group recorded by a prior run (real sleep, no tokens)', async (t) => {
+  t.after(() => __resetForTests())
+  __resetForTests()
+  const repo = '/tmp/slice-sweep-test'
+  configurePidfile(repo)                         // writes <repo>/.slice/children.pids
+  const child = spawn('/bin/sh', ['-c', 'sleep 300'], { detached: true })
+  trackProcessGroup(child.pid)                   // appends pid to the pidfile
+  await delay(100)
+  assert.doesNotThrow(() => process.kill(child.pid, 0))
+
+  sweepPidfile(repo)                             // simulates the next run's startup recovery
+  await new Promise((r) => child.on('exit', r))
+  assert.throws(() => process.kill(child.pid, 0), (e) => e.code === 'ESRCH', 'swept pid must be dead')
+})
+
+// END-TO-END: the real signal path (installHandlers → SIGTERM → cleanup → group-kill), which the
+// direct-cleanup() tests above do NOT exercise. Reproduces the exact `pkill -f run.mjs` failure mode.
+test('installHandlers: a REAL SIGTERM reaps the tracked group end-to-end (the pkill failure mode)', async (t) => {
+  const fixture = new URL('./orphan-signal-fixture.mjs', import.meta.url).pathname
+  const harness = spawn(process.execPath, [fixture], { stdio: ['ignore', 'pipe', 'inherit'] })
+  let sleepPid
+  t.after(() => { try { harness.kill('SIGKILL') } catch {} ; if (sleepPid) { try { process.kill(-sleepPid, 'SIGKILL') } catch {} } })
+
+  sleepPid = await new Promise((resolve, reject) => {
+    let buf = ''
+    const to = setTimeout(() => reject(new Error('fixture never reported SLEEPPID')), 8000)
+    harness.stdout.on('data', (b) => { buf += b; const m = buf.match(/SLEEPPID:(\d+)/); if (m) { clearTimeout(to); resolve(Number(m[1])) } })
+  })
+  assert.doesNotThrow(() => process.kill(sleepPid, 0), 'sleep grandchild alive before the signal')
+
+  harness.kill('SIGTERM')                          // the real pkill / Ctrl-C path
+  await new Promise((r) => harness.on('exit', r))
+
+  // the handler's group-kill is synchronous, but the OS reap can lag a few ms — poll briefly.
+  let dead = false
+  for (let i = 0; i < 100 && !dead; i++) {
+    try { process.kill(sleepPid, 0) } catch (e) { if (e.code === 'ESRCH') dead = true }
+    if (!dead) await delay(25)
+  }
+  assert.ok(dead, 'sleep grandchild reaped via the SIGTERM handler — no orphan')
 })
