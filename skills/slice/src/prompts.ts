@@ -17,6 +17,11 @@ export const R_BASELINE =
   'full dependency compile (a compiled language — Swift/Rust/C++/Go/etc. — whose deps recompile per checkout, with no ' +
   'shared/global cache a worktree reuses) → "expensive"; or is it CHEAP (interpreted / no build step / a shared cache ' +
   'a worktree reuses) → "cheap"? This gates whether parallel git-worktree builds are worthwhile or just thrash. ' +
+  'SHARED COMPILE CACHE: set `sharedCompileCache`=true if the build rig shares COMPILED ARTIFACTS across fresh ' +
+  'checkouts via a persistent content-addressed cache (Xcode compilation caching/CAS, ccache, sccache, Bazel remote ' +
+  'cache) — set it EVEN WHEN coldBuildCost is "expensive" (the first build still pays to populate the cache). It tells ' +
+  'the engine parallel git-worktrees need NOT each cold-compile, so they build CONCURRENTLY in their own dirs sharing ' +
+  'the cache instead of serializing on one shared build dir. Absent/false = no cross-checkout compile cache. ' +
   'PURPOSE (Beck — genies satisfy prompts, not purposes): set `purposeCheck` — beyond unit tests, how would one ' +
   'confirm this ACTUALLY works for the user? e.g. "run the env-gated live integration test", "a human marks a ' +
   'message unread in the app and confirms the server updated". Set `inProcessVerifiable` = can that be checked ' +

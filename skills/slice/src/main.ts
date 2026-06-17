@@ -381,11 +381,21 @@ let groups: Groups | null = null
 // forgotten `sharedScratch` no longer silently demotes parallel → sequential (the recurring drift logged
 // in proportional-ceremony memory). Explicit `sharedScratch:false` still wins; the <2-independent-groups
 // guard below still demotes to sequential when slices share files, so no merge hazard is ever forced.
-const autoSharedScratch = baseline.coldBuildCost === 'expensive' && A.sharedScratch !== false
+// A shared COMPILE cache (Xcode CAS / ccache / sccache / Bazel) de-dupes compilation across fresh
+// checkouts by content-addressing, so worktrees need NO shared build DIR (which serializes builds on its
+// lock). Decouple "expensive build" from "worktrees share artifacts": with a shared cache, skip the
+// scratch dir and let worktrees build CONCURRENTLY in their own dirs sharing the cache. (The FIRST build
+// per worktree still pays to populate the cache — that is coldBuildCost; the cache makes the PARALLELISM
+// non-redundant + safe, not the first build free.) Probe-confirmed: concurrent shared-CAS builds run
+// clean (exit 0, no corruption) and do not CPU-thrash once warm (compilation collapses to cache hits).
+const sharedCache = baseline.sharedCompileCache === true
+const autoSharedScratch = baseline.coldBuildCost === 'expensive' && !sharedCache && A.sharedScratch !== false
 const useSharedScratch = SHARED_SCRATCH || autoSharedScratch
 if (autoSharedScratch && !SHARED_SCRATCH)
-  log(`compile-bound (coldBuildCost=expensive) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`)
-const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== 'expensive' || FORCE_PARALLEL || useSharedScratch)
+  log(`compile-bound (coldBuildCost=expensive, no shared compile cache) → sharedScratch auto-ENABLED (deterministic; pass sharedScratch:false to opt out).`)
+else if (sharedCache && baseline.coldBuildCost === 'expensive')
+  log(`compile-bound BUT a shared compile cache is present → worktrees build in their OWN dirs sharing the cache (parallel, no shared-scratch serialization).`)
+const goParallel = PARALLEL && GIT && gitClean && (baseline.coldBuildCost !== 'expensive' || FORCE_PARALLEL || useSharedScratch || sharedCache)
 if (PARALLEL && GIT && !goParallel)
   log(`parallel requested but skipped → SEQUENTIAL. Reason: ${!gitClean ? 'main tree is DIRTY (merge would conflict with your work)' : 'sharedScratch:false explicitly set on a compile-bound repo (worktrees would force per-checkout cold builds → thrashing, slower than sequential-warm; drop sharedScratch:false to use the auto shared build dir, or forceParallel:true to brute-force)'}.`)
 // Shared scratch dir for parallel groups on a compile-bound repo. Lives in the MAIN repo (worktree

@@ -8,6 +8,7 @@ export const BASELINE = { type: 'object', required: ['invariants', 'measureComma
   currentState: { type: 'string' },                            // pass/fail counts as observed now
   projectCard: { type: 'string' },                             // distilled STATIC repo conventions shared to all workers
   coldBuildCost: { type: 'string', enum: ['cheap', 'expensive'] }, // would a FRESH worktree's first build be cheap (interpreted/no-build/shared-cache) or expensive (compiled lang, per-checkout dependency compile)?
+  sharedCompileCache: { type: 'boolean' },                     // the rig shares COMPILED artifacts across fresh checkouts via a persistent content-addressed cache (Xcode CAS/ccache/sccache/Bazel) — set even if the first build is expensive to populate it; lets parallel worktrees build concurrently in their own dirs sharing the cache instead of serializing on one shared build dir
   purposeCheck: { type: 'string' },                            // ① how to verify the work ACTUALLY works for the user (PURPOSE) beyond unit tests — e.g. a live integration test / a human action
   inProcessVerifiable: { type: 'boolean' },                    // ① can that purpose be verified deterministically in-process (pure logic / recorded-real bytes), or does it need a real env / human?
   worktreeSetupCommand: { type: 'string' },                    // E: shell command run ONCE per parallel git-worktree immediately after creation (e.g. 'npm ci'); empty/absent = no setup needed

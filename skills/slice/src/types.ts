@@ -24,6 +24,7 @@ export interface Baseline {
   currentState?: string
   projectCard?: string
   coldBuildCost?: 'cheap' | 'expensive'
+  sharedCompileCache?: boolean    // worktrees share COMPILED artifacts across fresh checkouts via a persistent content-addressed cache (Xcode CAS/ccache/sccache/Bazel) — even when coldBuildCost is 'expensive' (the first build populates it). Decouples "expensive build" from "no cross-checkout sharing": when true, parallel worktrees build in their OWN dirs sharing the cache instead of serializing on one shared build dir.
   purposeCheck?: string
   inProcessVerifiable?: boolean
   rigPresent?: boolean            // baseliner's explicit judgment: does a real RUNNABLE test rig exist (a real test cmd that runs real tests, OR a test-foundations scripts/verify.sh)? false ONLY if NO verify.sh, NO test files, AND NO test command — the testing-readiness gate keys off `=== false`
