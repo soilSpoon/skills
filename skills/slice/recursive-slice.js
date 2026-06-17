@@ -885,7 +885,7 @@ Match the language the task was written in. Be concrete.`,
         const dir = `${REPO}/docs/briefings`;
         const file = `${dir}/${ts}.md`;
         const b64 = b64encode(String(briefing.briefing));
-        const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
+        const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
         if (!shUnavailable(w) && w.exitCode === 0) log2(`owner briefing persisted → ${file}`);
         else log2(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
       } catch (e) {
@@ -1003,7 +1003,7 @@ Executors apply them; verifiers treat clear violations as issues (a skipped non-
 - ${baseline.invariants.join("\n- ")}
 Measure: ${baseline.measureCommand}${CARD}${PURPOSE}${SKILLS_NOTE}`;
   const LEAF_TEST = makeLeafTest(baseline.measureCommand);
-  const probe = `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`;
+  const probe = `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; git -C ${REPO} status --porcelain -- . ':(exclude)docs/run-traces' ':(exclude)docs/briefings' ':(exclude).rs-scratch' ':(exclude).rs-wt' 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`;
   let prologue = await shBatch(probe, "prologue");
   if (shUnavailable(prologue.raw)) {
     log2("shell-proxy returned no result for prologue (git-sha/clean/lock) — retrying once …");
@@ -1041,7 +1041,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       for (const [k, v] of Object.entries(rec)) if (v !== void 0) line[k] = v;
       const json = JSON.stringify(line);
       const b64 = b64encode(json + "\n");
-      await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
+      await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
     } catch (e) {
       log2(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
     }

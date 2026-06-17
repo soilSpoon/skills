@@ -199,7 +199,9 @@ if (trusted.length && !getQuotaHalt()) {
       const dir = `${REPO}/docs/briefings`
       const file = `${dir}/${ts}.md`
       const b64 = b64encode(String(briefing.briefing))
-      const w = await sh(`mkdir -p ${dir} && printf %s '${b64}' | base64 -d > ${file}`, 'briefing-persist')
+      // Self-ignore the briefings dir (see trace-append in main.ts): the engine's own output must never be
+      // swept into a user commit by an agent's `git add -A`, nor dirty the tree that gates parallel.
+      const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf %s '${b64}' | base64 -d > ${file}`, 'briefing-persist')
       if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`)
       else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`)
     } catch (e) { log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`) }

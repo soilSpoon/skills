@@ -188,7 +188,12 @@ const LEAF_TEST = makeLeafTest(baseline.measureCommand)   // dynamic per-leaf pr
 // --- Batch 1: git-sha + git-clean + lock-dir + lock-check (all reads, no mutation) ---
 const probe =
   `git -C ${REPO} rev-parse HEAD 2>/dev/null; printf '<<RS:git-sha:%s>>\\n' "$?"; ` +
-  `git -C ${REPO} status --porcelain 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; ` +
+  // gitClean gates parallel (a dirty tree means the user has uncommitted work that parallel-merge could
+  // clobber). But the engine's OWN artifacts (docs/run-traces, docs/briefings, scratch/worktree dirs) are
+  // NOT user work — counting them as "dirty" made the engine sabotage its own parallelism (a clean tree
+  // that had a prior run's untracked trace silently demoted parallel→sequential). Exclude engine-owned
+  // paths so the clean-check reflects only the USER's working state.
+  `git -C ${REPO} status --porcelain -- . ':(exclude)docs/run-traces' ':(exclude)docs/briefings' ':(exclude).rs-scratch' ':(exclude).rs-wt' 2>/dev/null; printf '<<RS:git-clean:%s>>\\n' "$?"; ` +
   `GD="$(git -C ${REPO} rev-parse --absolute-git-dir 2>/dev/null)"; ec=$?; printf '%s\\n' "$GD"; printf '<<RS:lock-dir:%s>>\\n' "$ec"; ` +
   `if [ -n "$GD" ]; then cat "$GD/rs-lock" 2>/dev/null; printf '<<RS:lock-check:%s>>\\n' "$?"; fi`
 let prologue = await shBatch(probe, 'prologue')
@@ -262,7 +267,10 @@ const trace = async (rec: TraceRecord): Promise<void> => {
     const b64 = b64encode(json + '\n')
     // mkdir -p the dir, then base64-decode the line and `>>` APPEND it (one line per call). The b64
     // alphabet is shell-safe, so the arbitrary role/label/model text never reaches the shell verbatim.
-    await sh(`mkdir -p ${REPO}/docs/run-traces && printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, 'trace-append')
+    // Self-ignore the trace dir (a `.gitignore` of `*`) so the engine's own observability output is never
+    // swept into a user commit by an agent's `git add -A`, nor counted as a dirty tree. Belt-and-suspenders
+    // with the gitClean exclude above; this stops the pollution AT THE SOURCE (the ` D <sha>.jsonl` drift).
+    await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, 'trace-append')
   } catch (e) { log(`trace append skipped (${e && (e as Error).message ? (e as Error).message : e}) — observability only, run unaffected`) }
 }
 
