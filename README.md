@@ -8,7 +8,7 @@ engineering workflow with day-to-day dev, job-hunt, and research skills.
 ```
 /plugin marketplace add soilSpoon/skills
 /plugin install slice@soilspoon-skills            # trust-first decomposition workflow (+4 role agents)
-/plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, build-config drift, root-cause workflow
+/plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, technical writing, build-config drift, root-cause workflow
 /plugin install job-hunt@soilspoon-skills         # resume tailoring, Wishket applications
 /plugin install research-tools@soilspoon-skills   # fact-checking, human-like browser automation
 ```
@@ -24,12 +24,12 @@ size budgets and structure rules that keep this repo lean.
 
 ## Plugins & Skills
 
-Four plugins bundle nine skills. Pick a plugin for the whole set, or install any skill on its own.
+Four plugins bundle ten skills. Pick a plugin for the whole set, or install any skill on its own.
 
 | Plugin | Skills | For |
 |---|---|---|
 | [`slice`](#slice) | `slice` (+5 agents) | Decomposing big/risky/vague coding tasks into verifiable slices |
-| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, build/runtime diagnostics |
+| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical writing, build/runtime diagnostics |
 | [`job-hunt`](#job-hunt) | `tailor-resume`, `apply-wishket` | Resume tailoring and freelance-project applications |
 | [`research-tools`](#research-tools) | `fact-check`, `human-like-browser` | Verifying content and driving the browser undetected |
 
@@ -64,8 +64,8 @@ npx skills add soilSpoon/skills@slice
 
 ## dev-toolkit
 
-Engineering fundamentals and diagnostics. Four skills that review code quality, enforce frontend
-fundamentals, and trace why something is broken at runtime even when static checks pass.
+Engineering fundamentals and diagnostics. Five skills that review code quality, enforce frontend
+fundamentals, sharpen technical writing, and trace why something is broken at runtime even when static checks pass.
 
 ### code-fundamentals
 
@@ -105,6 +105,22 @@ npx skills add soilSpoon/skills@toss-frontend-fundamentals
 - `references/recipes.md` — Modal, Form, Query Key Factory, overlay-kit, … (20 recipes)
 - `references/discussions.md` — community thread summaries
 - `references/library-patterns.md` — library-author only (opt-in)
+
+### technical-writing
+
+Toss's [Technical Writing](https://technical-writing.dev) guide — document types, information
+structure, and sentence craft — to write and review docs so the reader reaches their goal faster.
+
+```bash
+npx skills add soilSpoon/skills@technical-writing
+```
+
+**What it does:**
+- Two modes: write (pick the document type → its template → apply the principles) and review (3-step checklist → one integrated rewrite)
+- The single root behind every rule: flip writer-centered prose to reader-centered (the cost is reader cognition, not style)
+- Korean-specific sentence rules (active voice, drop 한자어/번역체, abbreviation-on-first-use, loanword-by-frequency)
+- Progressive-loads only the relevant `references/` (document-types, information-structure, sentence-craft, review-checklist, applied-contexts)
+- Pairs with `code-fundamentals` — that cuts the cost of reading *code*, this cuts the cost of reading *docs/PRs/commits*
 
 ### build-config-drift
 
