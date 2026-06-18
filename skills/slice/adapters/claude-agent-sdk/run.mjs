@@ -10,7 +10,8 @@
 // subscription — verify in Settings>Usage. Do NOT set ANTHROPIC_API_KEY unless you intend pay-as-you-go
 // API billing: it takes precedence over the subscription (a known Claude Code gotcha).
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runEngine } from './slice-engine-sdk.ts'
@@ -23,6 +24,15 @@ const flag = (f) => argv.includes(f)
 if (flag('--cleanup')) {
   const repo = resolve(opt('--repo', process.cwd()))
   sweepPidfile(repo)
+  process.exit(0)
+}
+
+if (flag('--status')) {
+  // Glanceable progress view — recovers the /workflows-style tree the harness gives the Workflow
+  // runtime but NOT a standalone Node process. Reads .slice/engine.log (tee'd below) + git + ps.
+  const repo = resolve(opt('--repo', process.cwd()))
+  const here = dirname(fileURLToPath(import.meta.url))
+  execFileSync(process.execPath, [join(here, 'status.mjs'), '--repo', repo, ...(opt('--out') ? ['--out', opt('--out')] : [])], { stdio: 'inherit' })
   process.exit(0)
 }
 
@@ -60,5 +70,9 @@ const persona = (role) => {
 }
 
 const artifactPath = join(HERE, '..', '..', 'recursive-slice.js')
-const result = await runEngine({ artifactPath, args, runQuery: query, persona, log: (m) => process.stderr.write(m + '\n') })
+// Tee the engine log to a KNOWN location so `run.mjs --status` (or status.mjs) can render progress
+// without knowing where this process's stderr was redirected. .slice/ was already created above.
+const slog = `${args.repo}/.slice/engine.log`
+try { writeFileSync(slog, '') } catch {}   // fresh per run
+const result = await runEngine({ artifactPath, args, runQuery: query, persona, log: (m) => { process.stderr.write(m + '\n'); try { appendFileSync(slog, m + '\n') } catch {} } })
 process.stdout.write(JSON.stringify(result, null, 2) + '\n')
