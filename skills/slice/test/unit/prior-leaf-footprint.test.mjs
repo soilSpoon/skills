@@ -30,5 +30,7 @@ test('footprint is a deterministic pure function over `done`: TRUSTED-only + fil
 test('footprint is threaded into the HOT TRIAD but NEVER the verifier (independence)', () => {
   const injections = (leafLoop.match(/\$\{footprint\(\)\}/g) || []).length
   assert.ok(injections >= 3, `footprint() must be injected into ≥3 hot-triad prompts (slicer/critic/executor); found ${injections}`)
-  assert.ok(!/footprint/.test(verify), 'the adversarial VERIFIER must NOT receive the footprint — it judges from ENGINE-DIFF/ENGINE-RAN independently')
+  // verify.ts uses the WORD "footprint" for the git diff --stat footprint (unrelated); the precise
+  // assertion is that the verifier neither defines nor injects the footprint() HELPER.
+  assert.ok(!/footprint\(\)/.test(verify), 'the adversarial VERIFIER must NOT receive the footprint() injection — it judges from ENGINE-DIFF/ENGINE-RAN independently')
 })
