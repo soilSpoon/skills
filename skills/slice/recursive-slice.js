@@ -332,6 +332,13 @@ var makeRunWork = (d) => {
     let discovered = 0;
     const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK);
     const keyOf = (s) => String(s).trim().slice(0, 120);
+    const footprint = () => {
+      const files = [...new Set(done.filter((d2) => d2.verdict?.trustworthy).flatMap((d2) => d2.filesChanged || []))];
+      if (!files.length) return "";
+      const shown = files.slice(0, 12);
+      return `
+PRIOR-LEAF FOOTPRINT (this run; trusted leaves already touched these — orient from them, but still Read before you edit): ${shown.join(", ")}${files.length > shown.length ? ` +${files.length - shown.length} more` : ""}.`;
+    };
     let commitChain = Promise.resolve();
     const withCommit = (fn) => {
       const run = commitChain.then(fn, fn);
@@ -417,7 +424,7 @@ Repo: ${repo}
 Decide this node's next action (bias HARD toward execute), then act.
 Task: ${node.task}
 ${node.ctx ? "Context: " + node.ctx + "\n" : ""}Depth ${node.depth}/${FLOOR}${atFloor ? " (AT FLOOR — you must return execute)" : ""}.
-${INV}
+${INV}${footprint()}
 If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, independently-verifiable slices with a self-contained contract each (group near-identical units; 2-5 slices; isolate any risky seam first).`,
           { phase: "Work", label: `${tag}decompose:d${node.depth}`, model: "sonnet", schema: DECOMPOSE }
         );
@@ -436,7 +443,7 @@ Repo: ${repo}
 Task: ${node.task}
 Proposed list:
 ` + slices.map((s, j) => `${j + 1}. ${s.desc}`).join("\n") + `
-${INV}`,
+${INV}${footprint()}`,
             // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
             // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
             // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
@@ -531,7 +538,7 @@ Repo: ${repo}
 Do EXACTLY this one atomic task.
 Task: ${node.task}
 ${node.ctx}${seamCtx}
-${INV}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
+${INV}${footprint()}${node.kind === "tidy" ? "" : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
           { phase: "Work", label: `exec:${lbl}${attempt ? ".r" + attempt : ""}`, model: "sonnet", schema: RESULT }
         );
         res = resR.ok ? resR.value : null;

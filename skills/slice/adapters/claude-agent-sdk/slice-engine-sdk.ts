@@ -174,7 +174,12 @@ export async function runEngine(opts: {
 
   const agent = async (prompt: string, o: AgentOpts = {}) => {
     if (isShOpts(o)) return shNative(prompt, repo) // NATIVE shell — the tax-free path
+    // ④ per-agent timing (host-side = clock-safe; the engine core stays clock-free for the Workflow
+    // runtime). With run.mjs's [+MM:SS] prefix this gives the per-ROLE cost breakdown — the engine is
+    // AGENT-bound, so this is the measurement that actually validates before/after of any AI-surface change.
+    const _t0 = Date.now()
     const out = await agentCall(prompt, o, { runQuery: opts.runQuery, cwd: repo, persona, budget })
+    log(`· agent ${o.label || roleOf(o.label || "", o.phase, o.model)} ${Math.round((Date.now() - _t0) / 1000)}s`)
     // Runtime.agent contract is value|null (host.ts agentSafe re-classifies); a typed-quota throw is a
     // follow-up so QUOTA_HALT fires on kind:'quota' rather than the generic null-streak. v1: value|null.
     return out.ok ? out.value : null

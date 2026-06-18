@@ -46,6 +46,20 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
   const untrustedBreaker = circuitBreaker(MAX_UNTRUSTED_STREAK)
   const keyOf = (s: unknown) => String(s).trim().slice(0, 120)
 
+  // ① Prior-leaf FOOTPRINT (DETERMINISTIC orientation — a pure function of `done`, NOT an AI step): the
+  // files prior TRUSTED leaves in THIS run already touched, threaded into the hot triad (slicer/critic/
+  // serial-executor) so a fresh stateless agent orients fast instead of cold-grepping the tree (the
+  // measured ~85%-AI re-derivation cost). Advisory ONLY (the agent still Reads before editing). Caps:
+  // TRUSTED leaves only (an untrusted leaf was reverted → its files are noise), filesChanged only
+  // (funList/symbols are unreliable), ≤12 files. NEVER to the verifier (independence) nor the concurrent
+  // path (mid-batch `done` is racy). Moves no judgment; cuts cold re-orientation.
+  const footprint = (): string => {
+    const files = [...new Set(done.filter(d => d.verdict?.trustworthy).flatMap(d => d.filesChanged || []))]
+    if (!files.length) return ''
+    const shown = files.slice(0, 12)
+    return `\nPRIOR-LEAF FOOTPRINT (this run; trusted leaves already touched these — orient from them, but still Read before you edit): ${shown.join(', ')}${files.length > shown.length ? ` +${files.length - shown.length} more` : ''}.`
+  }
+
   // ── leafConcurrency: file-disjoint atomic sibling leaves run concurrently (opt-in, default OFF) ──
   // COMMIT-IF-TRUSTED: the executor leaves its change UNCOMMITTED; the engine commits it SCOPED to the
   // leaf's files under a mutex (so `leafSha~1..leafSha` is EXACTLY that leaf's diff, disjoint from siblings),
@@ -124,7 +138,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       const dR = await agentSafe<Decompose>(
         `${R_SLICE}\n\nRepo: ${repo}\nDecide this node's next action (bias HARD toward execute), then act.\n` +
         `Task: ${node.task}\n${node.ctx ? 'Context: ' + node.ctx + '\n' : ''}` +
-        `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}\n` +
+        `Depth ${node.depth}/${FLOOR}${atFloor ? ' (AT FLOOR — you must return execute)' : ''}.\n${INV}${footprint()}\n` +
         `If action:'execute' set this leaf's riskTier. If action:'slice' emit thin, VERTICAL, ` +
         `independently-verifiable slices with a self-contained contract each (group near-identical units; ` +
         `2-5 slices; isolate any risky seam first).`,
@@ -147,7 +161,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
       if (slices.length > 1 && node.depth <= 1) {
         const critR = await agentSafe<{ missing?: Array<{ desc: string; contract: string }> }>(
           `${R_CRITIC}\n\nRepo: ${repo}\nTask: ${node.task}\nProposed list:\n` +
-          slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}`,
+          slices.map((s, j) => `${j + 1}. ${s.desc}`).join('\n') + `\n${INV}${footprint()}`,
           // agentType:'Explore' — the completeness critic is READ-ONLY + additive-only (it gates
           // NO trust, only proposes missing scenarios, with inline input). The Explore recon agent
           // (reads excerpts, returns conclusions) fits exactly and is leaner than the default agent.
@@ -271,7 +285,7 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
         ? `\nSeam Pointers (already resolved by the Slicer — confirm each via Read BEFORE using; lines may be stale):\n${node.seamPointers.map((p) => `  - ${p.file}${p.line != null ? `:${p.line}` : ''}${p.symbol ? ` (${p.symbol})` : ''}${p.currentText ? ` — "${p.currentText}"` : ''}`).join('\n')}`
         : ''
       const resR: AgentOutcome<ExecResult> = await agentSafe<ExecResult>(
-        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}${seamCtx}\n${INV}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
+        `${R_EXEC}\n\nRepo: ${repo}\nDo EXACTLY this one atomic task.\nTask: ${node.task}\n${node.ctx}${seamCtx}\n${INV}${footprint()}${node.kind === 'tidy' ? '' : LEAF_TEST(node.testScope)}${GIT_EXEC}${TIDY}${buildNote}${repair}`,
         { phase: 'Work', label: `exec:${lbl}${attempt ? '.r' + attempt : ''}`, model: 'sonnet', schema: RESULT })
       res = resR.ok ? resR.value : null
       if (!res) break
