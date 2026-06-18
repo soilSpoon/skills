@@ -9,6 +9,7 @@
 //   --log defaults to <repo>/.slice/engine.log (run.mjs tees there); --watch redraws in place every 2s.
 import { execFileSync } from 'node:child_process'
 import { readFileSync, existsSync, statSync } from 'node:fs'
+import { createServer } from 'node:http'
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i >= 0 ? process.argv[i + 1] : d }
 const has = (f) => process.argv.includes(f)
@@ -67,8 +68,56 @@ function snapshot() {
   return { text: out.join('\n'), alive, done }
 }
 
-if (has('--watch')) {
-  // LIVE dashboard — the native-exec answer to /workflows. Redraw in place every 2s until the run ends.
+const PAGE = `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>slice · live</title>
+<style>
+ body{background:#0b0e14;color:#cdd6f4;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;margin:0;padding:18px}
+ h1{font-size:14px;color:#89b4fa;margin:0 0 14px;font-weight:600}
+ .grid{display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:16px}
+ @media(max-width:720px){.grid{grid-template-columns:1fr}}
+ .lbl{color:#6c7086;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px}
+ pre{background:#11151c;border:1px solid #1e2430;border-radius:10px;padding:14px;margin:0;white-space:pre-wrap;word-break:break-word;overflow:auto;max-height:82vh}
+ #tree{color:#a6e3a1}
+ #log{color:#bac2de;font-size:12px}
+ .dim{color:#6c7086}
+ .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#a6e3a1;margin-left:6px;animation:p 2s infinite;vertical-align:middle}
+ @keyframes p{50%{opacity:.25}}
+</style>
+<h1>slice · live dashboard <span class=pulse id=pulse></span> <span class=dim id=meta></span></h1>
+<div class=grid>
+ <div><p class=lbl>progress</p><pre id=tree>loading…</pre></div>
+ <div><p class=lbl>engine log (live · [+mm:ss] = elapsed)</p><pre id=log></pre></div>
+</div>
+<script>
+async function tick(){
+ try{
+  const d=await (await fetch('/api')).json();
+  document.getElementById('tree').textContent=d.tree;
+  const log=document.getElementById('log'),atBottom=log.scrollTop+log.clientHeight>=log.scrollHeight-24;
+  log.textContent=d.log; if(atBottom) log.scrollTop=log.scrollHeight;
+  document.getElementById('meta').textContent=d.done?('· done: '+d.done):(d.alive?'· running':'· not running');
+  document.getElementById('pulse').style.background=d.done?'#89b4fa':(d.alive?'#a6e3a1':'#f38ba8');
+ }catch(e){document.getElementById('meta').textContent='· (server stopped)';document.getElementById('pulse').style.background='#f38ba8';}
+}
+tick();setInterval(tick,2000);
+</script>`
+
+if (has('--serve')) {
+  // LOCAL WEB DASHBOARD — the low-friction frontend: open a browser tab, live + rich, no babysat command.
+  // Zero-dep (node:http). Serves the same structured snapshot() + a live tail of the engine log.
+  const port = Number(arg('--port', 8787))
+  createServer((req, res) => {
+    if (req.url.startsWith('/api')) {
+      const s = snapshot()
+      const tail = (existsSync(logFile) ? readFileSync(logFile, 'utf8').split('\n').filter(Boolean).slice(-80) : []).join('\n')
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ tree: s.text, alive: s.alive, done: s.done, log: tail }))
+    } else {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+      res.end(PAGE)
+    }
+  }).listen(port, () => console.log(`slice dashboard → http://localhost:${port}\n  repo: ${repo}\n  open it in a browser (live, auto-refresh every 2s). Ctrl-C to stop.`))
+} else if (has('--watch')) {
+  // LIVE terminal dashboard — redraw in place every 2s until the run ends.
   let wasAlive = false
   const tick = () => {
     const s = snapshot()
