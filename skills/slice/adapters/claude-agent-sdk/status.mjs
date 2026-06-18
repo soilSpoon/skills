@@ -176,7 +176,13 @@ function parseRun() {
 
   const status = done ? 'done · ' + done : alive ? (builds ? 'building (' + builds + ')' : 'thinking') : 'not running'
   const verdict = verdictLine ? { trusted: !/NOT TRUSTED/.test(verdictLine.text), line: verdictLine.text.replace(/^Overall verdict:\s*/, '').slice(0, 160) } : null
-  return { status, alive: !!alive, done, elapsed, agentCount: agents.length, verdict, stepper, tree: phases, roles, recent: lines.slice(-60).map((l) => l.text) }
+  // wall-clock liveness — the log appends in BURSTS (per agent/leaf completion), so the log-derived
+  // `elapsed` FREEZES during a long build/test gate even though work is ongoing. statSync gives the
+  // host a real clock (status.mjs is a tool, not the clock-free engine core): wallElapsed keeps ticking
+  // and logAgeSec + building distinguish "still alive, just building" from "actually stalled".
+  let logAgeSec = 0, wallElapsed = elapsed
+  if (existsSync(logFile)) { const st = statSync(logFile); logAgeSec = Math.round((Date.now() - st.mtimeMs) / 1000); wallElapsed = Math.round((Date.now() - (st.birthtimeMs || st.ctimeMs)) / 1000) }
+  return { status, alive: !!alive, done, building: builds, elapsed, wallElapsed, logAgeSec, agentCount: agents.length, verdict, stepper, tree: phases, roles, recent: lines.slice(-60).map((l) => l.text) }
 }
 
 // ── the graphical dashboard page (zero-dep; inner JS uses string concat to avoid nested backticks) ─
@@ -255,8 +261,9 @@ function render(){
  $('roles').innerHTML=data.roles.map(function(r){return '<div class=arow><span class=arole>'+r.role+'</span><span class=abar style="width:'+(r.sec/max*150)+'px"></span><span class=dim>'+fmt(r.sec)+'</span></div>'}).join('')||'<div class=dim>\\u2014</div>';
  var f=($('filter').value||'').toLowerCase(),lg=$('log'),atB=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-24;
  lg.textContent=data.recent.filter(function(l){return !f||l.toLowerCase().indexOf(f)>=0}).join('\\n');if(atB)lg.scrollTop=lg.scrollHeight;
- $('meta').textContent='\\u00b7 '+data.status+' \\u00b7 +'+fmt(data.elapsed)+' \\u00b7 '+data.agentCount+' agents';
- $('pulse').style.background=data.done?'var(--accent)':(data.alive?'var(--green)':'var(--red)');
+ var building=data.building>0,quiet=data.logAgeSec>25&&!data.done&&data.alive;
+ $('meta').textContent='\\u00b7 '+data.status+' \\u00b7 +'+fmt(data.wallElapsed||data.elapsed)+' \\u00b7 '+data.agentCount+' agents'+((building||quiet)?' \\u00b7 last update '+fmt(data.logAgeSec)+' ago':'');
+ $('pulse').style.background=data.done?'var(--accent)':(building?'var(--yellow)':(data.alive?'var(--green)':'var(--red)'));
 }
 $('tree').onclick=function(e){var r=e.target.closest('.nrow');if(!r)return;var id=r.getAttribute('data-id');if(openSet[id])delete openSet[id];else openSet[id]=1;saveOpen();r.parentNode.classList.toggle('open')};
 $('expand').onclick=function(){openSet=ids(data.tree,{});saveOpen();render()};
