@@ -74,5 +74,12 @@ const artifactPath = join(HERE, '..', '..', 'recursive-slice.js')
 // without knowing where this process's stderr was redirected. .slice/ was already created above.
 const slog = `${args.repo}/.slice/engine.log`
 try { writeFileSync(slog, '') } catch {}   // fresh per run
-const result = await runEngine({ artifactPath, args, runQuery: query, persona, log: (m) => { process.stderr.write(m + '\n'); try { appendFileSync(slog, m + '\n') } catch {} } })
+// Timestamp each log line at the HOST level. The engine itself must stay CLOCK-FREE — Date.now() is
+// blocked in the Workflow runtime and would break resume — but run.mjs is native Node WITH a clock, so
+// the elapsed +MM:SS belongs here. This makes per-phase/per-leaf durations readable straight from the
+// log (no git-timestamp archaeology) and computable by status.mjs.
+const t0 = Date.now()
+const stamp = () => { const s = Math.round((Date.now() - t0) / 1000); return `+${String((s / 60) | 0).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` }
+const log = (m) => { const line = `[${stamp()}] ${m}`; process.stderr.write(line + '\n'); try { appendFileSync(slog, line + '\n') } catch {} }
+const result = await runEngine({ artifactPath, args, runQuery: query, persona, log })
 process.stdout.write(JSON.stringify(result, null, 2) + '\n')
