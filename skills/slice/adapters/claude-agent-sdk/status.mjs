@@ -40,31 +40,40 @@ const baseSha = (log.match(/baseline pinned at ([0-9a-f]+)/) || [])[1] || ''
 
 // ── lanes (per parallel group gN) ──────────────────────────────────────────────────────────────
 const gids = [...new Set([...log.matchAll(/\bg(\d+):/g)].map((m) => m[1]))].sort()
-const mainLog = sh(`git -C ${repo} log --oneline -8`)
+// Merges from THIS run only (baseSha..HEAD) — counting `git log -8` falsely picked up PRIOR runs' merges.
+const baseLog = baseSha ? sh(`git -C ${repo} log --oneline ${baseSha}..HEAD 2>/dev/null`) : ''
 const lane = (g) => {
-  const leaf = lastMatch(new RegExp(`g${g}:leaf (\\d+) (green|untrusted)([^|]*)`))
+  const leaf = lastMatch(new RegExp(`g${g}:leaf (\\d+) (green|untrusted)`))
   const repair = lastMatch(new RegExp(`g${g}:leaf \\d+ untrusted.*self-repair (\\d+/\\d+)`))
-  const merged = new RegExp(`Merge branch 'rs/g${g}'`).test(mainLog)
-  let commits = ''
-  if (baseSha) { const c = Number(sh(`git -C ${repo} log --oneline ${baseSha}..rs/g${g} 2>/dev/null | wc -l`)); if (c > 0) commits = `${c} commits` }
-  const state = merged ? 'MERGED ✓' : repair ? `leaf ${leaf ? leaf[1] : '?'} repairing ${repair[1]}` : leaf ? `leaf ${leaf[1]} ${leaf[2]}` : 'starting'
-  return { g, state, commits, merged }
+  const merged = new RegExp(`Merge branch 'rs/g${g}'`).test(baseLog)
+  return { g, merged, state: merged ? 'MERGED ✓' : repair ? `leaf ${leaf ? leaf[1] : '?'} repairing ${repair[1]}` : leaf ? `leaf ${leaf[1]} ${leaf[2]}` : 'starting' }
 }
 const lanes = gids.map(lane)
+// SEQUENTIAL leaves carry NO gN: prefix — surface them too (else a single-lane run shows an empty Work).
+const seqLeaf = !gids.length ? lastMatch(/(?:^|[\s\]])leaf (\d+) (green|untrusted)/) : null
+const seqDone = !gids.length ? [...log.matchAll(/(?:^|[\s\]])leaf \d+ green/g)].length : 0
+// elapsed + per-ROLE timings, from the host's [+MM:SS] prefix and the ④ '· agent <role> <s>s' lines
+const tstamps = [...log.matchAll(/\[\+(\d{2}:\d{2})\]/g)]
+const elapsed = tstamps.length ? tstamps[tstamps.length - 1][1] : null
+const timings = lines.filter((l) => l.includes('· agent ')).slice(-8).map((l) => l.replace(/^\[\+[\d:]+\]\s*· agent /, ''))
 
 // ── render ─────────────────────────────────────────────────────────────────────────────────────
 const dot = (ok) => (ok ? '✓' : '·')
 const out = []
-const status = done ? `DONE (${done})` : alive ? (builds ? `ALIVE · building (${builds} compiler procs)` : 'ALIVE · between builds') : 'NOT RUNNING'
-out.push(`slice · ${repo.split('/').pop()} · ${status}` + (logAgeMs != null ? ` · last log ${mins(logAgeMs)} ago` : ''))
+const head = done ? `DONE (${done})` : alive ? (builds ? `building (${builds} compiler procs)` : 'between builds') : 'NOT RUNNING'
+out.push(`slice · ${repo.split('/').pop()} · ${head}` + (elapsed ? ` · +${elapsed}` : '') + (logAgeMs != null ? ` · last log ${mins(logAgeMs)} ago` : ''))
 out.push(`├─ Baseline ${dot(baselineDone)}`)
-out.push(`├─ Plan ${dot(!!planM || seq)}` + (planM ? ` · parallel: ${planM[1]} groups${casAware ? ' (CAS-aware: own dirs + shared cache)' : ''}` : seq ? ' · sequential' : ''))
-out.push(`├─ Work${lanes.length ? '' : ' · (no leaves yet)'}`)
-lanes.forEach((l, i) => out.push(`│  ${i === lanes.length - 1 ? '└' : '├'}─ g${l.g} · ${l.state}${l.commits ? ' · ' + l.commits : ''}`))
-const merges = (mainLog.match(/Merge branch 'rs\/g\d+'/g) || []).length
-out.push(`└─ Coordinate/Integrate ${dot(merges > 0)}` + (merges ? ` · ${merges}/${lanes.length || '?'} lane(s) merged` : ''))
-if (logAgeMs != null && logAgeMs > 15 * 60000 && !builds && alive && !done) out.push(`\n⚠ STUCK? log silent ${mins(logAgeMs)}, no build active, no completion — consider 'node run.mjs --cleanup --repo ${repo}' + investigate`)
-// recent events (tail of the leaf log)
-const recent = lines.filter((l) => /:(leaf|\+\d+ discovered)|Merge branch|GATE: green/.test(l)).slice(-4)
-if (recent.length) { out.push('\nrecent:'); recent.forEach((r) => out.push('  ' + r.slice(0, 96))) }
+const planned = !!planM || seq || !!seqLeaf || (baselineDone && /decompose|leaf \d+/.test(log))
+out.push(`├─ Plan ${dot(planned)}` + (planM ? ` · parallel: ${planM[1]} groups${casAware ? ' (CAS-aware)' : ''}` : baselineDone && !gids.length ? ' · sequential' : ''))
+if (lanes.length) {
+  out.push('├─ Work'); lanes.forEach((l, i) => out.push(`│  ${i === lanes.length - 1 ? '└' : '├'}─ g${l.g} · ${l.state}`))
+} else {
+  out.push(`├─ Work · ${seqLeaf ? `leaf ${seqLeaf[1]} ${seqLeaf[2]} (${seqDone} done)` : '(no leaves yet)'}`)
+}
+const merges = (baseLog.match(/Merge branch 'rs\/g\d+'/g) || []).length
+out.push(`└─ Coordinate/Integrate ${dot(!!done || (lanes.length > 0 && merges >= lanes.length))}` + (merges ? ` · ${merges} merged` : ''))
+if (logAgeMs != null && logAgeMs > 15 * 60000 && !builds && alive && !done) out.push(`\n⚠ STUCK? log silent ${mins(logAgeMs)}, no build, no completion`)
+if (timings.length) { out.push('\nrole timings (④, recent):'); timings.forEach((t) => out.push('  ' + t.slice(0, 90))) }
+const recent = lines.filter((l) => /leaf \d+ (green|untrusted)|\+\d+ discovered|Merge branch|GATE: green/.test(l)).slice(-4)
+if (recent.length) { out.push('\nrecent:'); recent.forEach((r) => out.push('  ' + r.slice(0, 100))) }
 console.log(out.join('\n'))
