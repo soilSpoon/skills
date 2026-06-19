@@ -63,7 +63,9 @@ export const R_SLICE =
   'Cut into THIN, VERTICAL, independently-verifiable ' +
   'slices — NEVER by horizontal layer. The hard rule: if a slice cannot be verified ALONE it is wrong; ' +
   'restructure the seams until it can. Each slice carries a self-contained contract (achieve + exact files/seam ' +
-  '+ invariant + how to verify ALONE) AND is written knowing its siblings so they never overlap. Set ' +
+  '+ invariant + how to verify ALONE + a one-line DEFINITION OF DONE: the specific OBSERVABLE condition that ' +
+  'proves this slice complete — a named passing test, a wired call site that invokes the new code, or a ' +
+  'measurable behavior; NOT a vague "implemented X") AND is written knowing its siblings so they never overlap. Set ' +
   '`independent`=true ONLY if the slice shares NO files with any sibling AND has no `dependsOn` prerequisites ' +
   '(both conditions required: a dependent slice cannot build in isolation even if file-disjoint). ' +
   'Note: when this role is called as the PARTITION planner for a parallel build, the caller\'s prompt ' +

@@ -409,7 +409,9 @@ async function runWork(rootTask: string, repo: string, startDepth: number, gid?:
     // ITEM 7: emit the leaf's cost/verdict profile line — the single richest trace record (carries the
     // leafIndex, the deterministic gateLevel from ITEM 1, the final trust verdict, and how many repairs it
     // took). This is exactly the per-leaf profile Lesson 8 needed a human to reconstruct from logs.
-    await trace({ phase: 'Work', role: `leaf-verify:${lbl}`, model: 'verify', leafIndex: i, gateLevel, trustworthy: verdict!.trustworthy, repairAttempt: attempt })
+    const lv = verdict!.lensVotes   // ITEM 7+: tier + (heavy) per-lens votes → measure heavy's marginal flip rate offline (no auto-prune)
+    await trace({ phase: 'Work', role: `leaf-verify:${lbl}`, model: 'verify', leafIndex: i, tier, gateLevel, trustworthy: verdict!.trustworthy, repairAttempt: attempt,
+      ...(lv ? { lensVotes: lv, flippedByLens: lv.some(v => v) && lv.some(v => !v) } : {}) })
 
     // An untrusted leaf (incl. a RED/tier-0 leaf with only uncommitted edits) must leave NOTHING behind.
     if (GIT && !verdict!.trustworthy) {

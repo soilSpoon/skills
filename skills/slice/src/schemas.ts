@@ -20,7 +20,7 @@ export const BASELINE = { type: 'object', required: ['invariants', 'measureComma
 const SLICE_ITEM = { type: 'object', required: ['desc', 'interface', 'contract'], properties: {
   desc: { type: 'string' },                                  // one-line what
   interface: { type: 'string' },                             // FIXED public surface — or "TBD/exploratory"
-  contract: { type: 'string' },                              // achieve + seam/files + invariant + how to verify ALONE
+  contract: { type: 'string' },                              // achieve + seam/files + invariant + how to verify ALONE + a one-line definition-of-done
   independent: { type: 'boolean' },                          // safe to build concurrently (no shared files)?
   dependsOn: { type: 'array', items: { type: 'integer' } },  // indices of prerequisite slices
   kind: { type: 'string', enum: ['tidy', 'behavior'] },      // ③ Tidy-First: 'tidy' = behavior-PRESERVING structural prep (verified by existing suite, no new tests); 'behavior' = the actual change
@@ -74,6 +74,10 @@ export const VERDICT = { type: 'object', required: ['trustworthy', 'reason'], pr
   purposeGap: { type: 'string' },                              // ① real-user behavior the tests do NOT verify (e.g. only fakes used) — prompt satisfied ≠ purpose served
   prescription: { type: 'string' },                            // I3: when untrustworthy and the fix is VISIBLE — the exact minimal fix (file:line + change); a precise prescription is what makes repair converge (proven live)
   followUps: { type: 'array', items: { type: 'string' } },     // I4: concrete, independently-testable defects worth a follow-up leaf even when trustworthy=true (NOT style nits) — fed into the discovered batch
+} }
+export const PRESENCE = { type: 'object', required: ['alreadyDone', 'evidence'], properties: {
+  alreadyDone: { type: 'boolean' },                            // STRONG-evidence-only: the unit's deliverable ALREADY exists AND a test exercises it; any doubt → false (a false true silently drops real work — the costliest error)
+  evidence: { type: 'string' },                                // file:line citations supporting the judgment
 } }
 export const MISSING = { type: 'object', required: ['missing'], properties: {
   missing: { type: 'array', items: { type: 'object', required: ['desc', 'contract'], properties: {

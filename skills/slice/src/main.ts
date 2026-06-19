@@ -1,7 +1,7 @@
 // NOTE: the runtime-required `export const meta = {...}` literal lives in tsup.config.ts
 // (banner) — a bundler would relocate an in-module export away from the top of the file.
 
-import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING } from './schemas'
+import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING, PRESENCE } from './schemas'
 import { R_BASELINE, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
 import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel, TraceRecord } from './types'
 import { b64encode, circuitBreaker, engineRanBlock } from './util'
@@ -442,6 +442,42 @@ if (goParallel) {
       log(`parallel plan: ${indep.length} independent group(s) + ${groups.seq.length} sequential`)
     } else log(`parallel requested but <2 independent top slices — falling back to sequential`)
   } else log(`parallel requested but root is not big enough to slice — falling back to sequential`)
+}
+
+// ANTI-SPRAWL PRUNE (parallel mode, conservative): before paying a cold-build worktree per group, cheaply
+// probe whether an independent group's deliverable is ALREADY satisfied in the baseline tree. A stale-backlog
+// group is the ONE place "a mis-slice costs TOKENS" is most expensive — a whole worktree build, not a re-roll —
+// and the per-leaf "search before you write" reflex fires only AFTER that cost is paid. PRUNE-ONLY: a group is
+// dropped solely on STRONG already-done evidence; any doubt keeps it. Never gates on a human. Wrapped so any
+// probe failure degrades to current behavior (keep every group). Only `groups.indep` is filtered — `groups.all`
+// (and the dependsOn indices into it) and `groups.seq` are untouched; a pruned group's existing code already
+// satisfies any sequential dependent.
+{
+  const g = groups
+  if (g && g.indep.length >= 2) {
+    try {
+      const present = await parallel(g.indep.map(s => async () => {
+        const r = await agentSafe<{ alreadyDone: boolean; evidence: string }>(
+          `You are an ANTI-SPRAWL probe. Using ONLY the native Read/Grep/Glob tools on the repository at ${REPO}, ` +
+          `judge whether this unit of work is ALREADY FULLY implemented AND already covered by an existing test in ` +
+          `the CURRENT tree — i.e. building it would merely re-implement code that already exists (wasted work).\n` +
+          `Unit: ${s.desc}\nContract: ${s.contract}\n\n` +
+          `Answer alreadyDone:true ONLY with STRONG, CONCRETE evidence (cite file:line) that EVERY part of the ` +
+          `deliverable already exists AND a test already exercises it. ANY uncertainty, ANY missing piece, ANY ` +
+          `absent test → alreadyDone:false. A false 'alreadyDone' silently DROPS real work and is the costliest ` +
+          `possible error here — when in ANY doubt, answer false.`,
+          { phase: 'Plan', label: `presence:${s.desc.slice(0, 18)}`, model: 'sonnet', schema: PRESENCE })
+        return r.ok ? r.value : { alreadyDone: false, evidence: 'probe unavailable — kept' }
+      }))
+      const keptIndep = g.indep.filter((_, i) => !(present[i]?.alreadyDone))
+      const droppedCount = g.indep.length - keptIndep.length
+      if (droppedCount > 0) {
+        g.indep.forEach((s, i) => { if (present[i]?.alreadyDone) log(`anti-sprawl: group "${s.desc.slice(0, 50)}" already satisfied in baseline — SKIPPED (no worktree built). Evidence: ${(present[i]?.evidence || '').slice(0, 160)}`) })
+        if (keptIndep.length >= 2) { groups = { indep: keptIndep, seq: g.seq, all: g.all }; log(`anti-sprawl: pruned ${droppedCount} already-done group(s); ${keptIndep.length} independent group(s) remain`) }
+        else { log(`anti-sprawl: pruning would leave <2 independent groups → falling back to SEQUENTIAL (the leaf-level search-before-write reflex backstops the remaining work)`); groups = null }
+      }
+    } catch (e) { log(`anti-sprawl probe errored (${String(e).slice(0, 80)}) — keeping all groups (no prune)`) }
+  }
 }
 
 // =============================================================================

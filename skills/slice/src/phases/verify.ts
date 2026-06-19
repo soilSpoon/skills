@@ -107,6 +107,7 @@ export const makeVerifyLeaf = (d: VerifyDeps) => {
       purposeGap: votes.map(v => v.purposeGap).filter(Boolean).join('; ') || undefined,   // ① don't drop a hard-leaf purpose gap
       prescription: votes.map(v => v.prescription).filter(Boolean).join(' | ') || undefined,   // I3: lens prescriptions feed repair
       followUps: votes.flatMap(v => v.followUps || []),                                        // I4: lens follow-ups feed the batch
+      lensVotes: votes.map(v => v.trustworthy),                                                 // per-lens votes → traced for offline measurement of heavy's marginal flip rate vs standard
     }
   }
   const r = await agentSafe<Verdict>(base, { phase: 'Work', label: `verify:${lbl}`, schema: VERDICT })

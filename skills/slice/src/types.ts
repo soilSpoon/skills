@@ -78,6 +78,7 @@ export interface Verdict {
   purposeGap?: string
   prescription?: string
   followUps?: string[]
+  lensVotes?: boolean[]   // heavy tier only: per-lens trust votes [correctness, security, interface-drift] — recorded by the trace so heavy's marginal flip rate vs standard can be measured offline (never auto-acted on)
 }
 export interface ShResult { stdout?: string; exitCode: number }
 /** One item on the explicit recursion stack. */
@@ -164,6 +165,9 @@ export type TraceRecord = {
   gateLevel?: GateLevel
   trustworthy?: boolean
   repairAttempt?: number
+  tier?: RiskTier               // the leaf's verification tier — lets flip/abandon rates be bucketed by tier offline
+  lensVotes?: boolean[]         // heavy tier only: the 3 per-lens votes, recorded BEFORE the unanimous collapse
+  flippedByLens?: boolean       // heavy only: lenses disagreed (>=1 trust AND >=1 distrust) — a single-vote tier might have passed it (heavy's marginal catch)
 }
 // Cohesive parameter-objects threaded into phases (introduce-parameter-object — collapses the flat
 // 17-26 dep bags into named bundles that travel together: the run's tuning limits, and the git/repo context).
