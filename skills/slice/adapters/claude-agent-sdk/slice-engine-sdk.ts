@@ -38,13 +38,14 @@ export const shNative = (prompt: string, cwd: string): Promise<{ stdout: string;
     child.stdout?.on("data", push)
     child.stderr?.on("data", push)
 
-    // 60-min timeout → group-kill (reaps the whole xcodebuild→XCBBuildService→swift-frontend TREE).
+    // 80-min timeout → group-kill (reaps the whole xcodebuild→XCBBuildService→swift-frontend TREE).
     // HARD CEILING for the slowest legitimate command: a project's full-suite integration gate. MailKit's
-    // WebKit-heavy suite reaches ~33-45 min and was wedging the old 30-min ceiling. Set ABOVE the rig's
-    // own wall-clock watchdog (scripts/test.sh, ~55 min) so a TEST hang is killed cleanly there first
-    // (clean "GATE: RED"); this 60-min ceiling is the engine-side backstop for any OTHER command
-    // (build/git) that genuinely hangs. A faster project never reaches it — fast commands exit fast.
-    const timer = setTimeout(() => { try { process.kill(-(child.pid as number), "SIGTERM") } catch {} }, 60 * 60_000)
+    // WebKit-heavy suite MEASURED ~55-60 min (warm CAS — it's the WKWebView test tail, not the build) and
+    // was wedging the old 30-min ceiling. Set ABOVE the rig's own wall-clock watchdog (scripts/test.sh,
+    // ~75 min) so a TEST hang is killed cleanly there first (clean "GATE: RED"); this 80-min ceiling is the
+    // engine-side backstop for any OTHER command (build/git) that genuinely hangs. A faster project never
+    // reaches it. (This is a band-aid for a slow gate — the real fix is cutting that suite's WebKit cost.)
+    const timer = setTimeout(() => { try { process.kill(-(child.pid as number), "SIGTERM") } catch {} }, 80 * 60_000)
 
     const finish = (code: number) => { clearTimeout(timer); untrack(); resolve({ stdout: out, exitCode: code }) }
     child.on("close", (code, signal) => finish(typeof code === "number" ? code : signal ? 1 : 0))
