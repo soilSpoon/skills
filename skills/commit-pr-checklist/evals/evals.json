@@ -1,0 +1,29 @@
+{
+  "skill_name": "commit-pr-checklist",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "방금 결제 환불 로직 고친 거 커밋하려고 하는데 staged 된 거 한번 봐주고 커밋 메시지도 써줘. 우리 레포 컨벤션대로 맞춰줘.",
+      "expected_output": "staged diff를 hunk 단위로 리뷰(G1), stray/secret/debug/churn 점검(G2), git log/gh pr list로 레포 커밋 관례를 도출해 그 형식으로 메시지 작성. 휘발성 정보 없음. 코드 품질은 code-fundamentals로 위임 언급.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "이 PR 올리기 전에 점검해줘. React 컴포넌트 새로 만들었고 useReducer 훅도 추가했어. 테스트도 봐주고 PR 본문도 써줘.",
+      "expected_output": "6게이트 순서 진행. FE라 네 렌즈 함께 — code-fundamentals + toss-frontend-fundamentals + vercel-react-best-practices(성능) + vercel-composition-patterns(합성 API). 유닛/피처 테스트가 스펙-중심인지 test-foundations·spec-first로 위임, PR 본문은 레포 관례+technical-writing으로 왜>무엇. 디버그 잔여·관련없는 churn 점검.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "커밋 메시지에 'Phase 2 리팩토링, 어제 논의한 wf_3a9f1c 기준 임시로 처리, 현재는 잘 됨' 이렇게 썼는데 이대로 올려도 될까?",
+      "expected_output": "durability filter(G6) 발동 — 작업 과정(Phase 2)·휘발성 식별자(wf_…·어제 논의)·시간 상대어(현재는)·임시 표현을 전부 무시간 결과+이유로 재작성하라고 지적.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "오타 하나 고쳤어(주석 띄어쓰기). 바로 커밋해도 되지?",
+      "expected_output": "proportional — 전체 6게이트 의식 불필요. diff 한 번 보고 메시지만 관례대로. 단 기본 브랜치 직접 커밋 여부, 시크릿/산출물 바닥 점검만 가볍게.",
+      "files": []
+    }
+  ]
+}
