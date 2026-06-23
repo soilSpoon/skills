@@ -8,7 +8,7 @@ engineering workflow with day-to-day dev, job-hunt, and research skills.
 ```
 /plugin marketplace add soilSpoon/skills
 /plugin install slice@soilspoon-skills            # trust-first decomposition workflow (+4 role agents)
-/plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, technical writing, build-config drift, root-cause workflow
+/plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, technical & UX writing, build-config drift, root-cause workflow
 /plugin install job-hunt@soilspoon-skills         # resume tailoring, Wishket applications
 /plugin install research-tools@soilspoon-skills   # fact-checking, human-like browser automation
 ```
@@ -24,7 +24,7 @@ size budgets and structure rules that keep this repo lean.
 
 ## Plugins & Skills
 
-Four plugins bundle ten skills. Pick a plugin for the whole set, or install any skill on its own.
+Four plugins bundle eleven skills. Pick a plugin for the whole set, or install any skill on its own.
 
 | Plugin | Skills | For |
 |---|---|---|
@@ -64,8 +64,8 @@ npx skills add soilSpoon/skills@slice
 
 ## dev-toolkit
 
-Engineering fundamentals and diagnostics. Five skills that review code quality, enforce frontend
-fundamentals, sharpen technical writing, and trace why something is broken at runtime even when static checks pass.
+Engineering fundamentals and diagnostics. Six skills that review code quality, enforce frontend
+fundamentals, sharpen technical and UX writing, and trace why something is broken at runtime even when static checks pass.
 
 ### code-fundamentals
 
