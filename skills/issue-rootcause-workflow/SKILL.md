@@ -1,6 +1,6 @@
 ---
 name: issue-rootcause-workflow
-description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원인까지 도달하기 위한 6원칙 워크플로 — invariant 명문화, workaround vs root fix 의식, A/B 검증(가설 도달 검증 포함), 모순 신뢰, 최근 변경 + 두 path 대조. 트리거 - (1) "이거 왜 안 되지", "버그 추적", "회귀 분석", "근본 원인 찾기", "rootcause", (2) "이 fix 검증해줘", "이 패치가 진짜 고치는지", "A/B 테스트", (3) compiler/runtime/lib/infra 패치 PR 리뷰, (4) "테스트는 통과하는데 실제론 안 됨" 같은 false positive 의심, (5) "옵션 추가했는데 효과 없음" 같은 가설-도달 의심, (6) workaround만 쌓이고 같은 버그가 반복되는 상황, (7) 인시던트 포스트모템·ADR 작성. 컴파일러/런타임/인프라 한정이 아니라 자료구조 invariant·외부 시스템 호출·다단 toolchain·이중 경로 마이그레이션 어디든 적용.
+description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원인까지 도달하기 위한 6원칙 워크플로 — invariant 명문화, workaround vs root fix 의식, A/B 검증(가설 도달 검증 포함), 모순 신뢰, 최근 변경 + 두 path 대조. 트리거 - (1) "이거 왜 안 되지", "버그 추적", "회귀 분석", "근본 원인 찾기", "rootcause", (2) "이 fix 검증해줘", "이 패치가 진짜 고치는지", "A/B 테스트", (3) compiler/runtime/lib/infra 패치 PR 리뷰, (4) "테스트는 통과하는데 실제론 안 됨" 같은 false positive 의심, (5) "옵션 추가했는데 효과 없음" 같은 가설-도달 의심, (6) workaround만 쌓이고 같은 버그가 반복되는 상황, (7) 인시던트 포스트모템·ADR 작성, (8) "측정했는데 변화 없음/repro 안 됨" 같은 false negative 의심 — 측정 도구가 굶었거나(메인스레드 폴러) 엉뚱한 관측값을 봤을 때, 정적 스냅샷으로 과정을 판정할 때. 컴파일러/런타임/인프라 한정이 아니라 자료구조 invariant·외부 시스템 호출·다단 toolchain·이중 경로 마이그레이션·UI 레이아웃·측정 신뢰성 어디든 적용.
 ---
 
 # Issue Rootcause Workflow
@@ -19,6 +19,7 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 | 6 | 최근 변경 + 두 path 대조 | git log + working/broken, before/after |
 | 7 | Mechanism trace > blind variation | 표면 변형 5+ round 0 결과 → source patch + dump 로 전환. "X-specific"/"한계" 결론은 게으른 답. |
 | 8 | Variable enumeration & causal mapping | 분석 시작 전 *어떤 변수* 가 시스템에 영향 주는지 8 카테고리 (Surface/Composition/Order/Boundary/Format/Timing/Linkage/Environment) 훑기. 각 변수에 causal chain 가설. **모든 원칙의 prerequisite** — list 가 부족하면 #1–#7 모두 헛돈다. |
+| 9 | 측정 도구·관측 대상 의심 | "변화 없음/repro 안 됨"(false negative)은 *도구가 굶었거나*(메인스레드 폴러로 메인스레드 막힘 측정) *엉뚱한 관측값*(width 만 보고 위치 변화 놓침)이 원인. confound 밖 도구(CDP 스크린캐스트 등)로 재측정 + 관측값 enumerate + 의심 API 패치+stack. #5 의 false-negative 특수형. |
 
 자세한 정의·발동 신호·체크리스트·트레이드오프는 [principles.md](references/principles.md).
 
@@ -64,6 +65,10 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 | **새 시스템/도메인 분석 시작** — 변수 list 처음 만드는 단계 | #8 (taxonomy 8 카테고리 훑기 + causal chain 가설) | [principles.md #8](references/principles.md) |
 | **N round 변형 시도 후 "이 변수만 다르고 결과 같다"** 결론 | #8 (변수와 값 혼동 안티패턴 B — axis 다양성 vs 값 다양성) | [principles.md #8](references/principles.md) |
 | 변형 시도가 *causal chain 가설 없이* 진행 — "vtable size 늘려보자" 같은 blind | #8 (변수 → mechanism → 결과 가설 강제) | [principles.md #8](references/principles.md) |
+| **"측정했는데 안 변함 / 애니메이션 없음 / repro 안 됨"** 결론 직전 | #9 (도구가 굶었나 + 옳은 관측값인가 — false negative 의심) | [principles.md #9](references/principles.md), [case-browser-layout-shift.md](references/case-browser-layout-shift.md) |
+| 측정 도구가 피측정 시스템과 *같은 자원* 공유 (rAF/메인스레드 폴러로 무거운 구간 측정, 앱 위 계측, 프로파일러 aliasing) | #9 (confound 밖 도구로 재측정 — CDP 스크린캐스트·tcpdump·외부 샘플러) | [principles.md #9](references/principles.md) |
+| 동작 *끝난 뒤* 정적 스냅샷(스크린샷·로그 한 장)으로 *과정*을 판정 | #9 (과정 캡처 — 스크린캐스트·비디오·큐잉 이벤트) | [principles.md #9](references/principles.md) |
+| 브라우저 런타임에서 "누가 이 API 를 호출하나" (recompile 불가) | #9·#7 (프로토타입 메서드 patch + stack trace = 런타임 mechanism trace) | [principles.md #9](references/principles.md), [case-browser-layout-shift.md](references/case-browser-layout-shift.md) |
 | 인시던트 포스트모템 / ADR 작성 | (출력 형식) | [output-templates.md](references/output-templates.md) |
 
 ## 출력 형식 (조사 결과 보고)
@@ -128,11 +133,20 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 - `[SHOULD]` 변형 부피 = *axis 다양성* 인지 *값 다양성* 인지 점검 (anti-pattern B: 변수와 값 혼동 — vtable size 4/30/31 = 1 axis 의 3 값)
 - `[SHOULD]` 5 round 마다 변수 list 재검토 + brainstorm
 
+**측정 도구·관측 대상 (#9) — false negative 결론 직전**
+- `[MUST]` "변화 없음 / repro 안 됨" 결론 전에 *측정 도구가 피측정 시스템과 자원을 공유해 굶지 않았는지* 의심했는가 (rAF/메인스레드 폴러로 메인스레드 막힘 구간 측정 등)
+- `[MUST]` confound *밖*의 도구로 1회 재측정했는가 (CDP 스크린캐스트·비디오·큐잉 이벤트·외부 샘플러)
+- `[MUST]` 가정한 속성 하나가 아니라 *변할 수 있는 관측값*을 enumerate 했는가 (위치/스크롤/transform/opacity/size — "width 고정 ≠ 안 움직임")
+- `[SHOULD]` 동작 *끝난 뒤* 정적 스냅샷이 아니라 *과정*을 캡처했는가
+- `[SHOULD]` 호출자 미상이면 의심 API 를 패치 + stack trace 로 특정했는가 (recompile 불가 런타임의 mechanism trace)
+
 ## 케이스 스터디 — 이번 워크플로의 기원
 
 LLVM PR #194184 검증 (VTK 9.6.1 standardized-EH crash). 6원칙 각각이 어느 turning point에서 발동했는지 시간순 매핑 + 두 PR 비교(workaround vs root fix) + 외부 컨트리뷰터가 root cause에 도달하기 위한 가이드: [case-llvm-vtk.md](references/case-llvm-vtk.md).
 
 특히 **#5 (모순 신뢰)** 가 결정적이었던 사례 — "baseline이 통과해야 할 때 통과하지 않았는데, 그걸 그대로 받아들이지 않고 *실험 먼저 의심*한 사용자의 한 줄 질문이 false positive 검증을 캐치"한 부분 참조.
+
+**#9 (측정 도구·관측 대상 의심)** 의 기원 — 우측 도크 열 때 좌측 패널이 가로로 밀리는 버그를, 처음엔 rAF 로 *폭만* 재서 "변화 없음"으로 오판했다가, confound 밖 도구(CDP 스크린캐스트)와 옳은 관측값(left 좌표·부모 scrollLeft) + `scrollIntoView` 패치로 root cause 에 도달한 사례: [case-browser-layout-shift.md](references/case-browser-layout-shift.md).
 
 ## 주의 사항
 
