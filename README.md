@@ -11,6 +11,7 @@ engineering workflow with day-to-day dev, job-hunt, and research skills.
 /plugin install dev-toolkit@soilspoon-skills      # code & frontend fundamentals, technical & UX writing, build-config drift, root-cause workflow
 /plugin install job-hunt@soilspoon-skills         # resume tailoring, Wishket applications
 /plugin install research-tools@soilspoon-skills   # fact-checking, human-like browser automation
+/plugin install reliability-kit@soilspoon-skills  # 4-layer test rig (L0–L3) + spec-first acceptance lists
 ```
 
 Every skill also installs standalone in any `SKILL.md`-compatible tool (Claude Code, opencode, …):
@@ -24,14 +25,15 @@ size budgets and structure rules that keep this repo lean.
 
 ## Plugins & Skills
 
-Four plugins bundle eleven skills. Pick a plugin for the whole set, or install any skill on its own.
+Five plugins bundle fourteen skills. Pick a plugin for the whole set, or install any skill on its own.
 
 | Plugin | Skills | For |
 |---|---|---|
 | [`slice`](#slice) | `slice` (+5 agents) | Decomposing big/risky/vague coding tasks into verifiable slices |
-| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical & UX writing, build/runtime diagnostics |
+| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `commit-pr-checklist`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical & UX writing, pre-ship checklist, build/runtime diagnostics |
 | [`job-hunt`](#job-hunt) | `tailor-resume`, `apply-wishket` | Resume tailoring and freelance-project applications |
 | [`research-tools`](#research-tools) | `fact-check`, `human-like-browser` | Verifying content and driving the browser undetected |
+| [`reliability-kit`](#reliability-kit) | `test-foundations`, `spec-first` | Trustworthy 4-layer test rigs and spec-first acceptance lists |
 
 ---
 
@@ -64,8 +66,8 @@ npx skills add soilSpoon/skills@slice
 
 ## dev-toolkit
 
-Engineering fundamentals and diagnostics. Six skills that review code quality, enforce frontend
-fundamentals, sharpen technical and UX writing, and trace why something is broken at runtime even when static checks pass.
+Engineering fundamentals and diagnostics. Seven skills that review code quality, enforce frontend
+fundamentals, sharpen technical and UX writing, gate commits/PRs before they ship, and trace why something is broken at runtime even when static checks pass.
 
 ### code-fundamentals
 
@@ -139,6 +141,24 @@ npx skills add soilSpoon/skills@ux-writing
 - i18n hygiene: catch hardcoded English bypassing `t()`, en↔ko drift, 한영 혼용, terminology & tone inconsistency
 - Progressive-loads only the relevant `references/` (principles, ux-rules, error-messages, marketing-copy, review-checklist)
 - Pairs with `technical-writing` (prose docs) and `toss-frontend-fundamentals` (a11y/selectors) — UI copy uses all three
+
+### commit-pr-checklist
+
+A pre-ship gate orchestrator — before you commit, push, or open a PR, it asks "is this shippable?",
+checking *what goes in* (only the needed change, a clean diff) and *how it's explained* (repo
+conventions + reader-first), and delegates the actual verdicts to sibling skills.
+
+```bash
+npx skills add soilSpoon/skills@commit-pr-checklist
+```
+
+**What it does:**
+- Self-reviews the staged diff: no stray files, secrets, debug code, or unrelated churn — only the needed change
+- Derives commit/PR format from the repo's own history instead of imposing a template
+- Commits/PRs are permanent records — keeps the result and its justification, drops the *process* (phases, attempts, run IDs, "as of today")
+- Confirms unit/feature tests are spec-centered before shipping
+- Delegates judgment to siblings — code to `code-fundamentals` (+ `toss-frontend-fundamentals` for UI), tests to `test-foundations`, spec variants to `spec-first`, prose to `technical-writing`
+- Proportional: skips itself for one-line fixes; this gate decides *when and in what order* to call the others
 
 ### build-config-drift
 
@@ -258,6 +278,44 @@ npx skills add soilSpoon/skills@human-like-browser
 
 **Bundled scripts:**
 - `scripts/human-behavior.js` — initialization block reference (paste into Playwright `browser_run_code`)
+
+---
+
+## reliability-kit
+
+### test-foundations
+
+Diagnose → scaffold → guide a trustworthy 4-layer test rig (L0 quality · L1 unit · L2 integration ·
+L3 E2E), optimized on both axes at once: reliability = quality × speed.
+
+```bash
+npx skills add soilSpoon/skills@test-foundations
+```
+
+**What it does:**
+- Language/library-adaptive (JS/TS, Python, Go, Rust + detection to extend)
+- Exposes a single `verify` entry that abstracts tool choice — the `slice` baseliner adopts it as its measure/filter command
+- Rebalances the pyramid: catches slow or flaky rigs and over/under-weighted layers
+- Scope-floor discipline: only the *relevant* layers always; E2E *only when there's a user journey*
+- Pins an `issue-rootcause-workflow` invariant as a regression test (the recurrence seam)
+- Owns the rig only — code-quality judgment is `code-fundamentals`, a11y/E2E selectors are `toss-frontend-fundamentals`
+
+### spec-first
+
+Turn a fuzzy/big/underspecified request into the real problem + a falsifiable acceptance test-list +
+a now/punt cut — the front of the trust loop, where a senior de-risks ambiguity.
+
+```bash
+npx skills add soilSpoon/skills@spec-first
+```
+
+**What it does:**
+- Each item is a single falsifiable + deterministic behavior claim, not an implementation design
+- Maps every claim to a `test-foundations` layer (L0–L3) and emits a filename-safe `proposedTestName` token
+- Feeds `slice` a sharpened task + scope tokens (and a recurrence handle)
+- Makes the now/punt cut explicit — what to build now, what to defer
+- Owns WHAT-to-test only — HOW/WHERE-it-runs is `test-foundations`, slicing/execution is `slice`, post-hoc root cause is `issue-rootcause-workflow`
+- Proportional: not for a fix already diagnosed to one line
 
 ## License
 
