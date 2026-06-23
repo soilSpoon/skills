@@ -29,7 +29,7 @@ Four plugins bundle ten skills. Pick a plugin for the whole set, or install any 
 | Plugin | Skills | For |
 |---|---|---|
 | [`slice`](#slice) | `slice` (+5 agents) | Decomposing big/risky/vague coding tasks into verifiable slices |
-| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical writing, build/runtime diagnostics |
+| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical & UX writing, build/runtime diagnostics |
 | [`job-hunt`](#job-hunt) | `tailor-resume`, `apply-wishket` | Resume tailoring and freelance-project applications |
 | [`research-tools`](#research-tools) | `fact-check`, `human-like-browser` | Verifying content and driving the browser undetected |
 
@@ -121,6 +121,24 @@ npx skills add soilSpoon/skills@technical-writing
 - Korean-specific sentence rules (active voice, drop 한자어/번역체, abbreviation-on-first-use, loanword-by-frequency)
 - Progressive-loads only the relevant `references/` (document-types, information-structure, sentence-craft, review-checklist, applied-contexts)
 - Pairs with `code-fundamentals` — that cuts the cost of reading *code*, this cuts the cost of reading *docs/PRs/commits*
+
+### ux-writing
+
+Toss's product-writing philosophy — the 8 writing principles (5 core values), the UX-writing guide,
+the 6 error-message principles, and the 6 marketing-copy principles — to write and review **product
+microcopy**: buttons, errors/toasts, empty states, form labels, marketing copy, and i18n messages.
+
+```bash
+npx skills add soilSpoon/skills@ux-writing
+```
+
+**What it does:**
+- Targets in-screen microcopy, not prose docs — buttons/CTAs, error & validation messages, toast vs dialog, empty/loading states, tooltips, aria-label text, marketing/push copy, and en/ko i18n
+- The single root: flip supplier/developer-centered copy to user-centered — every error carries the *next action* (Navigating), and internal terms (engine·OCCT·FaceID·Bonded·solid) never leak to users
+- Korean mechanical rules (해요체, active & positive voice, drop 과잉 존대/명사 나열, button "닫기" not "취소"), with Toss's own exception table so rules stay heuristics
+- i18n hygiene: catch hardcoded English bypassing `t()`, en↔ko drift, 한영 혼용, terminology & tone inconsistency
+- Progressive-loads only the relevant `references/` (principles, ux-rules, error-messages, marketing-copy, review-checklist)
+- Pairs with `technical-writing` (prose docs) and `toss-frontend-fundamentals` (a11y/selectors) — UI copy uses all three
 
 ### build-config-drift
 

@@ -15,7 +15,7 @@
     },
     {
       "name": "dev-toolkit",
-      "description": "Engineering fundamentals & diagnostics: language-agnostic code-quality core (가독성/예측가능성/응집도/결합도), Toss frontend fundamentals (a11y/React/디자인토큰), Toss technical writing (문서유형/정보구조/문장 다듬기), commit/PR pre-ship checklist (diff 위생·레포 관례 메시지·기록 내구성), build-config drift detection, issue root-cause workflow.",
+      "description": "Engineering fundamentals & diagnostics: language-agnostic code-quality core (가독성/예측가능성/응집도/결합도), Toss frontend fundamentals (a11y/React/디자인토큰), Toss technical writing (문서유형/정보구조/문장 다듬기), Toss UX writing (제품 마이크로카피·버튼·에러·마케팅 카피·i18n 톤), commit/PR pre-ship checklist (diff 위생·레포 관례 메시지·기록 내구성), build-config drift detection, issue root-cause workflow.",
       "source": "./plugins/dev-toolkit"
     },
     {
