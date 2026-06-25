@@ -16,24 +16,14 @@
 
 ## 표준 워크플로 (private 레포)
 
-### 1) PNG는 feature 브랜치에 커밋 (증거 보관)
+### 1) PNG는 로컬에만 보관 — **레포에 커밋하지 않음**
 
-코드 PR과 **같은 feature 브랜치**에 스크린샷만 모은 별도 커밋을 권장한다.
-
-```
-.github/pr-assets/<slug>/
-  before-landing.png
-  after-landing.png
-  before-dashboard.png
-  after-dashboard.png
-  ...
-```
+스크린샷은 worktree·`/tmp` 등 **로컬 경로**에만 둔다. `.github/pr-assets/` 는
+`.gitignore` 대상이며 feature 브랜치에 PNG를 커밋하지 않는다.
 
 - 파일명: `before-<화면>.png` / `after-<화면>.png` (kebab-case)
 - 대표 화면 2~3곳 (랜딩·대시보드·워크벤치 등), 동일 뷰포트·동일 상태
 - before = base/main 앱 한 포트, after = worktree/feature 앱 다른 포트
-
-브랜치 커밋은 **리뷰·감사용 아카이브**다. PR 본문 `![...]()` 인라인 URL로는 쓰지 않는다.
 
 ### 2) PR 본문 — **`gh-image` 인라인 임베드** (기본)
 
@@ -123,7 +113,7 @@ bash scripts/pr-inline-images.sh \
 ## 체크리스트
 
 - [ ] before/after가 같은 뷰포트·화면·상태에서 찍혔는가
-- [ ] PNG가 **feature 브랜치** `.github/pr-assets/<slug>/` 에 커밋됐는가
+- [ ] PNG가 **레포에 커밋되지 않았는가** (로컬만, `.github/pr-assets/` 금지)
 - [ ] PR 본문이 **`gh-image` `user-attachments` 인라인**인가 (기본)
 - [ ] `gh image check-token` 이 통과했는가
 - [ ] 세션 없을 때만 blob 링크 테이블 폴백을 썼는가
