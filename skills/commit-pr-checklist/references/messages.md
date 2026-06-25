@@ -57,6 +57,11 @@ Closes #<이슈>   ← 레포가 이슈를 거는 관례면
 PR도 같은 골격 + 레포 템플릿 섹션을 채운다. 버그 fix엔 회귀 테스트, 성능 PR엔 before/after
 수치를 (프론트 규범은 toss-frontend 담당) — 없으면 *없는 이유*를 적는다.
 
+**프론트·UI 시각 변경** — before/after 스크린샷을 PR 본문에 넣는다. PNG는 feature 브랜치
+`.github/pr-assets/<slug>/`에 커밋하고, 본문에는 **상대 경로**만 쓴다. `raw.githubusercontent.com`·
+`gh-attach-assets` orphan URL은 private 레포에서 깨지므로 쓰지 않는다. 절차는
+[pr-visual-evidence.md](pr-visual-evidence.md).
+
 ## 4. durability filter를 메시지에 (G6)
 
 영구 기록에 휘발성 정보를 박지 않는다. 시간이 지나면 거짓이 되거나 잡음인 것을 뺀다.
