@@ -82,11 +82,11 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
    변경이 푸는 문제) > **무엇**(diff가 이미 말함) > 리스크·breaking change·리뷰어가 검증하는
    법. 공개 API breaking이면 마이그레이션 노트(프론트면 codemod까지 — toss-frontend 담당).
 4. **프론트·UI 시각 증거** — 폰트·레이아웃·스타일 등 *화면이 바뀌는* PR이면 before/after
-   스크린샷을 본문에 포함한다. **feature 브랜치**에 `.github/pr-assets/<slug>/` 로 PNG를
-   커밋하고, PR 본문에는 **상대 경로**만 쓴다 (`![before](.github/pr-assets/.../before.png)`).
-   `raw.githubusercontent.com`·`gh-attach-assets` orphan 브랜치 URL·임시 release URL은
-   private 레포에서 엑스박스(404)나 레포 오염을 낳으므로 **PR 본문에 넣지 않는다**. 캡처 절차·
-   금지 목록은 [references/pr-visual-evidence.md](references/pr-visual-evidence.md).
+   스크린샷을 남긴다. PNG는 **feature 브랜치** `.github/pr-assets/<slug>/` 에 커밋(코드와
+   분리 커밋 권장). **private 레포 PR 본문**에는 `![...]()` 인라인이 아니라 **blob 링크
+   테이블**로 첨부한다(클릭 시 GitHub에서 이미지 열림 — 엑스박스 없음). 인라인 미리보기가
+   꼭 필요하면 GitHub 웹에서 드래그앤드롭(`user-attachments`)만 쓴다. `raw.githubusercontent.com`·
+   상대 경로 임베드·orphan 브랜치 URL은 금지. [pr-visual-evidence.md](references/pr-visual-evidence.md).
 
 > 1줄 감각: `Phase 2 임시로 우회, 현재는 잘 됨` → `fix(auth): 토큰 만료 시 재시도 — 상류
 > race 회피`(과정·시간어를 벗고, 무엇 + 왜만).
@@ -136,8 +136,8 @@ durability filter(G6). 판정은 전부 defer한다.
   (되돌릴 수 있는 단위) · 무관한 churn(포맷·재정렬) 비포함
 - `[SHOULD]` 메시지 형식·트레일러(`Co-authored-by`/sign-off)가 레포 관례와 일치(`git log`/
   `gh pr list`에서 도출) · 본문이 *왜* > 무엇 · breaking change·리스크·검증법 명시 · CI green 예상
-- `[SHOULD]` UI·타이포·레이아웃 변경 PR — before/after를 feature 브랜치 `.github/pr-assets/`에
-  커밋하고 본문은 상대 경로만 (외부 raw·orphan 브랜치 URL 금지 — [pr-visual-evidence](references/pr-visual-evidence.md))
+- `[SHOULD]` UI·타이포·레이아웃 변경 PR — before/after PNG를 feature 브랜치 `.github/pr-assets/`에
+  커밋하고 본문은 **blob 링크 테이블** (`![...]()` 인라인·raw URL 금지 — [pr-visual-evidence](references/pr-visual-evidence.md))
 - `[SHOULD]` 기본 브랜치에 직접 커밋 안 함(브랜치 먼저) · 주석은 최소 + 기존 밀도/스타일에 맞춤
 
 ## 주의 / 비목표
