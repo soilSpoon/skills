@@ -41,15 +41,25 @@ private 레포 PR 설명에서 인라인 미리보기가 필요하면 **[`gh-ima
 로 `user-attachments` URL을 얻는다. 웹 드래그앤드롭과 동일한 URL이며, 로그인한 org 멤버에게
 본문에 바로 렌더된다.
 
-**사전 조건**
+**사전 조건 (한 번만 — 이후 headless)**
+
+업로드 자체는 브라우저 없이 동작한다. 필요한 건 `user_session` **값**이며, 최초 1회만
+구하면 된다.
 
 ```bash
 gh extension install drogers0/gh-image
-export GH_SESSION_TOKEN="$(gh image extract-token)"   # 로컬: github.com 브라우저 로그인
-gh image check-token                                  # username 확인
+
+# A) 호스트 Mac 터미널 (Docker 밖 — Chrome에 github.com 로그인된 상태)
+gh image extract-token > ~/.config/gh/image-session && chmod 600 ~/.config/gh/image-session
+
+# B) 또는 DevTools → Application → Cookies → github.com → user_session Value
+
+# 이후 Docker/CI/에이전트 (headless)
+gh image check-token   # username 확인
 ```
 
-headless/CI에서는 `GH_SESSION_TOKEN`을 환경 시크릿으로 주입한다(전용 bot 계정 권장).
+`~/.config/gh/` 는 devcontainer bind mount 대상이면 호스트에 저장한 토큰이 컨테이너에서도
+보인다. CI에서는 `GH_SESSION_TOKEN` 환경 시크릿(전용 bot 계정 권장).
 
 **단일 이미지**
 

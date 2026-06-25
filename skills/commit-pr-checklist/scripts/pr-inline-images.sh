@@ -59,10 +59,17 @@ if ! gh image --version >/dev/null 2>&1; then
   gh extension install drogers0/gh-image
 fi
 
+if [ -z "${GH_SESSION_TOKEN:-}" ] && [ -f "$HOME/.config/gh/image-session" ]; then
+  GH_SESSION_TOKEN=$(tr -d '[:space:]' <"$HOME/.config/gh/image-session")
+  export GH_SESSION_TOKEN
+fi
+
 if ! gh image check-token >/dev/null 2>&1; then
-  echo "gh-image 인증 실패 — 브라우저 github.com 로그인 또는 GH_SESSION_TOKEN 이 필요하다" >&2
-  echo "  export GH_SESSION_TOKEN=\"\$(gh image extract-token)\"" >&2
-  echo "  gh image check-token   # 확인" >&2
+  echo "gh-image 인증 실패 — user_session 토큰이 필요하다 (PAT/gh auth token 과 다름)" >&2
+  echo "  한 번만 설정 (호스트 Mac 터미널 — Docker 밖, github.com 로그인된 Chrome):" >&2
+  echo "    gh image extract-token > ~/.config/gh/image-session && chmod 600 ~/.config/gh/image-session" >&2
+  echo "  또는 DevTools → Cookies → user_session 값을 같은 파일에 저장" >&2
+  echo "  이후 Docker/headless: gh image check-token" >&2
   exit 1
 fi
 
