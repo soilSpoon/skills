@@ -16,14 +16,29 @@
 
 ## 표준 워크플로 (private 레포)
 
-### 1) PNG는 로컬에만 보관 — **레포에 커밋하지 않음**
+### 1) PNG는 **레포 밖** 로컬 경로에만 둔다
 
-스크린샷은 worktree·`/tmp` 등 **로컬 경로**에만 둔다. `.github/pr-assets/` 는
-`.gitignore` 대상이며 feature 브랜치에 PNG를 커밋하지 않는다.
+**절대 레포 안에 만들거나 커밋하지 않는다.** `.github/pr-assets/` 같은 경로는
+**생성 금지** — 과거에 레포가 오염된 전례가 있다.
 
+표준 출력 경로 (worktree 루트 기준):
+
+```
+out/pr-screenshots/<slug>/
+  before-landing.png
+  after-landing.png
+  before-dashboard.png
+  after-dashboard.png
+  ...
+```
+
+- `out/` 은 빌드·검증 산출물 디렉터리 — **git 추적 대상 아님**
 - 파일명: `before-<화면>.png` / `after-<화면>.png` (kebab-case)
-- 대표 화면 2~3곳 (랜딩·대시보드·워크벤치 등), 동일 뷰포트·동일 상태
+- 대표 화면 2~3곳, 동일 뷰포트·동일 상태
 - before = base/main 앱 한 포트, after = worktree/feature 앱 다른 포트
+
+`preship-scan.sh` 가 staged에 `.github/pr-assets/` 또는 `out/` 이 있으면 **경고**한다.
+스크린샷 PNG가 staged면 ship 전에 unstage 한다.
 
 ### 2) PR 본문 — **`gh-image` 인라인 임베드** (기본)
 
@@ -33,29 +48,14 @@ private 레포 PR 설명에서 인라인 미리보기가 필요하면 **[`gh-ima
 
 **사전 조건 (한 번만 — 이후 headless)**
 
-업로드 자체는 브라우저 없이 동작한다. 필요한 건 `user_session` **값**이며, 최초 1회만
-구하면 된다.
-
 ```bash
 gh extension install drogers0/gh-image
 
-# A) 호스트 Mac 터미널 (Docker 밖 — Chrome에 github.com 로그인된 상태)
+# 호스트 Mac 터미널 (Docker 밖 — Chrome에 github.com 로그인)
 gh image extract-token > ~/.config/gh/image-session && chmod 600 ~/.config/gh/image-session
 
-# B) 또는 DevTools → Application → Cookies → github.com → user_session Value
-
-# 이후 Docker/CI/에이전트 (headless)
-gh image check-token   # username 확인
-```
-
-`~/.config/gh/` 는 devcontainer bind mount 대상이면 호스트에 저장한 토큰이 컨테이너에서도
-보인다. CI에서는 `GH_SESSION_TOKEN` 환경 시크릿(전용 bot 계정 권장).
-
-**단일 이미지**
-
-```bash
-gh image screenshot.png --repo everysim-dev/dronerush
-# => ![screenshot.png](https://github.com/user-attachments/assets/<uuid>)
+# 이후 Docker/headless
+gh image check-token
 ```
 
 **before/after 일괄 업로드 + PR 본문 반영**
@@ -63,57 +63,34 @@ gh image screenshot.png --repo everysim-dev/dronerush
 ```bash
 bash scripts/pr-inline-images.sh \
   --repo everysim-dev/dronerush \
-  --pr 2319 \
-  --assets .github/pr-assets/pretendard-font \
-  --body-file .github/pr-body.md \
+  --pr <N> \
+  --assets out/pr-screenshots/<slug> \
+  --body-file /tmp/pr-body.md \
   --apply
 ```
 
 `--body-file`에 `<!-- PR_INLINE_SCREENSHOTS -->` 플레이스홀더를 넣으면 해당 구간을
-업로드된 인라인 테이블로 치환한다. `--apply` 없으면 stdout에만 출력한다.
-
-**PR 본문 예시 (인라인)**
-
-```markdown
-## 스크린샷 (Before: `:3030` / After: `:3040`)
-
-### landing
-
-| Before | After |
-|---|---|
-| ![before-landing](https://github.com/user-attachments/assets/…) | ![after-landing](https://github.com/user-attachments/assets/…) |
-```
+업로드된 인라인 테이블로 치환한다.
 
 ### 3) 폴백 — blob 링크 테이블 (세션 없을 때)
 
-`gh-image` 인증이 불가한 환경(브라우저 미로그인·세션 만료)에서는 **blob 링크 테이블**로
-남긴다. 클릭하면 GitHub에서 이미지가 열린다 (엑스박스 없음, 인라인은 아님).
+`gh-image` 인증이 불가하면 PR 본문에 화면명·포트·검증 절차만 텍스트로 남기고, 세션 확보
+후 `gh-image`로 갱신한다. **레포 blob URL로 스크린샷을 링크하지 않는다** (private에서
+인라인·img 모두 불안정).
 
-```markdown
-| 화면 | Before | After |
-|------|--------|-------|
-| 랜딩 | [before-landing.png](https://github.com/ORG/REPO/blob/BRANCH/.github/pr-assets/SLUG/before-landing.png) | [after-landing.png](...) |
-```
+## 금지
 
-세션을 확보한 뒤 `gh-image`로 다시 올려 인라인으로 갱신하는 것을 권장한다.
-
-## 금지 — PR 본문 `![...]()` 에 넣지 말 것
-
-| 방식 | 결과 |
+| 하지 말 것 | 이유 |
 |---|---|
-| `https://raw.githubusercontent.com/...` | private → 404 엑스박스 |
-| `![...](.github/pr-assets/...)` 상대 경로 | PR 설명에서 렌더 실패 (엑스박스) |
-| `gh-attach-assets/<uuid>/...` orphan 브랜치 | 레포 오염 + 임베드 불안정 |
-| org private release / `gh-attach release-asset` | `<img>` 404 |
-| `gh auth token` / PAT만으로 업로드 시도 | 422 — `user_session` 필요 |
-
-`gh-attach login`은 PAT만 저장하고 브라우저 쿠키는 없어 `browser-session`이 422로 실패할 수
-있다. 인라인 업로드는 **`gh-image`** 를 쓴다.
+| `.github/pr-assets/` 디렉터리 생성·커밋 | 레포 오염, 머지 후 제거 비용 |
+| `out/` · 스크린샷 PNG staged | 산출물은 PR diff에 넣지 않음 |
+| `raw.githubusercontent.com` / 상대 경로 `![...]()` | private → 엑스박스 |
+| `gh-attach-assets` orphan 브랜치 / release asset URL | 레포 오염 + img 404 |
+| PAT만으로 업로드 | 422 — `user_session` 필요 |
 
 ## 체크리스트
 
-- [ ] before/after가 같은 뷰포트·화면·상태에서 찍혔는가
-- [ ] PNG가 **레포에 커밋되지 않았는가** (로컬만, `.github/pr-assets/` 금지)
-- [ ] PR 본문이 **`gh-image` `user-attachments` 인라인**인가 (기본)
-- [ ] `gh image check-token` 이 통과했는가
-- [ ] 세션 없을 때만 blob 링크 테이블 폴백을 썼는가
+- [ ] 스크린샷이 `out/pr-screenshots/<slug>/` 에만 있는가 (레포 안 경로 없음)
+- [ ] staged에 PNG·`.github/pr-assets/`·`out/` 이 없는가
+- [ ] PR 본문이 **`gh-image` `user-attachments` 인라인**인가
+- [ ] `gh image check-token` 통과했는가

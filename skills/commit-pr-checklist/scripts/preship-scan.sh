@@ -57,6 +57,18 @@ echo "  staged 테스트 파일: ${TESTN} (코드만 staged이고 0이면 G4 —
 CMTN=$(diff_added . | grep -cE '^\+[[:space:]]*(//|#|\*|/\*)' || true)
 echo "  추가된 주석 라인: ${CMTN} (많으면 G3 — 최소화 + 기존 밀도/스타일 대조)"
 
+section "PR 스크린샷 오염 (G2 — 레포 커밋 금지)"
+PRSHOT='\.github/pr-assets/|(^|/)out/pr-screenshots/'
+if printf '%s\n' "$STAGED_FILES" | grep -qE "$PRSHOT"; then
+  echo "  ⛔ staged에 PR 스크린샷 경로가 있다 — unstage 후 out/ 로컬만 유지, gh-image로 PR에 첨부"
+  printf '%s\n' "$STAGED_FILES" | grep -E "$PRSHOT" | sed 's/^/    /'
+elif printf '%s\n' "$STAGED_FILES" | grep -qiE '\.(png|jpe?g|webp|gif)$'; then
+  echo "  ⚠ staged에 이미지 파일 — UI 스크린샷이면 레포에 넣지 말고 gh-image로 PR 본문에만 첨부"
+  printf '%s\n' "$STAGED_FILES" | grep -iE '\.(png|jpe?g|webp|gif)$' | sed 's/^/    /'
+else
+  echo "  (PR 스크린샷 경로 없음)"
+fi
+
 section "STRAY / ARTIFACT 후보"
 ART='(^|/)(dist|build|out|coverage|node_modules)/|\.(zip|tar|tgz|log|map|min\.js)$|(^|/)\.(env|DS_Store)|\.(pyc|class|o)$'
 { printf '%s\n' "$STAGED_FILES"; printf '%s\n' "$UNTRACKED"; } | grep -E "$ART" | sed 's/^/  ⚠ /' \

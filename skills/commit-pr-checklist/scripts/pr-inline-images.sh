@@ -9,7 +9,7 @@
 #   bash scripts/pr-inline-images.sh \
 #     --repo everysim-dev/dronerush \
 #     --pr 2319 \
-#     --assets .github/pr-assets/pretendard-font \
+#     --assets out/pr-screenshots/pretendard-font \
 #     --body-file .github/pr-body.md \
 #     --apply
 #

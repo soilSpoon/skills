@@ -82,7 +82,8 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
    변경이 푸는 문제) > **무엇**(diff가 이미 말함) > 리스크·breaking change·리뷰어가 검증하는
    법. 공개 API breaking이면 마이그레이션 노트(프론트면 codemod까지 — toss-frontend 담당).
 4. **프론트·UI 시각 증거** — 폰트·레이아웃·스타일 등 *화면이 바뀌는* PR이면 before/after
-   스크린샷을 남긴다. PNG는 **레포에 커밋하지 않음** (로컬만, `.github/pr-assets/` gitignore).
+   스크린샷을 남긴다. PNG는 **`out/pr-screenshots/<slug>/` 로컬만** — `.github/pr-assets/` 생성·
+   커밋 **금지**. `preship-scan`이 staged PNG·pr-assets 경로를 잡는다.
    **private 레포 PR 본문 인라인**은 **[`gh-image`](https://github.com/drogers0/gh-image)**
    로 `user-attachments` URL을 얻어 `![...]()` 로 붙인다(`gh image extract-token` →
    `GH_SESSION_TOKEN`). 일괄 반영은 [scripts/pr-inline-images.sh](scripts/pr-inline-images.sh).

@@ -57,9 +57,8 @@ Closes #<이슈>   ← 레포가 이슈를 거는 관례면
 PR도 같은 골격 + 레포 템플릿 섹션을 채운다. 버그 fix엔 회귀 테스트, 성능 PR엔 before/after
 수치를 (프론트 규범은 toss-frontend 담당) — 없으면 *없는 이유*를 적는다.
 
-**프론트·UI 시각 변경** — before/after PNG를 feature 브랜치 `.github/pr-assets/<slug>/`에
-커밋하고, PR 본문 인라인은 **`gh-image`** 로 `user-attachments` URL을 얻어 붙인다. 세션
-없을 때만 blob 링크 테이블 폴백. 절차·스크립트는 [pr-visual-evidence.md](pr-visual-evidence.md).
+**프론트·UI 시각 변경** — before/after PNG는 `out/pr-screenshots/<slug>/` 로컬만(레포 금지).
+PR 본문 인라인은 **`gh-image`** 로 `user-attachments` URL을 붙인다. [pr-visual-evidence.md](pr-visual-evidence.md).
 
 ## 4. durability filter를 메시지에 (G6)
 
