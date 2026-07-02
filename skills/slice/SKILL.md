@@ -21,12 +21,21 @@ filtered test, a diff you can read whole and revert in one commit. Spend the cos
 on the trust **deficit**. Uniform max-ceremony lowers trust-per-hour; a 10-minute change that
 takes an hour is a tier error, not rigor.
 
-**Two reflexes before the tiers (reflexes, not research projects):** (1) *Scope* — the cheapest,
+**Three reflexes before the tiers (reflexes, not research projects):** (1) *Scope* — the cheapest,
 highest-trust change is the one you don't make: does it need to exist (YAGNI)? stdlib / native /
 one line before fifty? (the scope floor — details in `code-fundamentals`). (2) *Deliberation* —
 don't spend longer deciding what *not* to build than building it would take; if your explanation
 is longer than the change, cut the explanation (prose defending a simplification is complexity
-smuggled back in). A care-process that ruminates is slower for zero trust gain.
+smuggled back in). A care-process that ruminates is slower for zero trust gain. (3) *Verifier cost*
+— "trust is free" assumes the signal is cheap; when it is not, tier the verifiers instead of
+verifying less. Pick the cheapest verifier that trustworthily catches THIS slice's error class,
+and never let a slow one be the inner loop: when the trust-manufacturing verifier is itself
+expensive (a minutes-long native/WASM build, an e2e or training run), run a faster proxy for the
+inner loop (a native compile standing in for the WASM build, a type-check for a wiring change, a
+filtered unit test) and reserve the expensive verifier for integration checkpoints. If the slow
+verifier is the bottleneck, make it *cheaper* (a fast local stand-in, a build-once CI fan-out), not
+*rarer* — speed here is a verifier-**speed** lever, not a coverage cut. The floor (a trustworthy
+signal per slice) is non-negotiable; only which verifier produces it scales with its cost.
 
 **Ceremony ladder — pick the LOWEST tier that still guarantees the baseline floor:**
 - **T0 deterministic** — a compiler / type-check / filtered test already proves it → just run it. No agent, no engine.
