@@ -12,6 +12,8 @@ engineering workflow with day-to-day dev, job-hunt, and research skills.
 /plugin install job-hunt@soilspoon-skills         # resume tailoring, Wishket applications
 /plugin install research-tools@soilspoon-skills   # fact-checking, human-like browser automation
 /plugin install reliability-kit@soilspoon-skills  # 4-layer test rig (L0–L3) + spec-first acceptance lists
+/plugin install ux-fundamentals@soilspoon-skills   # unified product UX (structure + microcopy + a11y UX)
+/plugin install dev-router@soilspoon-skills       # auto-load the right skill(s) for each dev task
 ```
 
 Every skill also installs standalone in any `SKILL.md`-compatible tool (Claude Code, opencode, …):
@@ -25,12 +27,14 @@ size budgets and structure rules that keep this repo lean.
 
 ## Plugins & Skills
 
-Five plugins bundle fourteen skills. Pick a plugin for the whole set, or install any skill on its own.
+Seven plugins bundle sixteen skills. Pick a plugin for the whole set, or install any skill on its own.
 
 | Plugin | Skills | For |
 |---|---|---|
+| [`dev-router`](#dev-router) | `dev-router` | **Daily driver** — one invoke routes to ux-fundamentals, dev-toolkit, or Vercel React skills |
 | [`slice`](#slice) | `slice` (+5 agents) | Decomposing big/risky/vague coding tasks into verifiable slices |
 | [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `commit-pr-checklist`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical & UX writing, pre-ship checklist, build/runtime diagnostics |
+| [`ux-fundamentals`](#ux-fundamentals) | `ux-fundamentals` | Unified screen UX (also loaded by dev-router for UI tasks) |
 | [`job-hunt`](#job-hunt) | `tailor-resume`, `apply-wishket` | Resume tailoring and freelance-project applications |
 | [`research-tools`](#research-tools) | `fact-check`, `human-like-browser` | Verifying content and driving the browser undetected |
 | [`reliability-kit`](#reliability-kit) | `test-foundations`, `spec-first` | Trustworthy 4-layer test rigs and spec-first acceptance lists |
@@ -61,6 +65,36 @@ npx skills add soilSpoon/skills@slice
 - `agents/slice-*.md` — the 4 roles (baseliner/slicer/executor/verifier) as standalone subagents — the slicer also owns the recursion-termination decision (the former assessor is folded into it)
 - `references/` — architecture, philosophy, and battle-tested lessons (deadlocks, orphaned test runners, false greens)
 - `scripts/` — live run viewer, no-focus window capture for visual UI verification (macOS)
+
+---
+
+## dev-router
+
+Single entrypoint for day-to-day development. Classifies the task and **reads** the right
+`SKILL.md` files (ux-fundamentals, dev-toolkit skills, Vercel React/composition patterns).
+
+```bash
+npx skills add soilSpoon/skills@dev-router
+```
+
+**Typical routes:** UI/UX → `ux-fundamentals` · React `.tsx` → Vercel + `toss-frontend-fundamentals`
+· code review → `code-fundamentals` · ship → `commit-pr-checklist` · bug → `issue-rootcause-workflow`.
+
+Install `dev-toolkit` + Vercel skills separately; dev-router resolves paths and install hints.
+
+---
+
+## ux-fundamentals
+
+Unified **product screen UX** — layout consistency, CTA, feedback, disclosure, microcopy, and
+accessibility at the UX level. Domain-agnostic (no industry-specific examples in core references).
+
+```bash
+npx skills add soilSpoon/skills@ux-fundamentals
+```
+
+**What it does:** Diagnose drift across similar surfaces → define a system contract → apply
+structure + copy + a11y together. Optional `references/examples/` only.
 
 ---
 

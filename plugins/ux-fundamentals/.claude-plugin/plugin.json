@@ -1,0 +1,9 @@
+{
+  "name": "ux-fundamentals",
+  "description": "Unified product UX skill — consistency, visual flow, CTA placement, feedback, disclosure, selection/commit, microcopy, accessibility (UX-level). Domain-agnostic; no sibling skill delegation for screen UX.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Daehee Lee",
+    "email": "lee111dae11@proton.me"
+  }
+}

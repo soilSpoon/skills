@@ -1,0 +1,9 @@
+{
+  "name": "dev-router",
+  "description": "Single development entrypoint: classifies task signals and loads the right skill SKILL.md (ux-fundamentals, dev-toolkit skills, Vercel React/composition patterns). Invoke once during dev instead of picking skills manually.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Daehee Lee",
+    "email": "lee111dae11@proton.me"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "skill": "ux-fundamentals",
+    "sourceAxes": 11,
+    "sourcePrinciples": 88,
+    "skillAxes": [
+      "consistency",
+      "visual-flow",
+      "action-placement",
+      "feedback",
+      "disclosure",
+      "selection-and-commit",
+      "microcopy",
+      "accessibility-ux"
+    ],
+    "mapping": {
+      "consistency": ["consistency"],
+      "visual-flow": ["visual-flow", "gaze-order"],
+      "action-placement": ["button-position"],
+      "feedback": ["feedback", "states"],
+      "disclosure": ["disclosure", "cognitive-load"],
+      "selection-and-commit": ["selection"],
+      "microcopy": ["microcopy"],
+      "accessibility-ux": ["a11y signals in feedback, visual-flow, disclosure"]
+    },
+    "agentSSOT": "references/*.md — not raw extraction paste"
+  },
+  "corpus": {
+    "articlesIndexed": 78,
+    "tieredShortlist": 44,
+    "topPicks": [
+      "toss.tech/article/introducing-toss-error-message-system",
+      "toss.tech/article/27426",
+      "toss.tech/article/34897",
+      "toss.tech/article/voiceover_usability",
+      "toss.tech/article/insurance-claim-process",
+      "toss.tech/article/interaction",
+      "toss.tech/article/42221",
+      "toss.tech/article/rethinking-design-system"
+    ]
+  },
+  "externalGapFill": [
+    "primary-cta-placement",
+    "loading-empty-success",
+    "multi-step-consistency",
+    "input-result-causality",
+    "dense-tool-surfaces"
+  ]
+}
