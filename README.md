@@ -70,17 +70,20 @@ npx skills add soilSpoon/skills@slice
 
 ## dev-router
 
-Single entrypoint for day-to-day development. Classifies the task and **reads** the right
+Single entrypoint for day-to-day development. Classifies the task, **installs missing skills** for
+your harness (Claude Code, Grok, Droid, OpenCode, Kimi, Cursor, …), then **reads** the right
 `SKILL.md` files (ux-fundamentals, dev-toolkit skills, Vercel React/composition patterns).
 
 ```bash
-npx skills add soilSpoon/skills@dev-router
+npx skills add soilSpoon/skills@dev-router -g -y -a <your-agent>   # e.g. opencode, droid, claude-code
+# Grok: copy to ~/.grok/skills/ or run scripts/ensure-skill.mjs after install
 ```
 
 **Typical routes:** UI/UX → `ux-fundamentals` · React `.tsx` → Vercel + `toss-frontend-fundamentals`
 · code review → `code-fundamentals` · ship → `commit-pr-checklist` · bug → `issue-rootcause-workflow`.
 
-Install `dev-toolkit` + Vercel skills separately; dev-router resolves paths and install hints.
+Missing skills? dev-router runs `scripts/ensure-skill.mjs` (or `npx skills add`) before Read — see
+`skills/dev-router/references/harnesses.md`.
 
 ---
 
