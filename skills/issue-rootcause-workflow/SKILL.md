@@ -51,6 +51,7 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 |---|---|---|
 | `if (!x.empty())` 가드, `try/catch` 무시, 매직 retry — "왜 그런 상태가 되는가"는 안 묻는 fix | #1·#2 | [principles.md #1·#2](references/principles.md) |
 | 같은 버그가 다른 자리에서 재발 (fix 두 번째 본 패턴) | #1 (invariant 미회복) | [principles.md #1](references/principles.md) |
+| `setTimeout(fn, 0)`/딜레이 0 타이머로 같은 틱 재실행 순서를 미루려는 코드 | #1 (invariant 아니라 재실행 트리거의 dep 자체가 원인일 가능성) | [principles.md #1](references/principles.md) |
 | "테스트는 도는데 실제로는 안 고쳐짐" / 운영에선 효과 없음 | #4 (도달 검증 누락) | [principles.md #4](references/principles.md) |
 | "이거 fail해야 하는데 pass했다" / 결과가 사전지식과 충돌 | #5 (모순 → 실험 의심) | [principles.md #5](references/principles.md) |
 | "어제까지 됐는데 오늘부터 안 됨" | #6 (최근 변경) | [principles.md #6](references/principles.md) |

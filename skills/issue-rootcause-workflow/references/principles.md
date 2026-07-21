@@ -54,6 +54,25 @@ invariant: 어떤 시점에 항상 참이어야 하는 명제. 함수 진입/이
 + // root fix: catch 대신 END_TRY_TABLE에서 push해서 N:N 회복
 ```
 
+같은 원칙이 적용되는 또 다른 흔한 형태 — **타이밍으로 관측 순서를 피하는 패턴** (언어·프레임워크 불문):
+
+```diff
+- // 재실행이 거슬리니 한 틱 미루자
+- useEffect(() => {
+-   const id = setTimeout(() => rebuild(), 0);
+-   return () => clearTimeout(id);
+- }, [spec, resetSignal]);          // spec: 매 렌더 새 참조, 실제로 쓰는 건 존재 여부뿐
++ // invariant: rebuild는 "빌드 대상이 있는가"가 바뀔 때만 실행돼야 한다
++ // 위반 원인: dep의 spec이 매 렌더 새 객체라 매번 "바뀐 것"으로 잡혀 재실행됨
++ const specPresent = spec != null;  // 원시값으로 파생
++ useEffect(() => {
++   if (!specPresent) return;
++   rebuild();
++ }, [specPresent, resetSignal]);
+```
+
+`setTimeout(fn, 0)` 류로 같은 틱의 재관측을 미루는 건 레이스를 없앤 게 아니라 관찰 순서를 운에 맡긴 것이다. 이 충동이 보이면 먼저 effect(또는 유사한 재실행 트리거)의 dep이 실제로 필요한 것(존재 여부·파생값)보다 넓은 것(매 렌더 새로 만들어지는 참조·객체 전체)을 물고 있는지 의심한다 — 타이밍 우회가 아니라 dep 자체가 root cause인 경우가 많다.
+
 ### 트레이드오프
 
 - invariant 명문화에 시간이 든다 (5–30분). 사소한 버그면 과잉.
