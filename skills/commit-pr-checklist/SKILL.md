@@ -48,6 +48,9 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
   - **무관한 churn** — 포매터 잡음·import 재정렬·공백만 바뀐 줄로 diff가 부풀지 않는가
     (리뷰 비용↑). 의도한 변경만 남긴다.
   - **atomic** — 한 커밋 = 한 논리적 변경. feature+refactor+fix가 한 덩어리면 쪼갠다.
+    **squash-merge 레포**(머지 후 PR이 커밋 1개로 접힘 — `git log`의 `(#N)` 한 줄이 신호)면 살아남는
+    단위가 *PR*이다: 원자성의 진짜 레버는 인트라-PR 커밋 정리가 아니라 **1 PR = 1 개념**(관심사 여럿이면
+    스택 PR로 쪼갠다). 봇/AI 루프의 fixup 커밋은 squash가 지우므로 그 정리에 과투자하지 않는다.
 - **G3 · 코드 품질** → **defer**. *항상* [code-fundamentals](../code-fundamentals/SKILL.md)로
   4축(가독성·예측가능성·응집도·결합도) 점검. **프론트엔드면 네 렌즈를 함께** 켠다 —
   code-fundamentals(언어 불문 4축) + [toss-frontend-fundamentals](../toss-frontend-fundamentals/SKILL.md)
@@ -81,7 +84,13 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
 3. **무엇을 담나** — 제목은 *무엇이 바뀌었나*를 한 줄로(레포 형식대로). 본문은 **왜**(이
    변경이 푸는 문제) > **무엇**(diff가 이미 말함) > 리스크·breaking change·리뷰어가 검증하는
    법. 공개 API breaking이면 마이그레이션 노트(프론트면 codemod까지 — toss-frontend 담당).
-4. **프론트·UI 시각 증거** — 폰트·레이아웃·스타일 등 *화면이 바뀌는* PR이면 before/after
+4. **리뷰어를 안내한다** — 제목은 *사용자가 겪는 증상*으로 연다(내부용어로 열지 않는다: "god-file
+   분해"가 아니라 "…할 때 …되던 문제"). 본문은 **역피라미드** — 상단 3줄을 비저자가 15초에 읽는다
+   (①한 문장 무엇 ②핵심 파일 1~2개 + 위험 ③스크린샷), 상세 추론·엣지케이스는 `<details>` 아래로
+   접는다. 파일이 많으면 **리딩 가이드**로 핵심/부수/노이즈(생성물·기계적 rename·픽스처)를 갈라
+   지목한다. 여력 되면 핵심 hunk에 **자기 diff 인라인 앵커 코멘트**(`gh api …/pulls/{n}/comments`)로
+   "여기가 판정 로직"을 코드 옆에 붙인다 — 산문 벽보다 스킴 가능하다.
+5. **프론트·UI 시각 증거** — 폰트·레이아웃·스타일 등 *화면이 바뀌는* PR이면 before/after
    스크린샷을 남긴다. PNG는 **`out/pr-screenshots/<slug>/` 로컬만** — `.github/pr-assets/` 생성·
    커밋 **금지**. `preship-scan`이 staged PNG·pr-assets 경로를 잡는다.
    **private 레포 PR 본문 인라인**은 **[`gh-image`](https://github.com/drogers0/gh-image)**
@@ -135,7 +144,10 @@ durability filter(G6). 판정은 전부 defer한다.
 - `[MUST]` 변경 코드에 테스트가 있고 로컬 green(없으면 *이유 명시*) · 피처 테스트는 구현이
   아니라 스펙/의도를 단언
 - `[SHOULD]` 디버그 잔여(`console.log`/`debugger`/주석코드) 제거 · 한 커밋 = 한 논리 변경
-  (되돌릴 수 있는 단위) · 무관한 churn(포맷·재정렬) 비포함
+  (되돌릴 수 있는 단위) · 무관한 churn(포맷·재정렬) 비포함 · squash-merge면 1 PR = 1 개념(스택)이
+  원자성 단위
+- `[SHOULD]` 리뷰어 안내 — 제목은 증상으로 · 본문 상단 3줄 skimmable(무엇·핵심 파일·스크린샷) ·
+  파일 많으면 리딩 가이드로 핵심/노이즈 갈라 지목(여력 되면 핵심 hunk 인라인 앵커)
 - `[SHOULD]` 메시지 형식·트레일러(`Co-authored-by`/sign-off)가 레포 관례와 일치(`git log`/
   `gh pr list`에서 도출) · 본문이 *왜* > 무엇 · breaking change·리스크·검증법 명시 · CI green 예상
 - `[SHOULD]` UI·타이포·레이아웃 변경 PR — before/after PNG는 로컬만, 본문은 **`gh-image` 인라인**
@@ -147,6 +159,9 @@ durability filter(G6). 판정은 전부 defer한다.
 - **교리가 아니다 — proportional.** 1줄 수정에 6게이트를 매기지 마라. 게이트는 변경에 비례.
 - **브랜치 먼저, 커밋은 요청 시.** 기본 브랜치면 먼저 브랜치를 판다. 사용자가 명시적으로
   요청할 때만 커밋·푸시한다(외부로 나가는 작업).
+- **봇/AI 리뷰 루프는 draft 뒤에서 돈다.** 봇 라운드마다 쌓이는 fixup 커밋을 사람이 실시간으로
+  목격하지 않게 PR을 **draft**로 열고, 봇이 조용하고 스크린샷·리딩 가이드가 갖춰졌을 때 ready로
+  flip한다. squash-merge면 그 커밋들은 머지 때 사라진다 — 커밋 정리보다 *노출 시점*을 관리한다.
 - **자동화가 1차 방어선.** 린터·포매터·타입·시크릿 스캐너·CI가 먼저 잡는다 — 이 게이트는
   그 위의 사람-층(리뷰어 본위·관례·내구성)이다. `preship-scan.sh`도 자동화의 보조이지 판정이
   아니다.
