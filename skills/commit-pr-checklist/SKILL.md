@@ -78,9 +78,11 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
 1. **관례 추출** — `git log --format='%s' -30`(최근 subject) + `gh pr list --state merged`로
    본다: Conventional Commits인가(`feat(scope):`)? 제목 길이·대소문자·언어(한/영)? 본문에
    이슈 링크·"왜" 단락·테스트 노트가 있나? PR 템플릿이 있나(`.github/PULL_REQUEST_TEMPLATE`)?
-2. **문장 다듬기** → **defer**. [technical-writing](../technical-writing/SKILL.md): 가치를
-   기능보다 먼저, 독자 본위, *왜*를 남긴다(메타담화·번역체·수동태 교정). 커밋·PR은 짧은 글
-   — technical-writing 본문 + 트리거 맵으로 충분하다(references 깊게 안 연다).
+2. **문장 다듬기** → **defer(선택 아님)**. 본문을 쓰거나 고치면 [technical-writing](../technical-writing/SKILL.md)을
+   *로드해 적용*하고 그 "빠른 자가 점검"을 통과시킨다 — 개인 문체 규칙으로 대체하지 않는다(가치
+   먼저·독자 본위·메타담화/번역체/한자어 제거). 분량이 짧으면 여는 references는 줄여도, 로드·적용은
+   건너뛰지 않는다(사소한 변경 제외는 G0 scope-floor가 판정하지, 이 게이트에서 빠져나가지 않는다).
+   판정 규칙은 technical-writing이 소유하므로 여기 복제하지 않는다.
 3. **무엇을 담나** — 제목은 *무엇이 바뀌었나*를 한 줄로(레포 형식대로). 본문은 **왜**(이
    변경이 푸는 문제) > **무엇**(diff가 이미 말함) > 리스크·breaking change·리뷰어가 검증하는
    법. 공개 API breaking이면 마이그레이션 노트(프론트면 codemod까지 — toss-frontend 담당).
@@ -143,6 +145,8 @@ durability filter(G6). 판정은 전부 defer한다.
   파일 비포함 · 메시지·코드·주석에 휘발성 정보(시간어·페이즈·run ID) 없음
 - `[MUST]` 변경 코드에 테스트가 있고 로컬 green(없으면 *이유 명시*) · 피처 테스트는 구현이
   아니라 스펙/의도를 단언
+- `[MUST]` PR·커밋 본문은 technical-writing을 로드해 적용했다(개인 규칙 대체 금지) · 이 PR을 처음
+  보는 독자로 다시 읽어 코드 지식 없이 안 풀리는 문장·내부참조가 없다(문장 판정은 technical-writing)
 - `[SHOULD]` 디버그 잔여(`console.log`/`debugger`/주석코드) 제거 · 한 커밋 = 한 논리 변경
   (되돌릴 수 있는 단위) · 무관한 churn(포맷·재정렬) 비포함 · squash-merge면 1 PR = 1 개념(스택)이
   원자성 단위
