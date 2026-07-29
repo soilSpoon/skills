@@ -51,6 +51,7 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 |---|---|---|
 | `if (!x.empty())` 가드, `try/catch` 무시, 매직 retry — "왜 그런 상태가 되는가"는 안 묻는 fix | #1·#2 | [principles.md #1·#2](references/principles.md) |
 | 같은 버그가 다른 자리에서 재발 (fix 두 번째 본 패턴) | #1 (invariant 미회복) | [principles.md #1](references/principles.md) |
+| 같은 자원을 같은 접근자로 만지는 형제 함수 중 하나만 고쳐져 있음 (caller 방향 grep으론 안 잡힘) | #1 (Ownership) | [code-fundamentals/coupling.md #7](../code-fundamentals/references/coupling.md#7-형제-함수-감사--공유-자원의-lifecycle) |
 | `setTimeout(fn, 0)`/딜레이 0 타이머로 같은 틱 재실행 순서를 미루려는 코드 | #1 (invariant 아니라 재실행 트리거의 dep 자체가 원인일 가능성) | [principles.md #1](references/principles.md) |
 | "테스트는 도는데 실제로는 안 고쳐짐" / 운영에선 효과 없음 | #4 (도달 검증 누락) | [principles.md #4](references/principles.md) |
 | "이거 fail해야 하는데 pass했다" / 결과가 사전지식과 충돌 | #5 (모순 → 실험 의심) | [principles.md #5](references/principles.md) |
@@ -93,6 +94,7 @@ description: 이슈·버그·회귀를 만났을 때 증상이 아닌 근본 원
 - `[MUST]` 망가진 자료구조/계약/상태가 무엇인지 1문장으로 적었는가
 - `[SHOULD]` 정상 입력에서 그게 어떻게 보존되는지 적었는가 (push N → pop N 같은 균형)
 - `[SHOULD]` 문제 입력에서 어디서 깨지는지 짚었는가 (ordering / counting / ownership / visibility)
+- `[SHOULD]` ownership 위반이면 같은 접근자를 쓰는 다른 함수를(caller 아니라 형제 방향으로) 감사했는가 — [code-fundamentals/coupling.md #7](../code-fundamentals/references/coupling.md#7-형제-함수-감사--공유-자원의-lifecycle)
 
 **선택의 의식 (#2)**
 - `[MUST]` 지금 fix가 "원인 제거"인지 "증상 차단"인지 PR/주석에 명시했는가
@@ -164,6 +166,7 @@ LLVM PR #194184 검증 (VTK 9.6.1 standardized-EH crash). 6원칙 각각이 어�
 
 ## 관련 스킬
 
+- code-fundamentals — Ownership 위반의 원인이 되는 "형제 함수 감사" 기법([coupling.md #7](../code-fundamentals/references/coupling.md#7-형제-함수-감사--공유-자원의-lifecycle))을 소유. 분담: 이미 터진 버그의 root cause를 이 스킬이 추적하고, 같은 기법을 *버그가 터지기 전* 코드 작성·리뷰 시점에 쓰는 건 code-fundamentals가 담당 — 원칙은 하나, 적용 시점만 다르다.
 - 토스 프론트엔드 fundamentals — 4축 코드 품질 + 접근성 (이 스킬과 도메인 다름; 합쳐 쓰면 프런트엔드 회귀 분석에 효과적)
 - test-foundations — invariant 발견 후 *회귀 박제* 핸드오프 (recurrence seam, reliability-system §6.4). 1단계(invariant 명문화)를 마치면 [test-foundations/references/recurrence.md](../test-foundations/references/recurrence.md) §2 핸드오프 템플릿(Invariant / Trigger condition / Observed violation / Cheapest catching layer / Proposed test name)을 채워 건넨다 — test-foundations가 그 invariant를 가장 싼 계층(보통 L1/L2)의 failing→green 회귀 테스트로 고착시키고, 2차 발생 시 guardrail로 escalate 한다. 분담: 이 스킬이 *무엇이 깨졌는가*를 소유, test-foundations가 *그 해석을 코드로 고착시키는* 언어를 소유. (Proposed test name 은 `/^[A-Za-z0-9_.-]+$/` 라 slice 엔진의 `{scope}` 토큰으로 바로 쓰인다.)
 - skill-creator — 이 스킬도 그 가이드로 만들어짐 (progressive disclosure, references one-level deep)

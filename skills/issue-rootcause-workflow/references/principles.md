@@ -43,6 +43,9 @@ invariant: 어떤 시점에 항상 참이어야 하는 명제. 함수 진입/이
   - **Counting** — push/pop 균형, ref count, transaction depth
   - **Ownership** — 누가 만들고 누가 지우나, lifecycle
   - **Visibility** — 어느 thread/context에서 보이나, memory model
+- [ ] **Ownership 위반이면**: 같은 자원을 같은 접근자로 만지는 다른 함수를
+      (caller 방향이 아니라 형제 방향으로) 감사했는가 — 기법은
+      [code-fundamentals/coupling.md #7](../../code-fundamentals/references/coupling.md#7-형제-함수-감사--공유-자원의-lifecycle)
 
 ### 안티패턴 → 개선
 

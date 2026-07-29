@@ -9,7 +9,8 @@
 3. [Props Drilling 제거 (item-edit-modal)](#3-props-drilling-제거)
 4. [데이터 주입 위치 — id vs 데이터](#4-데이터-주입-위치)
 5. [어댑터 패턴 — 얇은 인터페이스 + DI 팩토리](#5-어댑터-패턴)
-6. [점진 마이그레이션 — `/compat` 어댑터](#6-점진-마이그레이션-compat-어댑터)
+6. [점진 마이그레이션 — `/compat` 어댑터](#6-점진-마이그레이션--compat-어댑터)
+7. [형제 함수 감사 — 공유 자원의 lifecycle](#7-형제-함수-감사--공유-자원의-lifecycle)
 
 ---
 
@@ -249,3 +250,57 @@ export function createFunnel(steps: string[]) {
 - 마이그레이션 완료 기한을 명시해 무한 지속 방지
 
 **참고** — toss/es-toolkit `src/compat/`, toss/use-funnel `packages/next/src/compat.tsx`
+
+---
+
+## 7. 형제 함수 감사 — 공유 자원의 lifecycle
+
+**원칙** — 여러 함수가 같은 자원을 같은 접근자(helper)로 각자 조작할 때, 한 함수에 새 정리/teardown 의무를 추가하면서 형제 함수는 그대로 두면 그 의무는 스스로 강제되지 않는다. "이 함수의 caller를 다 봤다"로는 못 잡는다 — 형제 함수는 서로 호출하지 않기 때문이다. **caller 방향이 아니라, 같은 접근자를 쓰는 다른 함수 방향으로 찾아야 한다.**
+
+**Before**
+```
+function getRoot(id) { ... }              // 자원 접근자 — 호출부 2곳
+
+function update(id, next) {
+  const root = getRoot(id);
+  detachStaleChildren(root);              // 새로 추가한 정리 로직 — 여기만
+  root.set(next);
+}
+
+function remove(id) {
+  const root = getRoot(id);
+  root.delete();                          // detachStaleChildren 없음 — 형제라 안 걸림
+}
+```
+
+**After**
+```
+function purgeChildren(root) { ... }      // 정리 로직을 형제가 공유하는 단일 헬퍼로
+
+function update(id, next) {
+  const root = getRoot(id);
+  purgeChildren(root);
+  root.set(next);
+}
+
+function remove(id) {
+  const root = getRoot(id);
+  purgeChildren(root);                    // 같은 헬퍼를 거치므로 빠뜨릴 수 없음
+  root.delete();
+}
+```
+
+**찾는 법** — 그 접근자(`getRoot`)의 호출부를 grep해 전부 나열한다. caller 트리를
+타는 게 아니라 **같은 helper를 쓰는 다른 함수**를 찾는 것이 핵심.
+
+**왜**
+- 정리 로직을 형제 함수가 공유하는 헬퍼로 뽑으면, 한쪽만 고치고 다른 쪽을 잊는 게
+  구조적으로 불가능해진다 — 문서·주석만으론 재발을 막지 못한다
+- CRUD 성격 코드(create/update/delete/clear)가 특히 취약하다: 네 경로가 다 같은
+  자원을 만지지만 서로 부르지 않는다
+
+**참고** — dronerush `SceneService`: 자식 leaf가 있는 assembly를 편집하는
+`upsertShapeToDocument`에 자식 정리 로직이 추가됐지만, 같은 `findTopLevelShapeLabel`
+접근자를 쓰는 형제 함수 `removeShapeFromDocument`는 그대로 둬서 삭제 시 orphan
+회귀가 났다. 나중에 `removeAssemblyChildLeaves` 공유 헬퍼로 통합해 고쳤다 — 이슈
+조사가 아니라 애초에 정리 로직을 추가하던 시점(기능 개발 중)에 놓친 사례.

@@ -1,6 +1,6 @@
 ---
 name: code-fundamentals
-description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성·응집도·결합도)으로 코드를 작성·리뷰·리팩토링한다 — 언어 불문(예시는 TS/React지만 원칙은 Swift·Kotlin·Python·Go 어디든 적용). 트리거 - (1) "리뷰해줘"·"개선점"·"리팩토링"·"code review" 등 코드 품질 요청, (2) 매직 넘버, 중첩 삼항/조건, 이름 충돌, 숨은 부작용, 거대 함수/훅, 추상화 수준(레벨) 혼합, 단일 책임(SRP)·이름과 내용 불일치, 삼킨 에러/진단 가능성, 디렉토리 구조, 과도한 DRY, 깊은 파라미터 전달(drilling), 전역 상태 결합 등 안티패턴 언급, (3) "가독성"·"응집도"·"결합도"·"예측 가능성"·"변경하기 쉬운 코드" 명칭, (4) 다른 워크플로(slice 등)의 도메인 가이드로 주입될 때. 프론트엔드 고유 관점(a11y·디자인 토큰·React 런타임·라이브러리 저자 패턴·토스 채용축)은 toss-frontend-fundamentals가 담당 — UI 코드 리뷰엔 둘을 함께 쓴다.
+description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성·응집도·결합도)으로 코드를 작성·리뷰·리팩토링한다 — 언어 불문(예시는 TS/React지만 원칙은 Swift·Kotlin·Python·Go 어디든 적용). 트리거 - (1) "리뷰해줘"·"개선점"·"리팩토링"·"code review" 등 코드 품질 요청, (2) 매직 넘버, 중첩 삼항/조건, 이름 충돌, 숨은 부작용, 거대 함수/훅, 추상화 수준(레벨) 혼합, 단일 책임(SRP)·이름과 내용 불일치, 삼킨 에러/진단 가능성, 디렉토리 구조, 과도한 DRY, 깊은 파라미터 전달(drilling), 전역 상태 결합, 공유 자원 lifecycle(create/update/delete/clear) 비대칭(형제 함수 중 하나에만 정리 로직) 등 안티패턴 언급, (3) "가독성"·"응집도"·"결합도"·"예측 가능성"·"변경하기 쉬운 코드" 명칭, (4) 다른 워크플로(slice 등)의 도메인 가이드로 주입될 때. 프론트엔드 고유 관점(a11y·디자인 토큰·React 런타임·라이브러리 저자 패턴·토스 채용축)은 toss-frontend-fundamentals가 담당 — UI 코드 리뷰엔 둘을 함께 쓴다.
 ---
 
 # Code Fundamentals — 변경하기 쉬운 코드의 4대 축
@@ -95,6 +95,7 @@ Lane 간 통신 금지 — 각 lane은 같은 diff를 받되 자기 관점만 �
 | 곳마다 달라지는 로직을 억지 공통화 | 과도한 DRY | [coupling.md #2](references/coupling.md) |
 | core와 외부 환경(Router/Storage/SDK) 직결 | 어댑터 패턴 (얇은 인터페이스 + DI) | [coupling.md #5](references/coupling.md) |
 | 기존 API 유지하며 새 API 이전 | `/compat` 어댑터 | [coupling.md #6](references/coupling.md) |
+| CRUD 형제 함수가 같은 접근자로 같은 자원을 만지는데 한 곳에만 새 정리 로직 | 형제 함수 감사 | [coupling.md #7](references/coupling.md) |
 | 한 함수에 고수준 의도 + 저수준 메커니즘 혼재 | 추상화 수준 일관성 | [readability.md #11](references/readability.md) |
 | 이름에 `and`/그리고, 이름이 본문을 다 못 덮음, 비대 함수 | 이름=정직한 계약·단일 책임 | [predictability.md #14](references/predictability.md) |
 | 삼킨 에러(`catch {}`)·무근거 폴백, 표현 가능한 불가능 상태 | 진단 가능성 | [본문 §진단 가능성](#진단-가능성-operability--축에-인접한-관점) |
