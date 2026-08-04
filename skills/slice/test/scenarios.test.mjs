@@ -1456,8 +1456,9 @@ test('ITEM 1: empty filterCommand → trusted leaf runs gate=llm-only → degrad
 //   (b) a clean GREEN run computes overallTrust:true and the all-green headline ('N/M … 0 degradations');
 //   (c) an integration-distrust run computes overallTrust:false and NAMES integration as the first failure
 //       (a rollup can never manufacture a false green — it goes false on a dimension that already failed);
-//   (d) the briefing is DETERMINISTICALLY persisted to docs/briefings/<ts>.md via the sh proxy (base64 →
-//       base64 -d, injection-safe), and that write NEVER aborts the run even if it fails.
+//   (d) the briefing is DETERMINISTICALLY persisted to docs/briefings/<ts>.md via the sh proxy as a
+//       PLAIN single-quoted printf payload (v2 ①: readable, injection-inert via shQuote — no base64
+//       relay), and that write NEVER aborts the run even if it fails.
 test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (green + failing); briefing persisted deterministically', async () => {
   // --- GREEN run: slice path → leaves carry testScope → deterministic-filtered gate → 0 degradations.
   const greenDispatch = dispatcher((c) => {
@@ -1482,17 +1483,20 @@ test('ITEM 2: payload always has overallTrust:boolean + ownersHeadline:string (g
   assert.match(green.result.ownersHeadline, /0 degradations/, 'green headline must report 0 degradations')
 
   // (d) the briefing was persisted DETERMINISTICALLY via an sh write (NOT through an agent): a
-  //     base64-decode write to docs/briefings/<ts>.md, labeled 'briefing-persist'.
+  //     plain single-quoted printf write to docs/briefings/<ts>.md, labeled 'briefing-persist' (v2 ①).
   const persistCalls = green.calls.filter((c) => isSh(c) && /briefing-persist/.test(c.opts.label || ''))
   assert.equal(persistCalls.length, 1,
     `exactly one deterministic briefing-persist sh write must fire on a run with a briefing; got ${persistCalls.length}`)
   assert.match(persistCalls[0].prompt, /docs\/briefings\/.*\.md/,
     `the persist must target docs/briefings/<ts>.md; got: ${persistCalls[0].prompt}`)
-  assert.match(persistCalls[0].prompt, /base64 -d/,
-    `the persist must decode base64 (injection-safe, no raw briefing text in the shell command); got: ${persistCalls[0].prompt}`)
-  // INJECTION-SAFETY: the literal 'fixture briefing' text must NEVER appear verbatim in the shell command.
-  assert.ok(!/fixture briefing/.test(persistCalls[0].prompt),
-    `briefing markdown must be base64-encoded, never injected verbatim into the shell command; got: ${persistCalls[0].prompt}`)
+  assert.match(persistCalls[0].prompt, /printf '%s\\n' '/,
+    `the persist must carry the briefing as a single-quoted printf payload (v2 ①); got: ${persistCalls[0].prompt}`)
+  assert.ok(!/base64/.test(persistCalls[0].prompt),
+    `v2 ①: no base64 relay — an opaque blob reads as obfuscated execution to agent-relayed shells; got: ${persistCalls[0].prompt}`)
+  // READABILITY contract (the point of surgery ①): the briefing text appears VERBATIM inside the quotes —
+  // a human or classifier reading the command sees plain data, not an encoded blob. shQuote keeps it inert.
+  assert.ok(/fixture briefing/.test(persistCalls[0].prompt),
+    `the briefing markdown must be readable in the command (single-quoted, not encoded); got: ${persistCalls[0].prompt}`)
   assert.ok(green.logs.some((l) => /briefing persisted →/.test(l)),
     `a successful persist must log 'owner briefing persisted'; logs: ${green.logs.filter((l) => /briefing/.test(l)).join(' | ')}`)
 
@@ -1685,11 +1689,11 @@ test('seamPointers: slice with seamPointers threads them into exec prompt; R_EXE
 
 // ITEM 7 (observability/memory — PURE OBSERVATION, zero invariant risk). The engine auto-emits its own
 // cost/verdict profile: ONE JSONL line per agent() call appended to docs/run-traces/<baseSha>.jsonl via the
-// SAME deterministic, injection-safe sh proxy as ITEM 2's briefing-persist (base64 in JS → `base64 -d` →
-// `>>` append). This is the per-leaf profile Lesson 8 needed a HUMAN to reconstruct from logs the engine
-// never emitted. Claims pinned here:
+// SAME deterministic sh proxy as ITEM 2's briefing-persist — a PLAIN single-quoted printf payload (v2 ①:
+// readable, injection-inert via shQuote; no base64 relay) `>>` appended. This is the per-leaf profile
+// Lesson 8 needed a HUMAN to reconstruct from logs the engine never emitted. Claims pinned here:
 //   (a) the run ATTEMPTS trace appends — labeled 'trace-append', targeting docs/run-traces/<baseSha>.jsonl,
-//       INJECTION-SAFE (base64 → `base64 -d`), and `>>` APPENDING (not truncating);
+//       carrying the JSON line as a single-quoted printf payload, and `>>` APPENDING (not truncating);
 //   (b) each appended payload is PARSEABLE JSONL carrying baseSha (the pinned baseline, no clock), and at
 //       least one leaf line carries gateLevel (the ITEM-1 deterministic gate) + trustworthy (the verdict);
 //   (c) a sh-FAILURE on the append (dead trace proxy) does NOT fail the run — the leaves stay trusted, the
@@ -1709,23 +1713,21 @@ test('ITEM 7: run attempts injection-safe JSONL trace appends (gateLevel for a l
     // Each append targets docs/run-traces/<baseSha>.jsonl …
     assert.match(c.prompt, /docs\/run-traces\/[0-9a-f]+\.jsonl/,
       `each trace append must target docs/run-traces/<baseSha>.jsonl; got: ${c.prompt}`)
-    // … decodes base64 (injection-safe: no raw role/label/model text in the shell command) …
-    assert.match(c.prompt, /base64 -d/,
-      `each trace append must decode base64 (injection-safe); got: ${c.prompt}`)
+    // … carries the JSON line as a PLAIN single-quoted printf payload (v2 ①: readable — a relayed shell
+    // sees data in quotes, not an opaque blob; shQuote keeps arbitrary text inert) …
+    assert.match(c.prompt, /printf '%s\\n' '/,
+      `each trace append must carry a single-quoted printf payload (v2 ①); got: ${c.prompt}`)
+    assert.ok(!/base64/.test(c.prompt), `v2 ①: no base64 relay in trace appends; got: ${c.prompt}`)
     // … and APPENDS (`>>`), never truncates (`>` alone would clobber prior lines).
     assert.match(c.prompt, />>\s*\S+\.jsonl/,
       `each trace append must APPEND (>>) to the jsonl file, not truncate; got: ${c.prompt}`)
-    // INJECTION-SAFETY: the literal role-marker text must NEVER appear verbatim outside the base64 blob.
-    const b64 = (c.prompt.match(/printf %s '([A-Za-z0-9+/=]+)'/) || [])[1]
-    assert.ok(b64, `the append must carry a base64 blob (the JSON line); got: ${c.prompt}`)
-    assert.ok(!/leaf-verify|"phase"|"baseSha"/.test(c.prompt.replace(b64, '')),
-      `the JSON line must be base64-encoded, never injected verbatim into the shell command; got: ${c.prompt}`)
   }
 
   // (b) every appended payload is PARSEABLE JSONL; at least one LEAF line carries gateLevel + trustworthy.
   const records = traceCalls.map((c) => {
-    const b64 = c.prompt.match(/printf %s '([A-Za-z0-9+/=]+)'/)[1]
-    const decoded = Buffer.from(b64, 'base64').toString('utf8').trim()
+    const m = c.prompt.match(/printf '%s\\n' ('(?:'\\''|[^'])*')/)
+    assert.ok(m, `the append must carry a single-quoted JSON payload; got: ${c.prompt}`)
+    const decoded = m[1].slice(1, -1).replace(/'\\''/g, "'").trim()   // strip quotes, undo POSIX '\'' escapes
     return JSON.parse(decoded)   // throws (failing the test) if the line is not valid JSON
   })
   assert.ok(records.every((r) => typeof r.baseSha === 'string' && r.baseSha.length > 0),
@@ -2023,4 +2025,55 @@ test('gate fallback: a usable node.testScope still WINS over the executor-report
   })
   const { result } = await runEngine({ args: { ...ARGS, task: 'x' }, dispatch })
   assert.equal(result.fullSuiteGreen, true)
+})
+
+// v2 surgery ② — squash-to-land. Per-leaf commits are the run's reversibility mechanism WHILE it runs;
+// landed as-is they read as sprawl (observed live: 27-file/10-commit deposit → owner disorientation).
+// Claims pinned here:
+//   (a) a TRUSTED run whose deposit has >1 commits fires ONE squash-land sh call: tag FIRST (history
+//       preserved), then reset --soft + single commit, with a failed-commit rollback to the tag — and
+//       the payload carries squashed:{count,tag};
+//   (b) an UNTRUSTED run (integration distrust) performs NO squash activity (forensics keep the trail);
+//   (c) squash:false opts out entirely (not even the count probe).
+test('v2 squash-to-land: trusted multi-commit deposit → tag + soft-reset + ONE landing commit; untrusted/opted-out runs keep the leaf trail', async () => {
+  const squashSh = (c) => {
+    if (isSh(c) && /squash-count/.test(c.opts.label || '')) return { exitCode: 0, stdout: '3' }
+    if (isSh(c) && /squash-land/.test(c.opts.label || '')) return { exitCode: 0, stdout: 'RS_SQUASH_OK' }
+  }
+  // (a) trusted green run, 3-commit deposit
+  const green = await runEngine({ args: ARGS, dispatch: dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
+    return squashSh(c)
+  }) })
+  assert.equal(green.result.overallTrust, true, `precondition: green trusted run; headline=${green.result.ownersHeadline}`)
+  const land = green.calls.filter((c) => isSh(c) && /squash-land/.test(c.opts.label || ''))
+  assert.equal(land.length, 1, `exactly one squash-land call on a trusted multi-commit run; got ${land.length}`)
+  assert.match(land[0].prompt, /tag -f rs-leaves-[0-9a-f]+ HEAD &&/, 'history tag is taken FIRST (before any reset)')
+  assert.match(land[0].prompt, /reset --soft [0-9a-f]+ && git .* commit -m '/, 'squash = soft reset to baseline + ONE quoted landing commit')
+  assert.match(land[0].prompt, /\|\| git -C \S+ reset --soft rs-leaves-/, 'a failed commit rolls HEAD back to the tag — the deposit can never be left uncommitted')
+  assert.match(land[0].prompt, /leaf commits squashed to land/, 'the landing commit message names the squash and points at the history tag')
+  assert.deepEqual(green.result.squashed, { count: 3, tag: land[0].prompt.match(/rs-leaves-[0-9a-f]+/)[0] },
+    'payload carries squashed:{count,tag}')
+  assert.ok(green.logs.some((l) => /squash-to-land: 3 leaf commits → 1/.test(l)), 'squash is announced in the log')
+
+  // (b) untrusted run: no squash activity at all
+  const fail = await runEngine({ args: ARGS, dispatch: dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
+    if (!isSh(c) && /integration/.test(c.opts.label || '')) return FIX.distrust
+    return squashSh(c)
+  }) })
+  assert.equal(fail.result.overallTrust, false, 'precondition: distrusted run')
+  assert.equal(fail.calls.filter((c) => isSh(c) && /squash-(count|land)/.test(c.opts.label || '')).length, 0,
+    'an untrusted run must not touch the deposit (per-leaf trail kept for forensics)')
+  assert.equal(fail.result.squashed, undefined)
+
+  // (c) squash:false opts out even on a trusted run
+  const optOut = await runEngine({ args: { ...ARGS, squash: false }, dispatch: dispatcher((c) => {
+    if (/decompose/.test(c.opts.label || '')) return FIX.decomposeSlice
+    return squashSh(c)
+  }) })
+  assert.equal(optOut.result.overallTrust, true)
+  assert.equal(optOut.calls.filter((c) => isSh(c) && /squash-count/.test(c.opts.label || '')).length, 0,
+    'squash:false skips even the count probe')
+  assert.equal(optOut.result.squashed, undefined)
 })

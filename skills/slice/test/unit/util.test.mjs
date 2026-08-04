@@ -1,11 +1,11 @@
 // Unit tests for src/util.ts — the pure, host-agnostic helpers. Loaded directly via Node's native
 // TS type-stripping (util.ts has no relative imports). These pin the contracts the whole-engine
 // scenario tests only exercise indirectly: the ONE circuit-breaker abstraction (quota/untrusted/t0red
-// all instantiate it), the dependency-free base64, and the ENGINE-RAN string shape.
+// all instantiate it), the shQuote shell-carrier (v2 ①), and the ENGINE-RAN string shape.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { Buffer } from 'node:buffer'
-import { circuitBreaker, b64encode, engineRanBlock, classifyFailure, pickConcurrentLeaves, shouldRunConcurrent } from '../../src/util.ts'
+import { execFileSync } from 'node:child_process'
+import { circuitBreaker, shQuote, engineRanBlock, classifyFailure, pickConcurrentLeaves, shouldRunConcurrent } from '../../src/util.ts'
 
 test('circuitBreaker: trips at threshold when classThreshold is 0 (the t0red/untrusted shape)', () => {
   const b = circuitBreaker(2)
@@ -41,11 +41,21 @@ test('circuitBreaker: reset clears both streak and the class set', () => {
   assert.equal(b.tripped(), false, 'class set was cleared by reset (not 4 classes carried over)')
 })
 
-test('b64encode: byte-identical to Buffer + round-trips through base64 -d, across ASCII/UTF-8/surrogates', () => {
-  for (const s of ['', 'a', 'ab', 'abc', 'Hi\r\nBcc: x', 'héllo', '日本語', 'emoji 😀🎉', 'a'.repeat(100)]) {
-    assert.equal(b64encode(s), Buffer.from(s, 'utf8').toString('base64'), `mismatch for ${JSON.stringify(s.slice(0, 20))}`)
-    assert.equal(Buffer.from(b64encode(s), 'base64').toString('utf8'), s, 'round-trip')
+test('shQuote (v2 ①): arbitrary text round-trips byte-identical through a REAL /bin/sh — quotes, metachars, UTF-8, newlines stay inert', () => {
+  const vectors = [
+    '', 'a', "it's", "''", "'", 'a\nb\nc', 'Hi\r\nBcc: x',
+    '$(rm -rf /) `id` $HOME ; & | > >> < * ? [x] ~ ! # % \\',
+    '{"role":"verify","label":"leaf-verify:1","note":"한글 “quotes” 😀"}',
+    '# Reading order\n\n1. `src/core.ts` — pure core\n', 'a'.repeat(200),
+  ]
+  for (const s of vectors) {
+    // Execute exactly the shape the engine emits: printf '%s' <quoted> through a real shell.
+    const out = execFileSync('/bin/sh', ['-c', `printf '%s' ${shQuote(s)}`]).toString('utf8')
+    assert.equal(out, s, `round-trip mismatch for ${JSON.stringify(s.slice(0, 40))}`)
   }
+  // Readability contract (the point of surgery ①): the quoted form embeds the text VERBATIM (no
+  // opaque encoding) — a human or classifier reading the command sees plain data, not a blob.
+  assert.ok(shQuote('hello world').includes('hello world'))
 })
 
 test('engineRanBlock: emits the ENGINE-RAN shell-truth shape the verifier judges from', () => {

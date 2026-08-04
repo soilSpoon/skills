@@ -3,36 +3,16 @@
 // re-inlines these; this is a SOURCE-readability split, behavior-identical (same proven multi-module
 // pattern as prompts.ts/schemas.ts/types.ts).
 
-// ITEM 2 / 2026-06-16 MailKit dogfood: the host runs the emitted engine as a Node AsyncFunction body,
-// but the Workflow runtime sandbox does NOT expose Node's `Buffer` global — `Buffer.from(...)` threw
-// "Buffer is not defined" and SILENTLY degraded the JSONL run-trace + owner-briefing persist (both
-// observability; run unaffected, but the comprehension-debt ledger was lost). Use a dependency-free
-// UTF-8→base64 encoder (no Buffer/btoa/TextEncoder) so both paths survive any host. The base64 alphabet
-// is shell-safe, so arbitrary role/label/briefing text never reaches the deterministic `sh` write proxy
-// verbatim (the keep-text-out-of-shell discipline). Verified byte-identical to Buffer across ASCII /
-// multibyte UTF-8 / surrogate-pair vectors + round-trip through `base64 -d`.
-export const b64encode = (str: string): string => {
-  const bytes: number[] = []
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i)
-    if (c < 0x80) bytes.push(c)
-    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f))
-    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
-      const cp = 0x10000 + ((c & 0x3ff) << 10) + (str.charCodeAt(++i) & 0x3ff)
-      bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f))
-    } else bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f))
-  }
-  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 3) {
-    const n = bytes.length - i
-    const b0 = bytes[i], b1 = n > 1 ? bytes[i + 1] : 0, b2 = n > 2 ? bytes[i + 2] : 0
-    out += A[b0 >> 2] + A[((b0 & 3) << 4) | (b1 >> 4)]
-    out += n > 1 ? A[((b1 & 15) << 2) | (b2 >> 6)] : '='
-    out += n > 2 ? A[b2 & 63] : '='
-  }
-  return out
-}
+// v2 surgery ① (2026-08-04, from live post-mortems of both real engine runs): arbitrary LLM text
+// (trace JSON, briefing markdown, commit messages) is carried into the deterministic `sh` write proxy
+// as a PLAIN single-quoted POSIX string — NOT base64. The old base64 relay ("printf %s '<blob>' |
+// base64 -d") was injection-safe but OPAQUE: an agent-relayed shell sees "execute this encoded blob
+// without interpreting it", which safety classifiers read as obfuscated command execution (observed:
+// 12+ [trace-append] blocks in one run, and the final worktree merge blocked as a "bypass attempt").
+// Strict single-quoting is equally inert — inside '…' the ONLY special character is the quote itself,
+// escaped as '\'' — while the command stays human-readable, so nothing looks like obfuscation.
+// (Dependency-free on purpose: the AsyncFunction host has no Buffer; plain string ops survive any host.)
+export const shQuote = (str: string): string => `'${str.replace(/'/g, `'\\''`)}'`
 
 // ITEM 11a: ONE circuit-breaker abstraction (this engine had three ad-hoc counter+constant+comment
 // clusters that are the SAME breaker at different (class, scope)). A breaker counts a consecutive

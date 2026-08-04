@@ -14,6 +14,7 @@ export interface EngineArgs {
   confirmNoRig?: boolean     // opt-in ack: proceed even when the post-baseline testing-readiness gate fires (baseliner judged no runnable test rig → empty trust floor)
   skills?: unknown          // validated at use: string[] of guide-file paths
   leafConcurrency?: number  // opt-in (default 1 = OFF): run file-disjoint atomic sibling leaves concurrently (K=2-4, commit-if-trusted)
+  squash?: boolean          // v2 ② (default true): on a TRUSTED run, squash the >1-commit deposit to ONE landing commit (leaf history preserved at a tag); false keeps per-leaf commits
 }
 /** Baseliner output (BASELINE schema). filterCommand is mutable: the engine kills a broken template at runtime. */
 export interface Baseline {
@@ -131,6 +132,7 @@ export interface EngineResult {
   slices?: number          // breadth that tripped the over-tier stop (for the human's machine-readable ETA)
   overallTrust?: boolean   // ITEM 2: single rollup verdict — true IFF every trust dimension held (additive; never a false green)
   ownersHeadline?: string  // ITEM 2: one human line — the green summary, or the first failing dimension named
+  squashed?: { count: number; tag: string }  // v2 ②: the deposit landed as ONE commit; per-leaf history preserved at .tag
   briefing?: string
 }
 

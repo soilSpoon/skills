@@ -4,7 +4,7 @@
 import { BASELINE, DECOMPOSE, SLICES, LEARNING, RESULT, VERDICT, MISSING, BRIEFING, PRESENCE } from './schemas'
 import { R_BASELINE, R_SLICE, R_EXEC, R_VERIFY, R_VERIFY_LIGHT, R_CRITIC, R_COORD } from './prompts'
 import type { EngineArgs, Baseline, Decompose, SliceSpec, ExecResult, Verdict, ShResult, WorkNode, LeafRecord, Groups, EngineResult, RiskTier, SliceKind, Briefing, GateLevel, TraceRecord } from './types'
-import { b64encode, circuitBreaker, engineRanBlock } from './util'
+import { shQuote, circuitBreaker, engineRanBlock } from './util'
 import { makeVerifyLeaf } from './phases/verify'
 import { makeRunWork } from './phases/leaf-loop'
 import { makeHost } from './host'
@@ -55,6 +55,7 @@ const PARALLEL = A.parallel !== false    // DEFAULT ON: parallelize independent 
 const FORCE_PARALLEL = A.forceParallel === true   // override the compile-bound auto-fallback to sequential
 const CONFIRM_TIER = A.confirmTier === true        // opt-in: override the depth-0 over-tier stop (compile-bound + small breadth + all-light)
 const CONFIRM_NO_RIG = A.confirmNoRig === true     // opt-in: override the post-baseline testing-readiness gate (baseliner judged no runnable test rig → empty trust floor)
+const SQUASH = A.squash !== false        // v2 ② DEFAULT ON: land a trusted >1-commit deposit as ONE commit (history at a tag)
 const SHARED_SCRATCH = A.sharedScratch === true   // compile-bound parallel WITHOUT per-worktree cold builds: all
                                                   // worktrees share ONE build dir (--scratch-path) so dependency
                                                   // artifacts compile once; builds serialize on its lock (measured:
@@ -248,9 +249,9 @@ if (GIT && gitClean === false) log(`⚠ DIRTY baseline tree — uncommitted edit
 // later run / a tool can read the profile the engine produced about itself). It is a PASSIVE observer:
 //   • it gates NO trust and touches NONE of the four invariants — it only records what already happened;
 //   • the append goes through the same deterministic `sh` write proxy as ITEM 2's briefing-persist, and is
-//     INJECTION-SAFE the same way: the JSON line (which can embed arbitrary role/label/model text) is
-//     base64-encoded in JS — the [A-Za-z0-9+/=] alphabet is shell-safe — and decoded by `base64 -d`, so no
-//     LLM/agent text ever reaches the shell command verbatim (the keep-text-out-of-shell discipline);
+//     INJECTION-SAFE via strict single-quoting (shQuote): inside '…' the only live character is the quote
+//     itself, escaped as '\''  — and the command stays READABLE, so an agent-relayed shell never sees an
+//     opaque blob (v2 surgery ①: the old base64 relay tripped safety classifiers as obfuscated execution);
 //   • <baseSha>: the run has no clock in its context, so the file is named from the pinned baseline SHA
 //     (deterministic + stable across a run), falling back to a fixed name when git is off;
 //   • the whole thing is wrapped in its OWN try/catch that NEVER aborts the run — a failed append (dead
@@ -264,13 +265,12 @@ const trace = async (rec: TraceRecord): Promise<void> => {
     const line: Record<string, unknown> = { baseSha: BASE_SHA || null }
     for (const [k, v] of Object.entries(rec)) if (v !== undefined) line[k] = v
     const json = JSON.stringify(line)
-    const b64 = b64encode(json + '\n')
-    // mkdir -p the dir, then base64-decode the line and `>>` APPEND it (one line per call). The b64
-    // alphabet is shell-safe, so the arbitrary role/label/model text never reaches the shell verbatim.
+    // mkdir -p the dir, then `>>` APPEND the single-quoted JSON line (one line per call; shQuote keeps
+    // arbitrary role/label/model text inert AND the command readable — v2 surgery ①, no base64 relay).
     // Self-ignore the trace dir (a `.gitignore` of `*`) so the engine's own observability output is never
     // swept into a user commit by an agent's `git add -A`, nor counted as a dirty tree. Belt-and-suspenders
     // with the gitClean exclude above; this stops the pollution AT THE SOURCE (the ` D <sha>.jsonl` drift).
-    await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, 'trace-append')
+    await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf '%s\\n' ${shQuote(json)} >> ${TRACE_FILE}`, 'trace-append')
   } catch (e) { log(`trace append skipped (${e && (e as Error).message ? (e as Error).message : e}) — observability only, run unaffected`) }
 }
 
@@ -614,6 +614,6 @@ if (overTier.stop) {
 }
 
 // =============================================================================
-return await integratePhase({ rt, host, git, REPO, INV, TASK, baseline: baseline!, ABORTS, done, merge, groups })
+return await integratePhase({ rt, host, git, REPO, INV, TASK, SQUASH, baseline: baseline!, ABORTS, done, merge, groups })
 
 }

@@ -4,7 +4,7 @@
 // (destructured), body unchanged. Called ONCE after the Work phase, so a plain function (not a factory).
 import { BRIEFING, VERDICT } from '../schemas'
 import { R_VERIFY } from '../prompts'
-import { b64encode, engineRanBlock } from '../util'
+import { shQuote, engineRanBlock } from '../util'
 import type { ShResult, Baseline, Verdict, LeafRecord, EngineResult, Briefing, Groups, GitCtx, Runtime } from '../types'
 import type { Host } from '../host'
 
@@ -15,6 +15,7 @@ export type IntegrateDeps = {
   REPO: string
   INV: string
   TASK: string
+  SQUASH: boolean
   baseline: Baseline
   ABORTS: string[]
   done: LeafRecord[]
@@ -23,7 +24,7 @@ export type IntegrateDeps = {
 }
 
 export const integratePhase = async (d: IntegrateDeps): Promise<EngineResult> => {
-const { rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d
+const { rt, host, git, REPO, INV, TASK, SQUASH, baseline, ABORTS, done, merge, groups } = d
 const { agent, phase, log } = rt
 const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host
 const { BASE_SHA, GIT, LOCKFILE } = git
@@ -190,22 +191,62 @@ if (trusted.length && !getQuotaHalt()) {
   // trust) and is wrapped in its OWN try/catch that NEVER aborts the run — a failed persist must not cost
   // a green run its trusted leaves. <ts>: the run has no clock-timestamp in its context, so use a STABLE
   // name derived from the pinned baseline SHA (deterministic + collision-resistant across runs), falling
-  // back to a fixed name when git is off. INJECTION-SAFE: the briefing markdown (arbitrary LLM text) is
-  // base64-encoded in JS — the [A-Za-z0-9+/=] alphabet is shell-safe — and decoded by `base64 -d`, so no
-  // user/agent text ever reaches the shell command verbatim (the keep-text-out-of-shell discipline).
+  // back to a fixed name when git is off. INJECTION-SAFE via strict single-quoting (shQuote — v2 surgery ①:
+  // the old base64 relay read as obfuscated execution to safety classifiers in agent-relayed shells);
+  // inside '…' the only live character is the quote itself, and the command stays human-readable.
   if (briefing && briefing.briefing) {
     try {
       const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : 'briefing'
       const dir = `${REPO}/docs/briefings`
       const file = `${dir}/${ts}.md`
-      const b64 = b64encode(String(briefing.briefing))
       // Self-ignore the briefings dir (see trace-append in main.ts): the engine's own output must never be
       // swept into a user commit by an agent's `git add -A`, nor dirty the tree that gates parallel.
-      const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf %s '${b64}' | base64 -d > ${file}`, 'briefing-persist')
+      const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf '%s\\n' ${shQuote(String(briefing.briefing))} > ${file}`, 'briefing-persist')
       if (!shUnavailable(w) && w.exitCode === 0) log(`owner briefing persisted → ${file}`)
       else log(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`)
     } catch (e) { log(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`) }
   }
+}
+
+// ITEM 2: ONE overall trust verdict + an owner's headline. The payload already exposes every signal
+// SEPARATELY (results/coordinator/integration/fullSuiteGreen/degradations…) but NO single rollup — so a
+// CATASTROPHIC run (RED suite, distrusted integration, reverted leaves) could still LOOK perfect to a
+// glancing reader who only checks `briefing` or `trustedLeaves`. overallTrust is the AND of every trust
+// dimension; it is purely ADDITIVE (a rollup over existing booleans — it can only ever go FALSE on a
+// dimension that already failed, so it can NEVER manufacture a false green that the individual signals
+// did not already carry). Dimensions, in headline-priority order (first failing one names the verdict):
+// (computed BEFORE squash/lock-clear — squash-to-land is gated on the trusted verdict.)
+const allLeavesTrusted = trusted.length === done.length          // every EXECUTED leaf is trusted
+const mergeOk = !merge || merge.trustworthy                       // no parallel merge, OR the merge is trustworthy
+const integrationOk = !!(integration && integration.trustworthy) // the integrate verifier trusts the whole
+const noDegradations = !degradations || degradations.length === 0 // Item 1's trust-floor downgrades are empty
+const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations
+
+// v2 surgery ②: squash-to-land (default ON, `squash:false` opts out). Per-leaf commits are the run's
+// reversibility mechanism WHILE it runs; landed as-is they read as sprawl the owner cannot review
+// (observed live: a 27-file/10-commit deposit → "왜 이리 커밋이 많아?"). On a TRUSTED run with >1
+// deposit commits: preserve the full leaf history at a tag, then land the whole deposit as ONE commit.
+// Skipped for: untrusted runs (forensics want the per-leaf trail), quota-halt, no-git, single-commit
+// deposits. Failure-safe: the tag is taken FIRST, and a failed `git commit` rolls HEAD back to the tag
+// (reset --soft both ways — the file tree is never touched), so the deposit can never be left uncommitted.
+let squashed: EngineResult['squashed'] = undefined
+if (GIT && SQUASH && overallTrust && !getQuotaHalt()) {
+  try {
+    const cntR = await sh(`git -C ${REPO} rev-list --count ${BASE_SHA}..HEAD`, 'squash-count')
+    const cnt = shUnavailable(cntR) ? 0 : parseInt((cntR.stdout || '').trim(), 10) || 0
+    if (cnt > 1) {
+      const tag = `rs-leaves-${BASE_SHA.slice(0, 12)}`
+      const subject = TASK.split('\n')[0].slice(0, 68)
+      const msg = `${subject}\n\nslice: ${cnt} leaf commits squashed to land; full per-leaf history: tag ${tag}`
+      const r = await sh(
+        `git -C ${REPO} tag -f ${tag} HEAD && { git -C ${REPO} reset --soft ${BASE_SHA} && git -C ${REPO} commit -m ${shQuote(msg)} && printf RS_SQUASH_OK || git -C ${REPO} reset --soft ${tag}; }`,
+        'squash-land')
+      if (!shUnavailable(r) && r.exitCode === 0 && /RS_SQUASH_OK/.test(r.stdout || '')) {
+        squashed = { count: cnt, tag }
+        log(`squash-to-land: ${cnt} leaf commits → 1 (full history preserved at tag ${tag})`)
+      } else log(`squash-to-land did not complete — leaf commits left as-is (still correct, just verbose); history tag ${tag} may exist`)
+    }
+  } catch (e) { log(`squash-to-land skipped (${e && (e as Error).message ? (e as Error).message : e}) — leaf commits left as-is`) }
 }
 
 // A2: shForce so lock-clear runs even after QUOTA_HALT — without this, a quota death leaves a
@@ -215,19 +256,6 @@ if (LOCKFILE) { try { await shForce(`rm -f ${LOCKFILE}`, 'lock-clear') } catch (
 if (ABORTS.length) log(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(' | ')}`)
 log(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? (merge.trustworthy ? 'OK' : 'ISSUES') : 'n/a'} | full-suite ${finalRun.exitCode === -1 ? 'NOT RUN' : (fullSuiteGreen ? 'GREEN' : 'RED')} | integration ${integration && integration.trustworthy ? 'OK' : (integration ? 'FAILED' : 'UNKNOWN')}`)
 if (purposeGaps.length) log(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`)
-
-// ITEM 2: ONE overall trust verdict + an owner's headline. The payload already exposes every signal
-// SEPARATELY (results/coordinator/integration/fullSuiteGreen/degradations…) but NO single rollup — so a
-// CATASTROPHIC run (RED suite, distrusted integration, reverted leaves) could still LOOK perfect to a
-// glancing reader who only checks `briefing` or `trustedLeaves`. overallTrust is the AND of every trust
-// dimension; it is purely ADDITIVE (a rollup over existing booleans — it can only ever go FALSE on a
-// dimension that already failed, so it can NEVER manufacture a false green that the individual signals
-// did not already carry). Dimensions, in headline-priority order (first failing one names the verdict):
-const allLeavesTrusted = trusted.length === done.length          // every EXECUTED leaf is trusted
-const mergeOk = !merge || merge.trustworthy                       // no parallel merge, OR the merge is trustworthy
-const integrationOk = !!(integration && integration.trustworthy) // the integrate verifier trusts the whole
-const noDegradations = !degradations || degradations.length === 0 // Item 1's trust-floor downgrades are empty
-const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations
 // ownersHeadline: one human line. When green, the full reassuring summary; when not, NAME the first
 // failing dimension (so the owner sees WHAT broke, not just that something did) in the same priority order
 // the verdict is computed in.
@@ -251,6 +279,7 @@ return {
   trustedLeaves: trusted.length, totalLeaves: done.length,
   purposeGaps, wiringGaps, aborts: ABORTS, degradations,
   overallTrust, ownersHeadline,   // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
+  squashed,                       // v2 ②: set when the deposit was squashed to one landing commit (history at .tag)
   briefing: (briefing && briefing.briefing) || undefined,   // B: the owner's guided read — RELAY this, don't bury it
 }
 }

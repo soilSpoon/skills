@@ -152,28 +152,7 @@ var R_CRITIC = 'You are the Completeness Critic (Beck: the test LIST is the step
 var R_COORD = "You are the Coordinator — the ONLY agent with global context. A conflict has occurred merging one branch of a parallel build. Resolve the hunk by HONORING BOTH slices' stated intent — never silently discard a side's work; if genuinely irreconcilable, keep the lower-indexed slice and record the loss as an issue. Report the conflict resolved and any lost work in issues.";
 
 // src/util.ts
-var b64encode = (str) => {
-  const bytes = [];
-  for (let i = 0; i < str.length; i++) {
-    const c = str.charCodeAt(i);
-    if (c < 128) bytes.push(c);
-    else if (c < 2048) bytes.push(192 | c >> 6, 128 | c & 63);
-    else if (c >= 55296 && c <= 56319 && i + 1 < str.length) {
-      const cp = 65536 + ((c & 1023) << 10) + (str.charCodeAt(++i) & 1023);
-      bytes.push(240 | cp >> 18, 128 | cp >> 12 & 63, 128 | cp >> 6 & 63, 128 | cp & 63);
-    } else bytes.push(224 | c >> 12, 128 | c >> 6 & 63, 128 | c & 63);
-  }
-  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 3) {
-    const n = bytes.length - i;
-    const b0 = bytes[i], b1 = n > 1 ? bytes[i + 1] : 0, b2 = n > 2 ? bytes[i + 2] : 0;
-    out += A[b0 >> 2] + A[(b0 & 3) << 4 | b1 >> 4];
-    out += n > 1 ? A[(b1 & 15) << 2 | b2 >> 6] : "=";
-    out += n > 2 ? A[b2 & 63] : "=";
-  }
-  return out;
-};
+var shQuote = (str) => `'${str.replace(/'/g, `'\\''`)}'`;
 var circuitBreaker = (threshold, classThreshold = 0) => {
   let streak = 0;
   const classes = /* @__PURE__ */ new Set();
@@ -779,7 +758,7 @@ LEAF TEST DISCIPLINE (measured #1 time cost): at THIS leaf run ONLY the FILTERED
 
 // src/phases/integrate.ts
 var integratePhase = async (d) => {
-  const { rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups } = d;
+  const { rt, host, git, REPO, INV, TASK, SQUASH, baseline, ABORTS, done, merge, groups } = d;
   const { agent: agent2, phase: phase2, log: log2 } = rt;
   const { sh, shForce, shUnavailable, agentSafe, getQuotaHalt } = host;
   const { BASE_SHA, GIT, LOCKFILE } = git;
@@ -912,13 +891,41 @@ Match the language the task was written in. Be concrete.`,
         const ts = BASE_SHA ? BASE_SHA.slice(0, 12) : "briefing";
         const dir = `${REPO}/docs/briefings`;
         const file = `${dir}/${ts}.md`;
-        const b64 = b64encode(String(briefing.briefing));
-        const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf %s '${b64}' | base64 -d > ${file}`, "briefing-persist");
+        const w = await sh(`mkdir -p ${dir} && { [ -f ${dir}/.gitignore ] || printf '*\\n' > ${dir}/.gitignore; } && printf '%s\\n' ${shQuote(String(briefing.briefing))} > ${file}`, "briefing-persist");
         if (!shUnavailable(w) && w.exitCode === 0) log2(`owner briefing persisted → ${file}`);
         else log2(`owner briefing persist skipped (write unavailable/failed; the briefing is still in the payload)`);
       } catch (e) {
         log2(`owner briefing persist skipped (${e && e.message ? e.message : e}); briefing is still relayed in the payload`);
       }
+    }
+  }
+  const allLeavesTrusted = trusted.length === done.length;
+  const mergeOk = !merge || merge.trustworthy;
+  const integrationOk = !!(integration && integration.trustworthy);
+  const noDegradations = !degradations || degradations.length === 0;
+  const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations;
+  let squashed = void 0;
+  if (GIT && SQUASH && overallTrust && !getQuotaHalt()) {
+    try {
+      const cntR = await sh(`git -C ${REPO} rev-list --count ${BASE_SHA}..HEAD`, "squash-count");
+      const cnt = shUnavailable(cntR) ? 0 : parseInt((cntR.stdout || "").trim(), 10) || 0;
+      if (cnt > 1) {
+        const tag = `rs-leaves-${BASE_SHA.slice(0, 12)}`;
+        const subject = TASK.split("\n")[0].slice(0, 68);
+        const msg = `${subject}
+
+slice: ${cnt} leaf commits squashed to land; full per-leaf history: tag ${tag}`;
+        const r = await sh(
+          `git -C ${REPO} tag -f ${tag} HEAD && { git -C ${REPO} reset --soft ${BASE_SHA} && git -C ${REPO} commit -m ${shQuote(msg)} && printf RS_SQUASH_OK || git -C ${REPO} reset --soft ${tag}; }`,
+          "squash-land"
+        );
+        if (!shUnavailable(r) && r.exitCode === 0 && /RS_SQUASH_OK/.test(r.stdout || "")) {
+          squashed = { count: cnt, tag };
+          log2(`squash-to-land: ${cnt} leaf commits → 1 (full history preserved at tag ${tag})`);
+        } else log2(`squash-to-land did not complete — leaf commits left as-is (still correct, just verbose); history tag ${tag} may exist`);
+      }
+    } catch (e) {
+      log2(`squash-to-land skipped (${e && e.message ? e.message : e}) — leaf commits left as-is`);
     }
   }
   if (LOCKFILE) {
@@ -931,11 +938,6 @@ Match the language the task was written in. Be concrete.`,
   if (ABORTS.length) log2(`⚠ ${ABORTS.length} unit(s) halted by the untrusted-streak guard: ${ABORTS.join(" | ")}`);
   log2(`Done: ${trusted.length}/${done.length} leaves trusted | merge ${merge ? merge.trustworthy ? "OK" : "ISSUES" : "n/a"} | full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} | integration ${integration && integration.trustworthy ? "OK" : integration ? "FAILED" : "UNKNOWN"}`);
   if (purposeGaps.length) log2(`⚠ ${purposeGaps.length} PURPOSE GAP(S) — tests pass but real-user behavior is UNVERIFIED (see purposeGaps; close via live test / human).`);
-  const allLeavesTrusted = trusted.length === done.length;
-  const mergeOk = !merge || merge.trustworthy;
-  const integrationOk = !!(integration && integration.trustworthy);
-  const noDegradations = !degradations || degradations.length === 0;
-  const overallTrust = allLeavesTrusted && mergeOk && fullSuiteGreen && integrationOk && noDegradations;
   const headlineCounts = `${trusted.length}/${done.length} leaves trusted · full-suite ${finalRun.exitCode === -1 ? "NOT RUN" : fullSuiteGreen ? "GREEN" : "RED"} · integration ${integrationOk ? "OK" : integration ? "DISTRUSTED" : "UNKNOWN"} · ${(degradations || []).length} degradation${(degradations || []).length === 1 ? "" : "s"}${merge ? ` · merge ${mergeOk ? "OK" : "ISSUES"}` : ""}`;
   const firstFailure = !allLeavesTrusted ? `${done.length - trusted.length} of ${done.length} leaves NOT trusted` : !mergeOk ? "parallel merge NOT trustworthy" : !fullSuiteGreen ? finalRun.exitCode === -1 ? "integrate full-suite DID NOT RUN" : `integrate full-suite RED (exit ${finalRun.exitCode})` : !integrationOk ? integration ? "integration verdict DISTRUSTED" : "integration verdict UNKNOWN (never ran)" : !noDegradations ? `${degradations.length} trust-floor degradation(s)` : "";
   const ownersHeadline = overallTrust ? `TRUSTED — ${headlineCounts}` : `NOT TRUSTED — first failing: ${firstFailure} · ${headlineCounts}`;
@@ -958,6 +960,8 @@ Match the language the task was written in. Be concrete.`,
     overallTrust,
     ownersHeadline,
     // ITEM 2: the single rollup verdict + the one human line (additive; never a false green)
+    squashed,
+    // v2 ②: set when the deposit was squashed to one landing commit (history at .tag)
     briefing: briefing && briefing.briefing || void 0
     // B: the owner's guided read — RELAY this, don't bury it
   };
@@ -981,6 +985,7 @@ async function __main() {
   const FORCE_PARALLEL = A.forceParallel === true;
   const CONFIRM_TIER = A.confirmTier === true;
   const CONFIRM_NO_RIG = A.confirmNoRig === true;
+  const SQUASH = A.squash !== false;
   const SHARED_SCRATCH = A.sharedScratch === true;
   const MAX_LEAVES = 24;
   const overTier = { stop: "", slices: 0 };
@@ -1068,8 +1073,7 @@ Git: inspect the exact change with \`git -C ${repo} diff ${from || BASE_SHA}..HE
       const line = { baseSha: BASE_SHA || null };
       for (const [k, v] of Object.entries(rec)) if (v !== void 0) line[k] = v;
       const json = JSON.stringify(line);
-      const b64 = b64encode(json + "\n");
-      await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf %s '${b64}' | base64 -d >> ${TRACE_FILE}`, "trace-append");
+      await sh(`mkdir -p ${REPO}/docs/run-traces && { [ -f ${REPO}/docs/run-traces/.gitignore ] || printf '*\\n' > ${REPO}/docs/run-traces/.gitignore; } ; printf '%s\\n' ${shQuote(json)} >> ${TRACE_FILE}`, "trace-append");
     } catch (e) {
       log2(`trace append skipped (${e && e.message ? e.message : e}) — observability only, run unaffected`);
     }
@@ -1324,6 +1328,6 @@ Contract: ${seqOrdered[s].contract}`, REPO, 1, "seq" + s, gitClean, seqOrdered[s
     }
     return { error: `over-tiered: ${overTier.stop} — do it inline (T1) or re-run with confirmTier:true`, task: TASK, baseline, overTierStop: true, slices: overTier.slices };
   }
-  return await integratePhase({ rt, host, git, REPO, INV, TASK, baseline, ABORTS, done, merge, groups });
+  return await integratePhase({ rt, host, git, REPO, INV, TASK, SQUASH, baseline, ABORTS, done, merge, groups });
 }
 return await __main()
