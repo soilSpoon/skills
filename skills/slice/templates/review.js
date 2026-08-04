@@ -24,7 +24,8 @@ export const meta = {
 //   verify:      adversarial verify pass (default true; auto-skipped when 0 findings)
 //   maxFindings: report cap (default 12)
 // }
-const A = args && typeof args === 'object' ? args : {}
+// Tolerate stringified args (some hosts deliver the args value JSON-encoded — same guard as the engine).
+const A = typeof args === 'string' ? JSON.parse(args) : (args && typeof args === 'object' ? args : {})
 const REPO = A.repo
 if (!REPO) return { error: 'args.repo is required (absolute path)' }
 const TARGET = A.target || ''
