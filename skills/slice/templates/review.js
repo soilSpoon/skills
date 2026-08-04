@@ -3,9 +3,7 @@ export const meta = {
   description:
     'Canned trust-first review: scope → parallel lens lanes (skill-guided) → adversarial refute-vote → dedup/rank/cap. Read-only — no worktrees, no commits.',
   whenToUse:
-    'The slice T2-review lane. Pass args as an object: { repo, target?, context?, lenses?, items?, verify?, maxFindings? }. ' +
-    'Diff mode (default): target = a diff command / PR ref / scope hint. ' +
-    'Item mode: items = [{name, note}] — one reviewer per branch/PR/module, verdict ship|fix-first.',
+    'The slice T2-review lane. Pass args as an object: { repo, target?, context?, lenses?, items?, verify?, maxFindings? }. Diff mode (default): target = a diff command / PR ref / scope hint. Item mode: items = [{name, note}] — one reviewer per branch/PR/module, verdict ship|fix-first.',
   phases: [
     { title: 'Scope', detail: 'pin the diff + conventions (diff mode only)' },
     { title: 'Review', detail: 'one lane per lens, or one reviewer per item' },
