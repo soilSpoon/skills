@@ -186,3 +186,24 @@ test('installHandlers: a REAL SIGTERM reaps the tracked group end-to-end (the pk
   }
   assert.ok(dead, 'sleep grandchild reaped via the SIGTERM handler — no orphan')
 })
+
+
+// -- cancellation record (AX LABS stoppable-loops contract) --------------------------------------
+test('writeCheckpoint emits the 4-field cancellation record; graceful outside a git repo', async () => {
+  const { writeCheckpoint } = await import('../lifecycle.mjs')
+  const { mkdtempSync, readFileSync: rf } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const repo = mkdtempSync(join(tmpdir(), 'ckpt-'))
+  configurePidfile(repo)   // also arms the checkpoint repo
+  const rec = writeCheckpoint('SIGTERM')
+  assert.equal(rec.cancel_source, 'SIGTERM')
+  assert.ok(rec.resume_policy.includes('relaunch'), 'resume_policy must tell the operator what to do next')
+  assert.ok(rec.partial_outputs.engineLog.endsWith('.slice/engine.log'))
+  // Not a git repo -> last_safe_step degrades to nulls, never throws.
+  assert.equal(rec.last_safe_step.head, null)
+  const onDisk = JSON.parse(rf(join(repo, '.slice/checkpoint.json'), 'utf8'))
+  assert.equal(onDisk.cancel_source, 'SIGTERM')
+  assert.deepEqual(Object.keys(onDisk).sort(),
+    ['at', 'cancel_source', 'last_safe_step', 'partial_outputs', 'resume_policy'])
+})

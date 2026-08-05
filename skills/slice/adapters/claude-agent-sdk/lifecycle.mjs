@@ -3,6 +3,7 @@
 // run.mjs (installs handlers) and slice-engine-sdk.ts (registers children). No deps.
 import { appendFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { execFileSync } from 'node:child_process'
 
 // A reapable is either a detached build child {kind:'pg', pid} or an in-flight SDK query
 // {kind:'query', abort, close}. The Set is the single source of truth the handlers iterate.
@@ -22,9 +23,49 @@ const killSwallow = (target, sig) => {
   catch (e) { if (e.code !== 'ESRCH' && e.code !== 'EPERM') process.stderr.write(`lifecycle: kill ${target} ${sig} failed: ${e.code || e.message}\n`) }
 }
 
+let checkpointRepo = null     // set alongside the pidfile; enables the cancellation record
+
 export function configurePidfile(repo) {
   pidfile = `${repo}/.slice/children.pids`
+  checkpointRepo = repo
   try { mkdirSync(dirname(pidfile), { recursive: true }) } catch {}
+}
+
+// -- Cancellation record (AX LABS "stoppable loops" contract) -----------------------------------
+// A cancelled/crashed run must leave a machine-readable record -- cancel_source / last_safe_step /
+// partial_outputs / resume_policy -- so recovery is a READ, not an archaeology dig (measured on the
+// first live lane: recovering a SIGKILL'd run meant hand-grepping engine.log for what survived).
+// Best-effort and swallow-everything: a failed checkpoint must never block the exit path.
+export function writeCheckpoint(source) {
+  if (!checkpointRepo) return null
+  const repo = checkpointRepo
+  const git = (...args) => {
+    try { return execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim() || null }
+    catch { return null }
+  }
+  const record = {
+    cancel_source: source,   // 'SIGINT' | 'SIGTERM' | 'SIGHUP' | 'uncaughtException' | 'unhandledRejection'
+    at: new Date().toISOString(),
+    // Trusted work is COMMITTED work: HEAD + any rs/* worktree branch tips are the safe
+    // re-entry points; everything at or before them may be treated as done, never redone.
+    last_safe_step: {
+      head: git('rev-parse', 'HEAD'),
+      worktreeBranches: (git('for-each-ref', '--format=%(refname:short) %(objectname:short)', 'refs/heads/rs/') || '')
+        .split('\n').filter(Boolean),
+    },
+    partial_outputs: {
+      engineLog: `${repo}/.slice/engine.log`,
+      runTraces: `${repo}/docs/run-traces/`,
+      worktrees: `${repo}/.rs-wt/`,
+      briefings: `${repo}/docs/briefings/`,
+    },
+    resume_policy:
+      'Per-leaf commits survive on main and rs/* branches -- nothing trusted is lost. ' +
+      'Remove a stale rs-lock (in the tree gitdir) if present, sweep orphans with run.mjs --cleanup, ' +
+      'then relaunch the SAME run.mjs invocation; committed leaves are not redone (the engine re-baselines from HEAD).',
+  }
+  try { writeFileSync(`${repo}/.slice/checkpoint.json`, JSON.stringify(record, null, 2)) } catch {}
+  return record
 }
 
 // Register a DETACHED build child (pgid === pid). Returns an unregister fn for child.on('exit').
@@ -82,10 +123,10 @@ export function sweepPidfile(repo) {
 // Wire all catchable signals + exit + crash hooks ONCE. exitCode: SIGINT→130, else→143.
 export function installHandlers() {
   for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
-    process.on(sig, () => { cleanup(); process.exit(sig === 'SIGINT' ? 130 : 143) })
+    process.on(sig, () => { writeCheckpoint(sig); cleanup(); process.exit(sig === 'SIGINT' ? 130 : 143) })
   }
-  process.on('uncaughtException', (e) => { console.error(e); cleanup(); process.exit(1) })
-  process.on('unhandledRejection', (e) => { console.error(e); cleanup(); process.exit(1) })
+  process.on('uncaughtException', (e) => { console.error(e); writeCheckpoint('uncaughtException'); cleanup(); process.exit(1) })
+  process.on('unhandledRejection', (e) => { console.error(e); writeCheckpoint('unhandledRejection'); cleanup(); process.exit(1) })
   process.on('exit', () => hardKillAll())   // SYNC-only backstop; group SIGKILL
 }
 
