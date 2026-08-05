@@ -89,7 +89,12 @@ Include: **Evidence** (defect/feature anchored to `file:line` — diagnose BEFOR
 not inside the run) · **MUST PRESERVE** (untested behaviors the run may not regress) ·
 **Purpose** (what the USER observes afterward) · **Wiring clause** for UI/feature lanes
 (name the real production path — the #1 recurring defect class is built-tested-but-unwired)
-· **Known flakes** by name.
+· **Known flakes** by name · **DISCOVERY POLICY** (mandatory): by default instruct
+"record discovered items to the repo's BACKLOG — do NOT execute them"; discover-as-you-go
+otherwise chains follow-up leaves and silently multiplies wall-clock (measured live:
+a 4-leaf ~50-min lane became 11 leaves / ~100+ min on 19 discovered items — every one
+real debt, and still the wrong default, because delivery time is itself a reliability
+axis). A lane that SHOULD sweep discoveries opts in explicitly WITH a leaf cap.
 
 ## The four invariants (every rung, every route)
 
