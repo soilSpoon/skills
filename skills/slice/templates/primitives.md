@@ -8,6 +8,10 @@ Composition rule: pick ONE graph shape, wire ONE verifier behind it, set budget,
 A 10-line script from these parts beats a generic engine — the engine cannot know your
 task's shape; you do. For the canned review shape, use `review.js` instead of assembling.
 
+Promotion rule: the same assembled shape reused **twice** gets promoted to a canned
+template (that is how `review.js` was born). Depth accretes where usage has proven the
+interface — never design a template speculatively.
+
 Conventions used by every block: `agent()` returns null on failure → always
 `.filter(Boolean)`; every fan-out carries a `schema` (unstructured returns rot into
 prose); `Date.now()`/`Math.random()` are unavailable in Workflow scripts.

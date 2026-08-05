@@ -103,14 +103,18 @@ axis). A lane that SHOULD sweep discoveries opts in explicitly WITH a leaf cap.
 1. **executor ≠ verifier** — who builds it never solely judges it.
 2. **Shell truth before model judgment** — exit codes over opinions.
 3. **One trusted leaf = one commit** on the work branch; squash to land when the sum
-   would sprawl (an unreadable PR is a trust failure too).
+   would sprawl (an unreadable PR is a trust failure too). **A lane is one hat**: never mix
+   a tidy/cleanup lane and a behavior lane into one landing — commit-level two-hats does
+   not survive the squash, lane-level separation does.
 4. **Full suite only at integrate** — leaves run filtered tests.
 
 ## Reporting back
 
 Report a trust ledger, not a wall of text: the baseline protected, the decomposition,
 per-leaf trusted/untrusted, the deterministic integrate verdict, and anything flagged —
-untrusted leaves and wiring gaps FIRST. Relay any owner's briefing in full and persist it
+untrusted leaves and wiring gaps FIRST. Include a **tiering verdict**: per leaf, would T1
+have sufficed in hindsight? Routing has no prospective gate (task shape isn't a
+deterministic input), so this retrospective line is what tunes the routing reflex over time. Relay any owner's briefing in full and persist it
 to `docs/briefings/<date>-<lane>.md` in the target repo; append follow-ups to
 `docs/BACKLOG.md` (the repo remembers; the conversation doesn't). After a UI lane, render
 the real interface and read the pixels yourself before handover — a green ledger proves

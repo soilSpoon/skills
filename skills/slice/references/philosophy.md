@@ -169,3 +169,24 @@ Three tiers of defense, each catching the layer above:
 
 No single model decision is load-bearing for trust. That is the trust factory applied to the
 orchestrator itself. See [architecture.md](architecture.md) for how this is realized.
+
+## 7. Known tensions — accepted trade-offs, with escalation triggers
+
+Audited 2026-08-05 against Tidy First?, A Philosophy of Software Design, and the AX LABS
+harness-engineering series. These are conscious positions, not oversights. Each "accepted"
+entry names the condition that would reopen it — evidence reopens decisions; re-argument
+does not.
+
+| Tension | Position | Escalation trigger |
+|---|---|---|
+| **Tidy First two-hats vs squash-to-land** — squash collapses per-leaf structure/behavior commit separation on the landed history | Accepted: the readable-PR value wins at landing; `rs-leaves-<sha>` tags preserve the fine history. Mitigated structurally: *a lane is one hat* (invariant 3) — separation moved from commit granularity to lane granularity | none — resolved at lane granularity |
+| **Ousterhout deep-modules vs `primitives.md`** — the parts bin exposes complexity to the caller (a "configuration overload" red flag) | Accepted: only the caller knows the task's shape, and the shape-agnostic generic engine measurably failed (74-min runs). Depth accretes via the promotion rule: 2 reuses of a shape → canned template (review.js is the precedent) | a shape reused twice that hasn't been promoted |
+| **Homogeneous verifier** — executor≠verifier separates roles, not models; shared blind spots remain in build lanes | Accepted: leaf trust is primarily shell truth (exit codes), and integrate full-suite + the briefing's human hand-verify section are the false-green backstops. Cross-model spend belongs where trust is weakest (review VOTE lens ①) | ONE false green that survives integrate + hand-verify → cross-model leaf-verify becomes evidence-anchored work |
+| **No cost cap** — the token ledger observes, never stops | Accepted: on a Max subscription marginal USD is notional; the binding axis is wall-clock, and its measured cause (unbounded discovery chaining) was fixed at the source (DISCOVERY POLICY) | ETA overrun recurs despite DISCOVERY POLICY → soft-stop at leaf boundaries writing the cancellation checkpoint |
+| **Golden trajectory n=1** — the replay baseline derives from a single production lane | Accepted with a growth rule: every successful production lane of a NEW shape donates its auto-emitted run-trace as a golden-test candidate (AX LABS' own recipe — harvest from production traces, plural) | a novel lane shape ships without donating its trace |
+| **SKILL.md at ~130 lines vs the eight-lines doctrine** | Not a tension — category error. Eight-lines prices *always-loaded* context files; a skill body loads on-demand at trigger time, and each routing rule here was paid for by one production mistake | none |
+
+Maintenance policy (the meta-work cap): slice v2 is **done**. It is touched only when
+(a) a production run hits a real defect, or (b) the same pain recurs twice, measured.
+New feature ideas are recorded, not built — the fix for over-engineering is never more
+engineering.
