@@ -41,8 +41,10 @@ wall-clock, not trust.
 | investigation / design / any custom multi-agent shape | **compose it from `templates/primitives.md`** |
 | genuinely multi-leaf BUILD (≥2 risky leaves, unknown interface, cross-cutting plumbing) | **real-exec engine: `adapters/claude-agent-sdk/` or `adapters/opencode/`** |
 
-The in-harness engine (`recursive-slice.js`) is **retired — do not launch it**. Measured
-against it: exec-less sandboxes turn every git/test/build into a subagent round-trip
+**In-harness launch is retired** — never run `recursive-slice.js` via the Workflow tool.
+(The FILE stays: it is the tsup bundle of `src/*.ts` that both runtime adapters load and
+execute in a real Node process — deleting it breaks T2-build.) Measured against the
+in-harness path: exec-less sandboxes turn every git/test/build into a subagent round-trip
 (74-minute runs), its ledger tripped safety classifiers, per-leaf commits sprawled into
 unreadable PRs, and long runs blew the driving context. The routes above keep its
 discipline without its packaging.
