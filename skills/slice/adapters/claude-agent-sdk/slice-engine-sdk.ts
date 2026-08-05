@@ -10,6 +10,7 @@
 // zero deps leak into the core (own package.json/tsconfig/node_modules).
 import { spawn } from "node:child_process"
 import { readFile } from "node:fs/promises"
+import { appendFileSync, mkdirSync } from "node:fs"
 import type { query as SdkQuery } from "@anthropic-ai/claude-agent-sdk"
 import { trackProcessGroup, trackQuery } from "./lifecycle.mjs"
 
@@ -158,6 +159,21 @@ export async function agentCall(
   }
 }
 
+
+// Token ledger (AX LABS "reconstructible execution" third layer): one JSONL line per agent
+// call attributing DOLLARS to a role/label — trace (docs/run-traces) answers "what was
+// decided", the briefing answers "why", this answers "what it cost". Unusual growth here is
+// a design-flaw signal (retrieval/caching/decomposition), not billing trivia. Best-effort:
+// a failed append never affects the run.
+export function appendTokenLedger(repo: string, entry: {
+  at: string; label: string; phase?: string; model?: string; seconds: number; usd: number; cumulativeUsd: number
+}): void {
+  try {
+    mkdirSync(`${repo}/.slice`, { recursive: true })
+    appendFileSync(`${repo}/.slice/token-ledger.jsonl`, JSON.stringify(entry) + "\n")
+  } catch { /* observability only */ }
+}
+
 // ── Host the engine artifact (the AsyncFunction trick, faithful to test/host.mjs + the runtime) ──
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (...a: string[]) => (...a: unknown[]) => Promise<unknown>
 const isShOpts = (o: { schema?: { required?: unknown } } | undefined) =>
@@ -184,8 +200,18 @@ export async function runEngine(opts: {
     // runtime). With run.mjs's [+MM:SS] prefix this gives the per-ROLE cost breakdown — the engine is
     // AGENT-bound, so this is the measurement that actually validates before/after of any AI-surface change.
     const _t0 = Date.now()
+    const _usd0 = spentUsd
     const out = await agentCall(prompt, o, { runQuery: opts.runQuery, cwd: repo, persona, budget })
-    log(`· agent ${o.label || roleOf(o.label || "", o.phase, o.model)} ${Math.round((Date.now() - _t0) / 1000)}s`)
+    const _secs = Math.round((Date.now() - _t0) / 1000)
+    log(`· agent ${o.label || roleOf(o.label || "", o.phase, o.model)} ${_secs}s`)
+    // Per-call cost attribution — the engine core stays cost-blind (Workflow-runtime parity);
+    // the ledger lives host-side where total_cost_usd is actually known.
+    appendTokenLedger(repo, {
+      at: new Date().toISOString(),
+      label: o.label || roleOf(o.label || "", o.phase, o.model),
+      phase: o.phase, model: o.model,
+      seconds: _secs, usd: +(spentUsd - _usd0).toFixed(6), cumulativeUsd: +spentUsd.toFixed(6),
+    })
     // Runtime.agent contract is value|null (host.ts agentSafe re-classifies); a typed-quota throw is a
     // follow-up so QUOTA_HALT fires on kind:'quota' rather than the generic null-streak. v1: value|null.
     return out.ok ? out.value : null

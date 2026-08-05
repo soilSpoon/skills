@@ -207,3 +207,21 @@ test('writeCheckpoint emits the 4-field cancellation record; graceful outside a 
   assert.deepEqual(Object.keys(onDisk).sort(),
     ['at', 'cancel_source', 'last_safe_step', 'partial_outputs', 'resume_policy'])
 })
+
+
+// -- token ledger (AX LABS reconstructible-execution third layer) --------------------------------
+test('appendTokenLedger writes one attributable JSONL line per call; failures are swallowed', async () => {
+  const { appendTokenLedger } = await import('../slice-engine-sdk.ts')
+  const { mkdtempSync, readFileSync: rf } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const repo = mkdtempSync(join(tmpdir(), 'ledger-'))
+  appendTokenLedger(repo, { at: '2026-08-05T00:00:00Z', label: 'exec:g0:0', phase: 'Work', model: 'sonnet', seconds: 12, usd: 0.031, cumulativeUsd: 0.031 })
+  appendTokenLedger(repo, { at: '2026-08-05T00:01:00Z', label: 'verify:g0:0', seconds: 5, usd: 0.008, cumulativeUsd: 0.039 })
+  const lines = rf(join(repo, '.slice/token-ledger.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l))
+  assert.equal(lines.length, 2)
+  assert.equal(lines[0].label, 'exec:g0:0')
+  assert.equal(lines[1].cumulativeUsd, 0.039)
+  // Unwritable repo path -> swallowed, never throws (observability only).
+  appendTokenLedger('/dev/null/nope', { at: 'x', label: 'x', seconds: 0, usd: 0, cumulativeUsd: 0 })
+})
