@@ -158,8 +158,8 @@ const FETCH = `You are the diff-fetch step of a code review. Using your Bash too
 // SECTION lane prompts. code-fundamentals ships 2 lanes; toss-frontend overrides ROUTE with its own
 // lane→reference map (so this list is the config input, not a hardcoded fork).
 const LANES = [
-  { id: 'L1', focus: '가독성 + 예측 가능성 — 인지 부하·이름·시그니처·스코프 가시성·숨은 부작용·매직 넘버·중첩 조건·추상화 수준 혼합' },
-  { id: 'L2', focus: '응집도 + 결합도 — 모듈 경계·중복 vs 추상·디렉토리·drilling·과도한 DRY·어댑터 누락·전역 상태 결합' },
+  { id: 'L1', focus: '가독성 + 예측 가능성 — 인지 부하·이름·시그니처·스코프 가시성·숨은 부작용·매직 넘버·중첩 조건·추상화 수준 혼합. 지적에는 가능한 한 tidying 이름으로 처방한다(가드 절·설명 변수·대칭 정규화 — references/tidying.md); 구조 변경과 행동 변경이 한 커밋에 섞인 것도 지적 대상' },
+  { id: 'L2', focus: '응집도 + 결합도 — 모듈 경계·중복 vs 추상·디렉토리·drilling·과도한 DRY·어댑터 누락·전역 상태 결합 + 모듈 깊이(references/depth.md): pass-through 래퍼·정보 누설·설정 떠넘기기는 얕은-모듈 결함; "함수/클래스가 크다"는 그 자체로 결함이 아니며 쪼갠 결과의 인터페이스 비용을 먼저 계산' },
 ]
 function sectionPrompt(lane, diff) {
   return `You are a code-review lane. Review ONLY through your perspective; do NOT comment on other axes ` +

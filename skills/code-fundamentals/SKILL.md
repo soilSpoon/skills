@@ -1,6 +1,6 @@
 ---
 name: code-fundamentals
-description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성·응집도·결합도)으로 코드를 작성·리뷰·리팩토링한다 — 언어 불문(예시는 TS/React지만 원칙은 Swift·Kotlin·Python·Go 어디든 적용). 트리거 - (1) "리뷰해줘"·"개선점"·"리팩토링"·"code review" 등 코드 품질 요청, (2) 매직 넘버, 중첩 삼항/조건, 이름 충돌, 숨은 부작용, 거대 함수/훅, 추상화 수준(레벨) 혼합, 단일 책임(SRP)·이름과 내용 불일치, 삼킨 에러/진단 가능성, 디렉토리 구조, 과도한 DRY, 깊은 파라미터 전달(drilling), 전역 상태 결합, 공유 자원 lifecycle(create/update/delete/clear) 비대칭(형제 함수 중 하나에만 정리 로직) 등 안티패턴 언급, (3) "가독성"·"응집도"·"결합도"·"예측 가능성"·"변경하기 쉬운 코드" 명칭, (4) 다른 워크플로(slice 등)의 도메인 가이드로 주입될 때. 프론트엔드 고유 관점(a11y·디자인 토큰·React 런타임·라이브러리 저자 패턴·토스 채용축)은 toss-frontend-fundamentals가 담당 — UI 코드 리뷰엔 둘을 함께 쓴다.
+description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성·응집도·결합도)으로 코드를 작성·리뷰·리팩토링한다 — 언어 불문(예시는 TS/React지만 원칙은 Swift·Kotlin·Python·Go 어디든 적용). 트리거 - (1) "리뷰해줘"·"개선점"·"리팩토링"·"code review" 등 코드 품질 요청, (2) 매직 넘버, 중첩 삼항/조건, 이름 충돌, 숨은 부작용, 거대 함수/훅, 추상화 수준(레벨) 혼합, 단일 책임(SRP)·이름과 내용 불일치, 삼킨 에러/진단 가능성, 디렉토리 구조, 과도한 DRY, 깊은 파라미터 전달(drilling), 전역 상태 결합, 공유 자원 lifecycle(create/update/delete/clear) 비대칭(형제 함수 중 하나에만 정리 로직), pass-through 래퍼·설정 떠넘기기 같은 얕은 모듈, 구조+행동이 섞인 커밋·대형 cleanup PR 등 안티패턴 언급, (3) "가독성"·"응집도"·"결합도"·"예측 가능성"·"변경하기 쉬운 코드"·"tidy"·"정리 먼저"·"깊은 모듈(deep module)" 명칭, (4) 다른 워크플로(slice 등)의 도메인 가이드로 주입될 때. 프론트엔드 고유 관점(a11y·디자인 토큰·React 런타임·라이브러리 저자 패턴·토스 채용축)은 toss-frontend-fundamentals가 담당 — UI 코드 리뷰엔 둘을 함께 쓴다.
 ---
 
 # Code Fundamentals — 변경하기 쉬운 코드의 4대 축
@@ -16,7 +16,8 @@ description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성�
 | **응집도** | 같이 수정될 코드가 같이 묶여 있는가? |
 | **결합도** | 한 곳 수정 시 영향 범위가 좁고 예측 가능한가? |
 
-원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기). 이 스킬은 답을 강제하지
+원칙들은 때로 **충돌**한다(예: 중복 제거 vs 결합도 낮추기, "작게 쪼개라" vs
+모듈 깊이 — [depth.md #2](references/depth.md)). 이 스킬은 답을 강제하지
 않고 트레이드오프를 드러내며, 맥락에 따라 선택을 돕는다.
 
 ## 0. 범위 바닥 (the scope floor) — 4축보다 먼저
@@ -69,8 +70,8 @@ description: 변경하기 쉬운 코드의 4대 축(가독성·예측 가능성�
 
 | Lane | 관점 | references |
 |---|---|---|
-| **L1 readability+predictability** | 인지 부하·이름·시그니처·스코프 가시성 | [readability.md](references/readability.md), [predictability.md](references/predictability.md) |
-| **L2 cohesion+coupling** | 모듈 경계·중복 vs 추상·디렉토리·결합 | [cohesion.md](references/cohesion.md), [coupling.md](references/coupling.md) |
+| **L1 readability+predictability** | 인지 부하·이름·시그니처·스코프 가시성 + tidying 처방 | [readability.md](references/readability.md), [predictability.md](references/predictability.md), [tidying.md](references/tidying.md) |
+| **L2 cohesion+coupling** | 모듈 경계·중복 vs 추상·디렉토리·결합 + 모듈 깊이 | [cohesion.md](references/cohesion.md), [coupling.md](references/coupling.md), [depth.md](references/depth.md) |
 
 Lane 간 통신 금지 — 각 lane은 같은 diff를 받되 자기 관점만 답한다.
 
@@ -99,6 +100,11 @@ Lane 간 통신 금지 — 각 lane은 같은 diff를 받되 자기 관점만 �
 | 한 함수에 고수준 의도 + 저수준 메커니즘 혼재 | 추상화 수준 일관성 | [readability.md #11](references/readability.md) |
 | 이름에 `and`/그리고, 이름이 본문을 다 못 덮음, 비대 함수 | 이름=정직한 계약·단일 책임 | [predictability.md #14](references/predictability.md) |
 | 삼킨 에러(`catch {}`)·무근거 폴백, 표현 가능한 불가능 상태 | 진단 가능성 | [본문 §진단 가능성](#진단-가능성-operability--축에-인접한-관점) |
+| 인자 그대로 다음 층에 넘기는 래퍼(pass-through), 결정을 설정으로 전가 | 얕은 모듈 red flags | [depth.md #3](references/depth.md) |
+| "함수/클래스가 크다" 지적 자체, 잘게 쪼갰는데 조각끼리 conjoined | 모듈 깊이 (인터페이스:구현 비율) | [depth.md #1, #2](references/depth.md) |
+| 같은 설계 결정(포맷·스키마)을 여러 모듈이 동시에 앎 | 정보 누설 / 시간 분해 | [depth.md #3](references/depth.md) |
+| 구조 변경과 행동 변경이 한 커밋/PR에 혼재, 대형 cleanup PR | 두 모자 커밋 분리·묶음 크기 | [tidying.md #2, #4](references/tidying.md) |
+| "복잡하다"만 지적하고 처방 없음, 정리 시점 판단 필요 | tidying 카탈로그·경제학 | [tidying.md #1, #3](references/tidying.md) |
 
 ## 워크플로
 
@@ -136,7 +142,7 @@ D는 빠진 **VOTE(출력 전 적대적 finding 검증)** 를 더한다 (slice h
 ## 체크리스트 (최소 스캔)
 
 - `[MUST]` 매직 넘버/문자열 상수화 · 삼항 2중 중첩 금지 · 시그니처에 없는 부작용 금지 · 표준 라이브러리와 이름 충돌 금지
-- `[SHOULD]` 범위 비교 부등호 순서 · 복잡식에 중간 변수명 · 배타 분기 비혼합 · 같은-수정-단위 파일 동거 · 상수 비복제 · drilling 3단 미만 · "곳마다 다른" 동작의 공통 훅 인자화 금지 · 한 단위 내 추상화 수준 일관 · 이름이 본문 전체를 정직하게 덮음(`and` 금지) · 에러는 맥락과 함께 크게 실패(삼킴 금지)
+- `[SHOULD]` 범위 비교 부등호 순서 · 복잡식에 중간 변수명 · 배타 분기 비혼합 · 같은-수정-단위 파일 동거 · 상수 비복제 · drilling 3단 미만 · "곳마다 다른" 동작의 공통 훅 인자화 금지 · 한 단위 내 추상화 수준 일관 · 이름이 본문 전체를 정직하게 덮음(`and` 금지) · 에러는 맥락과 함께 크게 실패(삼킴 금지) · 구조 변경과 행동 변경 커밋 비혼합 · pass-through 래퍼 층 금지
 
 ## 출력 형식 (지적 1건 당)
 
