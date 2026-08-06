@@ -1,6 +1,6 @@
 ---
 name: issue-driven
-description: 이슈가 곧 spec — 사람은 기능·테스트 케이스를 설계하고, 에이전트는 규율과 함께 실행한다("Issues are the new PRs" 모델). 언어·스택 불문, 어떤 프로젝트에서든 동작. 트리거 - (1) 이슈 번호/URL/파일을 주며 구현을 위임할 때 ("이슈 #12 해줘", "이 이슈 구현해"), (2) "이슈 템플릿 설치/설정" 요청, (3) 기능·버그를 위임 단위(이슈)로 만들어 달라는 요청 ("이거 이슈로 만들어줘"), (4) 오너가 테스트 케이스·수용 기준을 주며 "나머지는 알아서" 류의 위임. 리뷰/감사 팬아웃은 slice(review.js)가, 코드 품질 렌즈는 code-fundamentals가 담당 — 이 스킬은 위임 단위의 규격과 실행 규율을 담당한다.
+description: 이슈가 곧 spec — 사람은 기능·테스트 케이스를 설계하고, 에이전트는 규율과 함께 실행한다("Issues are the new PRs" 모델). 언어·스택 불문, 어떤 프로젝트·호스트(Buzz 채널 메시지, GitHub Issues, 파일)에서든 동작. 트리거 - (1) 이슈 번호/URL/파일/채널 메시지를 주며 구현을 위임할 때 ("이슈 #12 해줘", "이 이슈 구현해", Buzz 스레드에서의 작업 지시), (2) "이슈 템플릿 설치/설정" 요청, (3) 기능·버그를 위임 단위(이슈)로 만들어 달라는 요청 ("이거 이슈로 만들어줘"), (4) 오너가 테스트 케이스·수용 기준을 주며 "나머지는 알아서" 류의 위임. 리뷰/감사 팬아웃은 slice(review.js)가, 코드 품질 렌즈는 code-fundamentals가 담당 — 이 스킬은 위임 단위의 규격과 실행 규율을 담당한다.
 ---
 
 # issue-driven — 이슈가 spec, 실행은 규율
@@ -26,9 +26,13 @@ description: 이슈가 곧 spec — 사람은 기능·테스트 케이스를 설
 | **Discovery policy** | 기본 = 발견 항목은 BACKLOG **기록만**. sweep은 명시적 opt-in + cap (실측: 무단 체이닝은 4리프 50분을 11리프 100분+로 만든다) |
 | **ETA** | 시간도 수용 기준이다 — 납기는 신뢰성의 1급 축 |
 
-설치: 대상 리포에 `.github/ISSUE_TEMPLATE/agent-task.md`로 복사 (GitHub 리포).
-GitHub이 아니면 `docs/issues/NNN-slug.md` 파일로 같은 규격을 쓴다 — 규격이 본질이지
-호스팅이 아니다.
+**규격이 본질이지 호스팅이 아니다.** 위임 단위가 사는 곳은 셋 중 어디든 같은 필드:
+
+- **Buzz 채널 메시지** (오너 기본 환경) — 스레드가 곧 이슈이자 영구 기록. spec 필드는
+  메시지 본문에, 논의는 스레드에, trust ledger는 스레드 답글로. 에이전트는 스레드
+  히스토리가 곧 컨텍스트임을 전제로 쓴다 (인수인계 문서 없음).
+- **GitHub Issues** — `.github/ISSUE_TEMPLATE/agent-task.md`로 템플릿 설치.
+- **파일** — `docs/issues/NNN-slug.md` (호스팅 없는 리포).
 
 ## 실행 규율 (에이전트 측 — 모든 이슈에 동일)
 
@@ -59,6 +63,9 @@ GitHub이 아니면 `docs/issues/NNN-slug.md` 파일로 같은 규격을 쓴다 
 - 오너 hand-verify 절차: 무엇을 열고 무엇을 눌러 무엇이 보여야 하는지. UI 작업이면
   실행해서 픽셀을 직접 확인한 뒤 넘긴다 — green ledger는 테스트 통과의 증명이지
   사용자가 기능을 볼 수 있다는 증명이 아니다.
+- **증거를 동봉한다(proof-of-completion)**: 배포가 있으면 실제 URL + 스크린샷, 그리고
+  exit code가 아니라 **실제 HTTP 요청으로 살아있음을 확인**한 결과. "배포 명령이
+  성공했다"와 "서비스가 응답한다"는 다른 명제다 — shell truth의 끝단은 end-to-end truth.
 
 오너가 verify 후 close — close는 오너의 것이다.
 
@@ -74,3 +81,5 @@ GitHub이 아니면 `docs/issues/NNN-slug.md` 파일로 같은 규격을 쓴다 
 - **품질 렌즈**: skills(code-fundamentals + tidying/depth 등) 편집 — 리뷰·실행에 자동 반영
 - **리포 로컬 규칙**: 각 리포 AGENTS.md — 게이트·관례·when-choices
 - **작업별 조정**: 이슈의 Rules/Discovery/ETA 필드
+- **결정 분산 축소**: 프레임워크·배포 타깃처럼 에이전트가 고를 필요 없는 것은 spec에
+  이름으로 박는다 — 에이전트의 재량은 구현에 쓰이게 하고 선택지 탐색에 낭비하지 않는다
