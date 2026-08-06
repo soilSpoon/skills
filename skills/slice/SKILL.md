@@ -1,6 +1,6 @@
 ---
 name: slice
-description: Trust-first decomposition of development work — a ceremony ladder that routes each task to the cheapest path that still manufactures the trust it lacks. T0 deterministic (just run the check), T1 inline TDD (most work), T2-review (canned parallel lens review), T2-assemble (compose orchestration primitives per-task), T2-build (real-exec engine for genuinely multi-leaf builds). Use whenever a coding task is big, risky, multi-file, or vague enough that "just doing it" could silently break things, whenever the user asks to decompose work or wants TDD discipline enforced, and for parallel review/audit/verification lanes. Works on any language/stack. Not for a single-file fix already diagnosed to a line — do that directly. Args = the task description (optionally with a repo path).
+description: Trust-first routing of development work — a ceremony ladder that routes each task to the cheapest path that still manufactures the trust it lacks. T0 deterministic (just run the check), T1 inline TDD (most work), T2-review (canned parallel lens review), T2-assemble (compose orchestration primitives per-task). Build work routes to the issue-driven skill (inline execution against owner-designed test cases) — the build engine is retired. Use for parallel review/audit/verification lanes, custom multi-agent shapes, and when the user asks to decompose work or wants TDD discipline enforced. Works on any language/stack. Not for a single-file fix already diagnosed to a line — do that directly. Args = the task description (optionally with a repo path).
 ---
 
 # /slice — trust-first routing
@@ -33,21 +33,27 @@ structure), one head. **Default for most work — most tasks exit here.** This i
 audit-prescribed fixes with known remedies: the audit was the verification; a lane adds
 wall-clock, not trust.
 
-**T2 — orchestrated.** Three shapes, three routes. Pick by what the task IS:
+**T2 — orchestrated.** Two shapes, two routes. Pick by what the task IS:
 
 | task shape | route |
 |---|---|
 | review / audit / verify a change, PR, branch set, or claim | **`templates/review.js`** via the Workflow tool |
 | investigation / design / any custom multi-agent shape | **compose it from `templates/primitives.md`** |
-| genuinely multi-leaf BUILD (≥2 risky leaves, unknown interface, cross-cutting plumbing) | **real-exec engine: `adapters/claude-agent-sdk/` or `adapters/opencode/`** |
 
-**In-harness launch is retired** — never run `recursive-slice.js` via the Workflow tool.
-(The FILE stays: it is the tsup bundle of `src/*.ts` that both runtime adapters load and
-execute in a real Node process — deleting it breaks T2-build.) Measured against the
-in-harness path: exec-less sandboxes turn every git/test/build into a subagent round-trip
-(74-minute runs), its ledger tripped safety classifiers, per-leaf commits sprawled into
-unreadable PRs, and long runs blew the driving context. The routes above keep its
-discipline without its packaging.
+**BUILD work is NOT a T2 shape anymore.** Multi-leaf builds run as issue-driven inline
+execution (the `issue-driven` skill): owner-designed test cases → red → green → tidy →
+gate, one issue at a time. Measured: inline defect-to-green 15–20 min vs a 110-min
+orchestrated lane for comparable work — build orchestration paid for parallelism a solo
+repo rarely has. When a build genuinely IS parallel (independent modules, no shared
+interface), compose worktree-fanout from primitives.md per-task.
+
+**The build engine is retired entirely (2026-08-06)** — both the in-harness launch
+(`Workflow` → `recursive-slice.js`: 74-minute exec-less runs, classifier trips, commit
+sprawl) and the SDK/opencode adapters (the one production lane ran 110 min against a
+90-min quote; inline issue-driven execution beat it by ~5× on wall-clock). `src/`,
+`adapters/`, and `recursive-slice.js` stay in-repo as an archive — do not launch, do not
+maintain. The engine's DISCIPLINE (four invariants, lane-spec fields, TDD leaves,
+adversarial verify) lives on in the `issue-driven` skill and the routes above.
 
 ### T2-review — `templates/review.js`
 
@@ -74,15 +80,6 @@ sweep, adversarial-refute, deterministic-gate, model-tiering, worktree-fanout. P
 graph shape, wire one verifier behind it, set budget — a 10-line per-task script from
 proven parts beats a generic engine, because you know the task's shape and the engine
 doesn't.
-
-### T2-build — real-exec runtime
-
-For a decompose → TDD-leaves → verify → integrate build lane, use the runtime adapter
-(`adapters/claude-agent-sdk/run.mjs`, or `adapters/opencode/` on an opencode host — each
-README has the invocation). Build loops are shell-bound; they need real exec, not
-subagent-relayed shells. Before launching: quote a rough ETA (~leaf count × per-leaf
-build+test cost — an uncomfortable number means you mis-tiered; drop known-remedy leaves
-to T1), and require a clean quiesced tree.
 
 ## Writing a T2 task spec — a lane spec, not a wish
 
