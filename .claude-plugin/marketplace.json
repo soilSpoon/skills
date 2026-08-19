@@ -30,7 +30,7 @@
     },
     {
       "name": "ux-fundamentals",
-      "description": "Unified product UX — structure, consistency, flow, CTA, feedback, disclosure, microcopy, a11y (UX-level). Domain-agnostic single skill for screen UX.",
+      "description": "Unified product UX — structure, consistency, flow, CTA, feedback, disclosure, microcopy, a11y (UX-level), and a measurable visual-surface axis (emphasis/saturation/density/scale counted against thresholds). Domain-agnostic single skill for screen UX.",
       "source": "./plugins/ux-fundamentals"
     },
     {
