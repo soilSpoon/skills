@@ -80,9 +80,19 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
 붙이면 정보가 늘지 않고 신호 대 잡음비만 나빠진다. 항목별로 "해당하면"이 붙은 것은 특히
 그렇다 — 해당 안 되면 그 항목 자체를 쓰지 않는다, 빈 칸이나 "없음"으로 채우지 않는다.
 
-1. **관례 추출** — `git log --format='%s' -30`(최근 subject) + `gh pr list --state merged`로
-   본다: Conventional Commits인가(`feat(scope):`)? 제목 길이·대소문자·언어(한/영)? 본문에
-   이슈 링크·"왜" 단락·테스트 노트가 있나? PR 템플릿이 있나(`.github/PULL_REQUEST_TEMPLATE`)?
+1. **관례 추출 — 커밋 제목과 PR 제목은 *다른* 관례다. 각각 자기 소스에서 뽑는다.**
+   - 커밋: `git log --no-merges --format='%s' -30`. `--no-merges`가 중요하다 — 머지 커밋의
+     subject는 `Merge pull request #N from owner/branch`라서 **브랜치명이지 PR 제목이 아니다.**
+     그걸 세면 "이 레포는 영어 소문자 명사구를 쓴다" 같은 결론이 나오는데, PR 제목은 전혀
+     다를 수 있다(실제로 그렇게 틀린 적이 있다).
+   - PR: `gh pr list --state merged --limit 30 --json number,title`. **제목을 쓰기 전에 반드시
+     이걸 본다.** 커밋 관례에서 PR 제목을 유추하지 않는다.
+   - 둘 다에서 본다: Conventional Commits인가(`feat(scope):`)? 스코프를 다는가? 제목 길이·
+     대소문자·언어(한/영)? 본문에 이슈 링크·"왜" 단락·테스트 노트가 있나? PR 템플릿이
+     있나(`.github/PULL_REQUEST_TEMPLATE`)?
+   - **한국어 제목은 명사형(개조식)으로 끝낸다** — `~ 수정`·`~ 지원`·`~ 스크립트`. `~한다`로
+     끝나는 서술문은 영어 명령형 커밋 관례를 직역한 것이라 한국어 제목으로 어색하다. 그리고
+     `feat:` 접두어가 이미 "추가"를 뜻하므로 제목에서 "추가한다"를 또 쓰지 않는다.
 2. **문장 다듬기** → **defer(선택 아님)**. 본문을 쓰거나 고치면 [technical-writing](../technical-writing/SKILL.md)을
    *로드해 적용*하고 그 "빠른 자가 점검"을 통과시킨다 — 개인 문체 규칙으로 대체하지 않는다(가치
    먼저·독자 본위·메타담화/번역체/한자어 제거). 분량이 짧으면 여는 references는 줄여도, 로드·적용은
@@ -132,6 +142,11 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
    `GH_SESSION_TOKEN`). 일괄 반영은 [scripts/pr-inline-images.sh](scripts/pr-inline-images.sh).
    세션 없을 때만 blob 링크 테이블 폴백. `raw.githubusercontent.com`·상대 경로 임베드·orphan
    브랜치·PAT-only 업로드는 금지. [pr-visual-evidence.md](references/pr-visual-evidence.md).
+
+4. **본문의 사실은 push마다 다시 맞춘다.** PR 본문은 한 번 쓰고 끝이 아니다 — 리뷰 대응으로
+   커밋이 쌓이면 `## Verification`의 테스트 수·red 근거·빌드 결과가 조용히 낡는다. 낡은 검증
+   숫자는 리뷰어에게 *거짓 정보*지 오래된 정보가 아니다. push 직전에 본문의 수치와 주장이
+   현재 HEAD와 맞는지 한 번 훑는다(G6가 지우는 것이 *과정*이라면, 이건 *사실*을 갱신하는 것).
 
 > 1줄 감각: `Phase 2 임시로 우회, 현재는 잘 됨` → `fix(auth): 토큰 만료 시 재시도 — 상류
 > race 회피`(과정·시간어를 벗고, 무엇 + 왜만).
@@ -186,6 +201,10 @@ durability filter(G6). 판정은 전부 defer한다.
   파일 많으면 리딩 가이드로 핵심/노이즈 갈라 지목하되 파일명은 `#diff-<sha256>` 딥링크로(맨
   글자 금지) + 항목마다 한 문장 해석 · 코드 스니펫 임베드는 쓰지 않는다(diff보다 못하고
   해석을 안 준다) · 여력 되면 핵심 hunk에 인라인 앵커
+- `[MUST]` PR 제목은 `gh pr list --state merged`에서 도출했다 — 커밋 subject(`git log`)에서
+  유추하지 않았다. 둘은 다른 관례이고, 머지 커밋 subject는 브랜치명이라 세면 틀린다
+- `[MUST]` 리뷰 대응으로 커밋을 더 얹었으면 push 전에 본문의 *사실*을 HEAD에 맞췄다 —
+  `## Verification`의 테스트 수·red 근거·빌드 결과. 낡은 숫자는 리뷰어에게 거짓 정보다
 - `[SHOULD]` 메시지 형식·트레일러(`Co-authored-by`/sign-off)가 레포 관례와 일치(`git log`/
   `gh pr list`에서 도출) · 본문이 *왜* > 무엇 · breaking change·리스크·검증법 명시 · CI green 예상 ·
   안 건드린 관련 영역·미검증 갈래가 있으면(해당할 때만) 짧게 명시
