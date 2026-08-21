@@ -33,7 +33,7 @@ Seven plugins bundle sixteen skills. Pick a plugin for the whole set, or install
 |---|---|---|
 | [`dev-router`](#dev-router) | `dev-router` | **Daily driver** — one invoke routes to ux-fundamentals, dev-toolkit, or Vercel React skills |
 | [`slice`](#slice) | `slice` (+5 agents) | Decomposing big/risky/vague coding tasks into verifiable slices |
-| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `commit-pr-checklist`, `build-config-drift`, `issue-rootcause-workflow` | Code-quality review, frontend fundamentals, technical & UX writing, pre-ship checklist, build/runtime diagnostics |
+| [`dev-toolkit`](#dev-toolkit) | `code-fundamentals`, `toss-frontend-fundamentals`, `technical-writing`, `ux-writing`, `commit-pr-checklist`, `build-config-drift`, `issue-rootcause-workflow`, `unshipped-state-gate` | Code-quality review, frontend fundamentals, technical & UX writing, pre-ship checklist, build/runtime diagnostics |
 | [`ux-fundamentals`](#ux-fundamentals) | `ux-fundamentals` | Unified screen UX (also loaded by dev-router for UI tasks) |
 | [`job-hunt`](#job-hunt) | `tailor-resume`, `apply-wishket` | Resume tailoring and freelance-project applications |
 | [`research-tools`](#research-tools) | `fact-check`, `human-like-browser` | Verifying content and driving the browser undetected |
@@ -196,6 +196,25 @@ npx skills add soilSpoon/skills@commit-pr-checklist
 - Confirms unit/feature tests are spec-centered before shipping
 - Delegates judgment to siblings — code to `code-fundamentals` (+ `toss-frontend-fundamentals` for UI), tests to `test-foundations`, spec variants to `spec-first`, prose to `technical-writing`
 - Proportional: skips itself for one-line fixes; this gate decides *when and in what order* to call the others
+
+### unshipped-state-gate
+
+A gate for compatibility residue — fallbacks, `expand*` converters, "legacy" branches, and
+migration evolution chains (create, then alter, then constraint change) all defend some *past
+state*. This skill names that state in one sentence, asks the human whether it was ever actually
+deployed (git merge ≠ deployment — that fact lives outside the repo), then either deletes the
+whole chain (and squashes the schema to its final form) or records an expiry condition.
+
+```bash
+npx skills add soilSpoon/skills@unshipped-state-gate
+```
+
+**What it does:**
+- Signal scan: legacy/fallback comments, converter functions, nullable "keep old value" branches, repeated ALTERs on one table
+- NAME-THE-STATE: if the defended state can't be named in one sentence, that alone argues for deletion
+- ASK-DEPLOYMENT: deployment boundary is a human fact — never inferred from git history (agents have verifiably gotten this wrong in both directions)
+- DECIDE + SWEEP: unshipped means delete the state's entire chain (guards, tests, down() restores) and squash migrations; shipped means keep, with an expiry condition recorded outside the code
+- Complements `commit-pr-checklist` (which forwards signals at ship time) and `code-fundamentals`' YAGNI floor (creation-time vs cleanup-time judgment)
 
 ### build-config-drift
 

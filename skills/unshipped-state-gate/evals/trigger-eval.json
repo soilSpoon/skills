@@ -1,0 +1,38 @@
+[
+  {
+    "query": "이 브랜치에 exclusions 테이블 마이그레이션이 3개야 — create 하고, 컬럼 추가하고, FK 제거. 아직 배포 전인데 하나로 합쳐도 되나?",
+    "should_trigger": true
+  },
+  {
+    "query": "expandLegacyCodeExclusions() 라는 함수가 있는데 옛 형식 행을 새 형식으로 전개하는 거야. 이거 아직 필요한지 판단해줘.",
+    "should_trigger": true
+  },
+  {
+    "query": "리뷰어가 이 폴백 분기에 '왜 필요한가요?' 라고 커멘트 달았어. '구 응답에는 totals 필드가 없어서'라고 주석엔 써 있는데.",
+    "should_trigger": true
+  },
+  {
+    "query": "code 파라미터가 nullable이고 null이면 기존 값을 유지하는 분기가 있는데, 프론트는 항상 code를 보내는 것 같아. 정리해도 돼?",
+    "should_trigger": true
+  },
+  {
+    "query": "PR 올리기 전에 레거시 호환 코드 남은 거 있는지 점검해줘. 이 기능은 dev에서만 돌았어.",
+    "should_trigger": true
+  },
+  {
+    "query": "같은 테이블에 alter 마이그레이션이 이번 분기에만 4개 쌓였어. 스쿼시 가능한지 봐줘.",
+    "should_trigger": true
+  },
+  {
+    "query": "결제 웹훅 입력 검증이 너무 빡빡한 것 같은데 좀 느슨하게 풀어도 될까?",
+    "should_trigger": false
+  },
+  {
+    "query": "새 기능 만들 때 이 옵션도 미리 추가해둘까? 나중에 쓸 것 같은데.",
+    "should_trigger": false
+  },
+  {
+    "query": "lint 는 통과하는데 next dev 만 깨져. 머지 직후부터 이래.",
+    "should_trigger": false
+  }
+]

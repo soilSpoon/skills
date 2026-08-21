@@ -16,6 +16,7 @@
 | 버그·회귀·근본 원인 | **issue-rootcause-workflow** | |
 | 테스트 리그·verify·flaky | **test-foundations** | |
 | lint/test 통과인데 런타임만 깨짐 | **build-config-drift** | |
+| 레거시·호환·폴백 정리, 마이그레이션 스쿼시 | **unshipped-state-gate** | 배포 경계는 사람에게 질문 |
 | 큰/위험한 기능 분해·slice | **slice** | |
 
 ## React 프론트 기본 번들
