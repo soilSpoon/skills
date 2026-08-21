@@ -47,6 +47,15 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
     없는 `TODO`.
   - **무관한 churn** — 포매터 잡음·import 재정렬·공백만 바뀐 줄로 diff가 부풀지 않는가
     (리뷰 비용↑). 의도한 변경만 남긴다.
+  - **공개 표면 소비처 증명** — 이 diff가 추가·변경한 공개 표면(엔드포인트·파라미터·응답
+    필드·설정 키·export)마다 *실 소비처 grep 결과*를 PR 본문에 한 줄로 남긴다 — 계약
+    상대 저장소(프론트↔API)까지 포함해서. 자기 테스트만 소비하면 red flag다(code-fundamentals
+    "바닥은 드리프트도 본다" 상속). "만들 때는 호출자가 있었다"는 증명이 아니다 —
+    소비자 쪽을 고친 커밋이 표면 쪽 정리를 건너뛰는 게 이 부류의 발생 경로다.
+  - **미실존 상태 방어 잔재** → **defer**. legacy·구·호환·폴백 주석, `expand*`/변환 함수,
+    같은 테이블 연속 마이그레이션, "null이면 기존 값 유지" 분기가 diff에 보이면
+    [unshipped-state-gate](../unshipped-state-gate/SKILL.md)로 판정한다 — 방어 대상 상태
+    명명, 배포 경계는 사람에게(git 병합 ≠ 배포), 미실존이면 사슬째 삭제.
   - **atomic** — 한 커밋 = 한 논리적 변경. feature+refactor+fix가 한 덩어리면 쪼갠다.
     **squash-merge 레포**(머지 후 PR이 커밋 1개로 접힘 — `git log`의 `(#N)` 한 줄이 신호)면 살아남는
     단위가 *PR*이다: 원자성의 진짜 레버는 인트라-PR 커밋 정리가 아니라 **1 PR = 1 개념**(관심사 여럿이면
@@ -87,6 +96,14 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
      다를 수 있다(실제로 그렇게 틀린 적이 있다).
    - PR: `gh pr list --state merged --limit 30 --json number,title`. **제목을 쓰기 전에 반드시
      이걸 본다.** 커밋 관례에서 PR 제목을 유추하지 않는다.
+   - **용어·표현은 리뷰 커멘트에서 배운다** — 제목·형식의 소스가 커밋/PR 목록이라면, *단어*의
+     소스는 과거 PR의 리뷰 커멘트다(`gh api repos/{owner}/{repo}/pulls/{n}/comments`): 리뷰어가
+     suggestion으로 고쳐 쓴 문장이 곧 팀의 실제 언어다. 프로젝트에 용어집(glossary)이 있으면
+     그것이 정본 — 코드·주석·메시지의 용어는 용어집을 인용해 판정하고, 없는 개념은 등재를
+     제안한 뒤 쓴다. ⚠️ 자기(에이전트) 과거 산출물의 사용 빈도는 관례의 근거가 아니다 —
+     내가 만든 번역어를 여러 PR에서 반복하면 그것이 "기존 용어"로 보이는 순환이 생기고,
+     실제로 그렇게 발명어("도장"·"갈래")가 수십 곳에 굳은 뒤에야 리뷰에서 전량 교정받은
+     적이 있다.
    - 둘 다에서 본다: Conventional Commits인가(`feat(scope):`)? 스코프를 다는가? 제목 길이·
      대소문자·언어(한/영)? 본문에 이슈 링크·"왜" 단락·테스트 노트가 있나? PR 템플릿이
      있나(`.github/PULL_REQUEST_TEMPLATE`)?
@@ -169,6 +186,27 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
 > 내구성*. 코드 곁 산문엔 둘을 함께 쓴다. 메시지에 적용한 before/after 카탈로그는
 > [references/messages.md §4](references/messages.md).
 
+**PR 규모면 무맥락 패스로 판정한다.** "처음 보는 독자로 다시 읽기"를 작업한 그 컨텍스트가
+하면 curse of knowledge를 못 뚫는다 — 과정 서사("새 계약:"·"구 응답 폴백")는 저자에겐
+완벽하게 읽히는 게 그 정체다. PR 규모(다파일·공개 표면 변경)면 **별도 컨텍스트의
+서브에이전트에게 diff와 프로젝트 용어집·리뷰 표준만** 주고 "git 이력 없이는 이해되지
+않는 문장·용어집 밖 용어"를 찾게 한다. 작업 대화·저자의 결론·설계 문서는 주지 않는다 —
+새어 들어가면 같은 맹점이 재생된다. 출력은 판결이 아니라 센서다: 후보를 사람/메인이
+판정하고, 기준(용어집·표준의 어느 항목인가)을 인용 못 하는 지적은 버린다.
+
+## 리뷰 지적은 부류로 흡수한다 (ship 이후의 게이트)
+
+지적된 단어를 grep해 지우는 것은 사례 소비다 — 다음 회차에 같은 부류가 새 단어로
+태어난다. 리뷰 지적 1건을 받으면 **수정 커밋과 같은 날** 두 가지를 함께 남긴다:
+
+1. **부류 등재** — 프로젝트의 리뷰 표준(부류 카탈로그)에 `부류 이름 / 정체 / 처방`으로
+   일반화해 더한다. 용어 교정이면 용어집의 "피하기" 목록과 교정 이력에 등재한다.
+2. **탐지 배선** — 그 부류를 다음에 누가 잡는지 정한다: 자동화(lint·스캔 스크립트)로
+   내릴 수 있으면 내리고, 아니면 무맥락 패스의 주입 문서에 들어가게 한다.
+
+같은 리뷰어에게 같은 부류를 두 번 지적받으면 이 절차가 누락된 것이다 — 그때는 부류가
+아니라 *이 절차 자체*를 점검한다(패턴의 패턴).
+
 ## 분담 (seams) — 무엇이 *아닌가*
 
 이 스킬이 **소유** = 게이트 시퀀스 + diff 위생(G1·G2) + 메시지 learn-from-repo(G5) +
@@ -180,6 +218,7 @@ durability filter(G6). 판정은 전부 defer한다.
 | **toss-frontend-fundamentals** | 프론트엔드 고유 판정(a11y·React 런타임·디자인 토큰), 공개 API breaking의 codemod·마이그레이션 가이드 |
 | **vercel-react-best-practices** *(외부)* | 프론트엔드 *성능* 판정 — 데이터 워터폴 제거·번들 크기·서버(RSC) 성능·리렌더 최적화. [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices) |
 | **vercel-composition-patterns** *(외부)* | React *합성 API 설계* — compound components·render props·context·boolean prop 증식·React 19 API. [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills/tree/main/skills/composition-patterns) |
+| **unshipped-state-gate** | 미실존 상태 방어 잔재의 판정 — 방어 대상 상태 명명·배포 경계 질문(사람)·스쿼시/만료 결정. G2는 *신호를 넘길* 뿐 판정하지 않는다 |
 | **test-foundations** | 테스트 *리그*(계층·구조·`verify` 엔트리·2축 신뢰성), 유닛 vs 피처 계층 배치, 정직한 green(vacuous·flake 차단) |
 | **spec-first** | 피처 테스트의 *스펙-중심* 변종(관찰 가능한 결과 = WHAT, 구현·메커니즘 금지) — "구현 중심 아닌 스펙 중심"의 정본 |
 | **technical-writing** | 메시지·PR 본문의 문장 다듬기(가치>기능·독자 본위·번역체/수동태 교정·문서 유형) |
@@ -203,6 +242,12 @@ durability filter(G6). 판정은 전부 defer한다.
   해석을 안 준다) · 여력 되면 핵심 hunk에 인라인 앵커
 - `[MUST]` PR 제목은 `gh pr list --state merged`에서 도출했다 — 커밋 subject(`git log`)에서
   유추하지 않았다. 둘은 다른 관례이고, 머지 커밋 subject는 브랜치명이라 세면 틀린다
+- `[MUST]` 공개 표면(엔드포인트·파라미터·응답 필드·export) 변경마다 소비처 grep 증거를
+  본문에 남겼다(계약 상대 저장소 포함) · 잔재 신호(legacy·폴백·연속 마이그레이션)가 보이면
+  unshipped-state-gate로 판정했다
+- `[MUST]` PR 규모면 무맥락 패스를 돌렸다 — 별도 컨텍스트에 diff+용어집·리뷰 표준만 주입,
+  작업 서사 미전달, 출력은 센서로 취급 · 용어는 프로젝트 용어집을 인용해 판정했다
+- `[MUST]` 리뷰 지적을 반영할 때 수정 커밋과 함께 부류 카탈로그·용어집을 같은 날 갱신했다
 - `[MUST]` 리뷰 대응으로 커밋을 더 얹었으면 push 전에 본문의 *사실*을 HEAD에 맞췄다 —
   `## Verification`의 테스트 수·red 근거·빌드 결과. 낡은 숫자는 리뷰어에게 거짓 정보다
 - `[SHOULD]` 메시지 형식·트레일러(`Co-authored-by`/sign-off)가 레포 관례와 일치(`git log`/
