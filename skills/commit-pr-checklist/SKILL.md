@@ -97,7 +97,7 @@ durability filter(G6)의 뿌리이자, 메시지를 레포 관례로 맞추는(G
    - PR: `gh pr list --state merged --limit 30 --json number,title`. **제목을 쓰기 전에 반드시
      이걸 본다.** 커밋 관례에서 PR 제목을 유추하지 않는다.
    - **용어·표현은 리뷰 커멘트에서 배운다** — 제목·형식의 소스가 커밋/PR 목록이라면, *단어*의
-     소스는 과거 PR의 리뷰 커멘트다(`gh api repos/{owner}/{repo}/pulls/{n}/comments`): 리뷰어가
+     소스는 과거 PR의 리뷰 커멘트다 — **세 출처를 같이** 읽는다: `pulls/{n}/comments`(인라인), `pulls/{n}/reviews`의 `.body`(리뷰 본문 — 인라인에 없는 질문이 여기 온다), `issues/{n}/comments`(대화). 인라인만 읽고 본문의 4개 질문을 놓친 적이 있다: 리뷰어가
      suggestion으로 고쳐 쓴 문장이 곧 팀의 실제 언어다. 프로젝트에 용어집(glossary)이 있으면
      그것이 정본 — 코드·주석·메시지의 용어는 용어집을 인용해 판정하고, 없는 개념은 등재를
      제안한 뒤 쓴다. ⚠️ 자기(에이전트) 과거 산출물의 사용 빈도는 관례의 근거가 아니다 —
